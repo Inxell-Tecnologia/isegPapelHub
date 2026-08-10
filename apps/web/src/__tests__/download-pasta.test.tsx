@@ -100,9 +100,10 @@ describe('Download de pasta (web-navegacao, download-pasta-zip)', () => {
     stubFetch((path, method) => {
       if (path === '/auth/me') return new Response(JSON.stringify(IDENTITY), { status: 200 });
       if (path === '/auth/public-config')
-        return new Response(JSON.stringify({ appName: 'PapelHub', clientName: '' }), {
-          status: 200,
-        });
+        return new Response(
+          JSON.stringify({ appName: 'PapelHub', clientName: '', manualUrl: '' }),
+          { status: 200 },
+        );
       if (path === '/folders/root/contents')
         return new Response(JSON.stringify(contents()), { status: 200 });
       if (path === '/folders/root/download-manifest' && method === 'POST') {

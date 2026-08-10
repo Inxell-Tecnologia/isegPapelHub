@@ -63,7 +63,7 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
       'GET /auth/me': { status: 401 },
       'GET /auth/public-config': {
         status: 200,
-        body: { appName: 'PapelHub', clientName: 'SETES' },
+        body: { appName: 'PapelHub', clientName: 'SETES', manualUrl: '' },
       },
     });
     renderApp(['/login']);
@@ -75,7 +75,10 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
   it('sem identificação de cliente configurada, nenhum subtítulo aparece e o login segue funcional', async () => {
     mockFetch({
       'GET /auth/me': { status: 401 },
-      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: '' } },
+      'GET /auth/public-config': {
+        status: 200,
+        body: { appName: 'PapelHub', clientName: '', manualUrl: '' },
+      },
       'POST /auth/login': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
@@ -113,7 +116,7 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
       'GET /auth/me': { status: 401 },
       'GET /auth/public-config': {
         status: 200,
-        body: { appName: 'PapelHub', clientName: 'SETES' },
+        body: { appName: 'PapelHub', clientName: 'SETES', manualUrl: '' },
       },
     });
     renderApp(['/login']);
@@ -125,7 +128,10 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
   it('sem identificação de cliente, o título do documento permanece "PapelHub"', async () => {
     mockFetch({
       'GET /auth/me': { status: 401 },
-      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: '' } },
+      'GET /auth/public-config': {
+        status: 200,
+        body: { appName: 'PapelHub', clientName: '', manualUrl: '' },
+      },
     });
     renderApp(['/login']);
 

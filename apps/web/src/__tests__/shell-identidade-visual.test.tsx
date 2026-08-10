@@ -14,7 +14,7 @@ describe('Identidade visual no shell (identidade-visual)', () => {
       },
       'GET /auth/public-config': {
         status: 200,
-        body: { appName: 'PapelHub', clientName: 'SETES' },
+        body: { appName: 'PapelHub', clientName: 'SETES', manualUrl: '' },
       },
     });
     renderApp(['/']);
@@ -35,7 +35,10 @@ describe('Identidade visual no shell (identidade-visual)', () => {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
       },
-      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: '' } },
+      'GET /auth/public-config': {
+        status: 200,
+        body: { appName: 'PapelHub', clientName: '', manualUrl: '' },
+      },
     });
     renderApp(['/']);
 
@@ -48,7 +51,10 @@ describe('Identidade visual no shell (identidade-visual)', () => {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
       },
-      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: '' } },
+      'GET /auth/public-config': {
+        status: 200,
+        body: { appName: 'PapelHub', clientName: '', manualUrl: '' },
+      },
     });
     renderApp(['/']);
 

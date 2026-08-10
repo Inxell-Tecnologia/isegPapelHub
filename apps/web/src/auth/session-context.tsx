@@ -6,8 +6,14 @@ import { authenticatedIdentitySchema, publicConfigResponseSchema } from '../lib/
 type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 
 // Fallback quando `GET /auth/public-config` falha ou ainda não resolveu
-// (design.md D7/D9): sem identificação de cliente, título só com o nome.
-const DEFAULT_PUBLIC_CONFIG: PublicConfigResponse = { appName: 'PapelHub', clientName: '' };
+// (design.md D7/D9; `manualUrl` pela change `acesso-ao-manual-no-shell`,
+// design.md D4): sem identificação de cliente e sem `manualUrl`, o item do
+// manual desaparece do rodapé em vez de apontar para lugar nenhum.
+const DEFAULT_PUBLIC_CONFIG: PublicConfigResponse = {
+  appName: 'PapelHub',
+  clientName: '',
+  manualUrl: '',
+};
 
 interface SessionContextValue {
   status: SessionStatus;

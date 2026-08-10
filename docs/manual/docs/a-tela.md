@@ -19,6 +19,13 @@ dependem do seu perfil:
 | **Painel**   | Administradores       | Ver estatísticas e gráficos de uso.                                  |
 | **Unidades** | Administrador global  | Criar, renomear e ativar/desativar unidades.                         |
 
+## Manual do usuário
+
+Ao pé do menu lateral, separado dos itens acima, fica o acesso ao **Manual do
+usuário** — este material que você está lendo agora. Ele aparece para
+qualquer perfil, em qualquer tela, e abre em uma nova aba do navegador, sem
+fechar ou perder o que você estava fazendo na aplicação.
+
 ## Sino de notificações
 
 No canto superior direito, ao lado do menu do seu perfil, fica o **sino de

@@ -8,6 +8,7 @@ import {
   FolderOutlined,
   HomeOutlined,
   LogoutOutlined,
+  ReadOutlined,
   SearchOutlined,
   TeamOutlined,
   UserOutlined,
@@ -74,6 +75,33 @@ export function AppShell() {
     [isAdmin, isGlobalAdmin],
   );
 
+  // Acesso auxiliar ao manual do usuário (change acesso-ao-manual-no-shell,
+  // design.md D6/D8): segundo `<Menu>` de item único e `selectable={false}`
+  // — não é destino da SPA, nunca deve disputar `selectedKeys` com a
+  // navegação real nem aparecer como "tela atual". `title` explícito garante
+  // o tooltip do estado colapsado em texto plano (não o link aninhado que o
+  // AntD usaria por padrão a partir do `label`). O nome acessível do link
+  // anuncia a saída da aplicação para quem usa leitor de tela.
+  const manualMenuItems: MenuProps['items'] = publicConfig.manualUrl
+    ? [
+        {
+          key: 'manual-do-usuario',
+          icon: <ReadOutlined />,
+          title: 'Manual do usuário',
+          label: (
+            <a
+              href={publicConfig.manualUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Manual do usuário (abre em nova aba, fora da aplicação)"
+            >
+              Manual do usuário
+            </a>
+          ),
+        },
+      ]
+    : undefined;
+
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
@@ -97,25 +125,42 @@ export function AppShell() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}>
-        <div style={{ minHeight: 48, margin: 16 }}>
-          {collapsed ? (
-            <div style={{ color: '#fff', fontWeight: 600, fontSize: 18, lineHeight: '24px' }}>
-              PH
-            </div>
-          ) : (
-            // Shell expandido (design.md D7): não há texto irmão do nome aqui, então
-            // a logomarca carrega o nome acessível diretamente via `alt`.
-            <BrandMark height={40} alt="PapelHub" />
-          )}
-          {/* Identificação do cliente só no estado expandido (design.md D6) —
-              o colapsado não tem largura para o subtítulo sem truncar. */}
-          {!collapsed && publicConfig.clientName && (
-            <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: 12, lineHeight: '16px' }}>
-              {publicConfig.clientName}
-            </div>
+        {/* Wrapper flex column (design.md D6): `.ant-layout-sider-children` do
+            AntD não é flex por padrão, então o próprio conteúdo do Sider
+            precisa impor a coluna para o rodapé do manual (`margin-top: auto`
+            abaixo) empurrar para o pé, sem depender de CSS global novo. O
+            trigger de colapso do AntD é `position: fixed`, fora deste fluxo,
+            então não interfere. */}
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ minHeight: 48, margin: 16 }}>
+            {collapsed ? (
+              <div style={{ color: '#fff', fontWeight: 600, fontSize: 18, lineHeight: '24px' }}>
+                PH
+              </div>
+            ) : (
+              // Shell expandido (design.md D7): não há texto irmão do nome aqui, então
+              // a logomarca carrega o nome acessível diretamente via `alt`.
+              <BrandMark height={40} alt="PapelHub" />
+            )}
+            {/* Identificação do cliente só no estado expandido (design.md D6) —
+                o colapsado não tem largura para o subtítulo sem truncar. */}
+            {!collapsed && publicConfig.clientName && (
+              <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: 12, lineHeight: '16px' }}>
+                {publicConfig.clientName}
+              </div>
+            )}
+          </div>
+          <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]} items={items} />
+          {manualMenuItems && (
+            <Menu
+              theme="dark"
+              mode="inline"
+              selectable={false}
+              items={manualMenuItems}
+              style={{ marginTop: 'auto' }}
+            />
           )}
         </div>
-        <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]} items={items} />
       </Sider>
       <Layout>
         <Header

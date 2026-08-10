@@ -24,6 +24,8 @@ export interface CreateAppOptions {
   webDistDir?: string;
   /** Injeção do verificador/flag OIDC do endpoint de finalização (testes). */
   storageEvents?: StorageEventsOptions;
+  /** Override de `config.appManualUrl` (testes) — ver validação abaixo. */
+  appManualUrl?: string;
 }
 
 export function createApp(ports: Ports, options: CreateAppOptions = {}): Express {
@@ -31,9 +33,27 @@ export function createApp(ports: Ports, options: CreateAppOptions = {}): Express
   app.use(express.json());
   app.use(cookieParser());
 
+  // Validação do endereço do manual do usuário (change
+  // acesso-ao-manual-no-shell, design.md D5): mesmo padrão de fail-fast do
+  // WEB_DIST_DIR abaixo — um esquema fora de http/https (ex.: `javascript:`
+  // colado por engano) não deve chegar intacto ao `href` renderizado.
+  // Vazio não é inválido — é a ausência tratada em D4.
+  const appManualUrl = options.appManualUrl ?? config.appManualUrl;
+  if (appManualUrl) {
+    let scheme: string | null;
+    try {
+      scheme = new URL(appManualUrl).protocol;
+    } catch {
+      scheme = null;
+    }
+    if (scheme !== 'http:' && scheme !== 'https:') {
+      throw new Error(`APP_MANUAL_URL inválida: "${appManualUrl}" não é um endereço http/https`);
+    }
+  }
+
   app.use(healthRouter(ports));
   app.use(storageEventsRouter(ports, options.storageEvents));
-  app.use(authRouter(ports));
+  app.use(authRouter(ports, appManualUrl));
 
   // Serving da SPA em produção (mesma origem que a API) — design.md D1-D4 do
   // change `deploy-frontend-gcp`. Ausente (dev/testes) = comportamento de

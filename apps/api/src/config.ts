@@ -107,4 +107,11 @@ export const config = {
   // GET /auth/public-config; não passa pelo SecretsPort. Vazia/ausente ⇒
   // nenhuma identificação de cliente é exibida.
   appClientName: optional('APP_CLIENT_NAME', ''),
+
+  // Endereço do manual do usuário publicado, exibido no rodapé do shell
+  // (change acesso-ao-manual-no-shell, design.md D2/D4) — mesmo tratamento
+  // de appClientName: dado público, não passa pelo SecretsPort. Vazio ⇒
+  // nenhum acesso ao manual é apresentado. Validado (esquema http/https) no
+  // arranque de `createApp` (app.ts), não aqui — design.md D5.
+  appManualUrl: optional('APP_MANUAL_URL', ''),
 };
