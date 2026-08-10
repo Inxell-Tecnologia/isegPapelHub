@@ -33,9 +33,11 @@ cors_allowed_origins = [
 # change rebranding-doc7-setes). Vazio (padrão) = nenhuma identificação exibida.
 # app_client_name = "SETES"
 
-# Endereço do manual do usuário desta implantação, exibido no rodapé do shell
-# autenticado (design.md D2 do change acesso-ao-manual-no-shell). Vazio
-# (padrão) = nenhum acesso ao manual é apresentado.
+# Override opcional do endereço do manual do usuário desta implantação,
+# exibido no rodapé do shell autenticado (design.md D2 do change
+# acesso-ao-manual-no-shell). Vazio (padrão) = a aplicação adota o endereço
+# canônico do manual publicado por este repositório (design.md D2 do change
+# corrige-alcance-do-manual).
 # app_manual_url = "https://carlossalesnaturaltec.github.io/gdoc/"
 
 # E-mail do administrador global criado pelo Job de bootstrap (obrigatório —

@@ -37,8 +37,11 @@ export function createApp(ports: Ports, options: CreateAppOptions = {}): Express
   // acesso-ao-manual-no-shell, design.md D5): mesmo padrão de fail-fast do
   // WEB_DIST_DIR abaixo — um esquema fora de http/https (ex.: `javascript:`
   // colado por engano) não deve chegar intacto ao `href` renderizado.
-  // Vazio não é inválido — é a ausência tratada em D4.
-  const appManualUrl = options.appManualUrl ?? config.appManualUrl;
+  // Vazio não é inválido — é a ausência tratada em D4. O override passa pela
+  // mesma resolução da variável de ambiente (change corrige-alcance-do-manual,
+  // design.md D2): um override vazio ou ausente também cai no valor já
+  // resolvido de `config.appManualUrl` (canônico, se nada estiver configurado).
+  const appManualUrl = options.appManualUrl || config.appManualUrl;
   if (appManualUrl) {
     let scheme: string | null;
     try {
