@@ -22,10 +22,10 @@ describe('Login (US 1.2)', () => {
     });
     renderApp(['/login']);
 
-    await screen.findByRole('heading', { name: 'Doc7' });
+    await screen.findByRole('heading', { name: 'PapelHub' });
     await fillAndSubmit('ana@example.com', 'senha-correta');
 
-    await screen.findByText('Bem-vindo ao Doc7');
+    await screen.findByText('Bem-vindo ao PapelHub');
   });
 
   it('credenciais inválidas mostram mensagem genérica e permanecem no login (cenário 2)', async () => {
@@ -35,11 +35,11 @@ describe('Login (US 1.2)', () => {
     });
     renderApp(['/login']);
 
-    await screen.findByRole('heading', { name: 'Doc7' });
+    await screen.findByRole('heading', { name: 'PapelHub' });
     await fillAndSubmit('ana@example.com', 'senha-errada');
 
     await screen.findByText('E-mail ou senha inválidos.');
-    expect(screen.getByRole('heading', { name: 'Doc7' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'PapelHub' })).toBeInTheDocument();
   });
 
   it('conta desativada mostra aviso específico, distinto da mensagem genérica (cenário 3)', async () => {
@@ -49,7 +49,7 @@ describe('Login (US 1.2)', () => {
     });
     renderApp(['/login']);
 
-    await screen.findByRole('heading', { name: 'Doc7' });
+    await screen.findByRole('heading', { name: 'PapelHub' });
     await fillAndSubmit('ana@example.com', 'senha-correta');
 
     await screen.findByText('Esta conta está desativada. Procure a administração.');
@@ -61,18 +61,21 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
   it('identificação do cliente configurada aparece abaixo do heading, que mantém o nome acessível puro', async () => {
     mockFetch({
       'GET /auth/me': { status: 401 },
-      'GET /auth/public-config': { status: 200, body: { appName: 'Doc7', clientName: 'SETES' } },
+      'GET /auth/public-config': {
+        status: 200,
+        body: { appName: 'PapelHub', clientName: 'SETES' },
+      },
     });
     renderApp(['/login']);
 
     await screen.findByText('SETES');
-    expect(screen.getByRole('heading', { name: 'Doc7' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'PapelHub' })).toBeInTheDocument();
   });
 
   it('sem identificação de cliente configurada, nenhum subtítulo aparece e o login segue funcional', async () => {
     mockFetch({
       'GET /auth/me': { status: 401 },
-      'GET /auth/public-config': { status: 200, body: { appName: 'Doc7', clientName: '' } },
+      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: '' } },
       'POST /auth/login': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
@@ -80,11 +83,11 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
     });
     renderApp(['/login']);
 
-    await screen.findByRole('heading', { name: 'Doc7' });
+    await screen.findByRole('heading', { name: 'PapelHub' });
     expect(screen.queryByText('SETES')).not.toBeInTheDocument();
 
     await fillAndSubmit('ana@example.com', 'senha-correta');
-    await screen.findByText('Bem-vindo ao Doc7');
+    await screen.findByText('Bem-vindo ao PapelHub');
   });
 
   it('falha ao obter a identidade visual não bloqueia o bootstrap nem o login', async () => {
@@ -98,32 +101,35 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
     });
     renderApp(['/login']);
 
-    await screen.findByRole('heading', { name: 'Doc7' });
+    await screen.findByRole('heading', { name: 'PapelHub' });
     expect(screen.queryByText('SETES')).not.toBeInTheDocument();
 
     await fillAndSubmit('ana@example.com', 'senha-correta');
-    await screen.findByText('Bem-vindo ao Doc7');
+    await screen.findByText('Bem-vindo ao PapelHub');
   });
 
-  it('título do documento compõe "Doc7 - SETES" com identificação configurada', async () => {
+  it('título do documento compõe "PapelHub - SETES" com identificação configurada', async () => {
     mockFetch({
       'GET /auth/me': { status: 401 },
-      'GET /auth/public-config': { status: 200, body: { appName: 'Doc7', clientName: 'SETES' } },
+      'GET /auth/public-config': {
+        status: 200,
+        body: { appName: 'PapelHub', clientName: 'SETES' },
+      },
     });
     renderApp(['/login']);
 
-    await screen.findByRole('heading', { name: 'Doc7' });
-    await waitFor(() => expect(document.title).toBe('Doc7 - SETES'));
+    await screen.findByRole('heading', { name: 'PapelHub' });
+    await waitFor(() => expect(document.title).toBe('PapelHub - SETES'));
   });
 
-  it('sem identificação de cliente, o título do documento permanece "Doc7"', async () => {
+  it('sem identificação de cliente, o título do documento permanece "PapelHub"', async () => {
     mockFetch({
       'GET /auth/me': { status: 401 },
-      'GET /auth/public-config': { status: 200, body: { appName: 'Doc7', clientName: '' } },
+      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: '' } },
     });
     renderApp(['/login']);
 
-    await screen.findByRole('heading', { name: 'Doc7' });
-    await waitFor(() => expect(document.title).toBe('Doc7'));
+    await screen.findByRole('heading', { name: 'PapelHub' });
+    await waitFor(() => expect(document.title).toBe('PapelHub'));
   });
 });

@@ -1,9 +1,9 @@
 # Primeiro acesso
 
-O Doc7 **não tem autocadastro**. Sua conta é criada pela área administrativa, que lhe
+O PapelHub **não tem autocadastro**. Sua conta é criada pela área administrativa, que lhe
 informa o **e-mail** e a **senha inicial**.
 
-1. Abra o [endereço da aplicação](index.md#o-que-e-o-doc7) no navegador.
+1. Abra o [endereço da aplicação](index.md#o-que-e-o-papelhub) no navegador.
 2. Na tela de **login**, informe seu **e-mail** e **senha**.
 3. Clique em entrar.
 

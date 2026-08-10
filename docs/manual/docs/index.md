@@ -1,12 +1,12 @@
-# Manual do Usuário — Doc7
+# Manual do Usuário — PapelHub
 
-Bem-vindo(a) ao **Doc7**, o repositório documental corporativo da organização. Este
+Bem-vindo(a) ao **PapelHub**, o repositório documental corporativo da organização. Este
 manual explica, em linguagem simples, como usar o sistema no dia a dia. É um guia
 **funcional**: fala do que você vê e faz na tela, não de como o sistema é construído
 por dentro.
 
 !!! note "Endereço desta implantação"
-    O endereço abaixo é o desta implantação específica do Doc7 — não o endereço
+    O endereço abaixo é o desta implantação específica do PapelHub — não o endereço
     único do produto. Cada organização pode ter o seu próprio.
 
     **https://gdoc-prod-api-hmwigy67mq-uc.a.run.app/**
@@ -14,9 +14,9 @@ por dentro.
 Use um navegador atualizado (Chrome, Edge, Firefox ou Safari). Não é preciso instalar
 nada.
 
-## O que é o Doc7
+## O que é o PapelHub
 
-O Doc7 é um repositório de arquivos na nuvem com **controle rigoroso de acesso**. A
+O PapelHub é um repositório de arquivos na nuvem com **controle rigoroso de acesso**. A
 ideia central é simples: cada pessoa vê, baixa, envia, altera ou exclui **apenas
 aquilo que criou ou que lhe foi liberado** — nada além disso. Tudo que acontece com
 os arquivos importantes (visualizações e downloads) fica registrado, e cada unidade
@@ -40,7 +40,7 @@ Valores de cota, retenção e demais tetos operacionais são padrões desta impl
 
 ## Perfis de usuário
 
-O que você pode fazer no Doc7 depende do seu **perfil**, definido pela administração
+O que você pode fazer no PapelHub depende do seu **perfil**, definido pela administração
 quando sua conta é criada. Existem três:
 
 | Perfil                       | O que enxerga                                                                                 | O que pode fazer                                                                                                                                                                            |
@@ -64,5 +64,5 @@ quando sua conta é criada. Existem três:
 
 ---
 
-_Este manual cobre o uso funcional do Doc7. Para dúvidas sobre políticas de acesso da
+_Este manual cobre o uso funcional do PapelHub. Para dúvidas sobre políticas de acesso da
 sua organização, procure a área administrativa da sua unidade._

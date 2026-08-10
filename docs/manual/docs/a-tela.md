@@ -1,6 +1,6 @@
 # Conhecendo a tela
 
-Na tela de **login** e no menu lateral, logo abaixo do nome **Doc7**, aparece a
+Na tela de **login** e no menu lateral, logo abaixo do nome **PapelHub**, aparece a
 identificação da sua organização (por exemplo, "SETES") — ela confirma que você
 está na implantação correta quando existe mais de uma.
 

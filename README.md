@@ -1,13 +1,15 @@
-# Doc7
+# PapelHub
 
 Repositório documental corporativo com governança de acesso — permissões
 granulares, isolamento por unidade, auditoria e lixeira com retenção. Ver
 `docs/prd_final.md` para o produto completo.
 
-O nome exibido (`Doc7`) e a identificação do cliente na tela de login/shell
-(`APP_CLIENT_NAME`, ver `.env.example`) são configuráveis por implantação —
-ver `openspec/specs/identidade-visual/` (capability entregue pela change
-arquivada em `openspec/changes/archive/2026-08-05-rebranding-doc7-setes/`).
+O nome exibido (`PapelHub`) e a identificação do cliente na tela de
+login/shell (`APP_CLIENT_NAME`, ver `.env.example`) são configuráveis por
+implantação — ver `openspec/specs/identidade-visual/` (capability entregue
+pela change arquivada em
+`openspec/changes/archive/2026-08-05-rebranding-doc7-setes/` e atualizada
+pela change `rebranding-papelhub`).
 Identificadores internos de código e infraestrutura (`@gdoc/*`,
 `gdoc_dev`/`gdoc_ci`, `name_prefix = "gdoc"` no Terraform) permanecem
 inalterados por decisão — trocar `name_prefix` faria o Terraform destruir e

@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Toda saída do modelo (respostas, mensagens de commit, PRs, specs) é sempre em pt_BR.**
 - Integrações (merge de PR) usam **merge commit — nunca squash.**
 - Node **22** (`.nvmrc`); npm workspaces. `postinstall` na raiz compila `packages/shared` automaticamente.
-- **Nome exibido do produto é `Doc7`** (e `APP_CLIENT_NAME` por implantação); os identificadores internos permanecem `gdoc` (`@gdoc/*`, `gdoc_dev`/`gdoc_ci`, `name_prefix = "gdoc"` no Terraform) **por decisão** — renomear o `name_prefix` faria o Terraform destruir e recriar bucket, Cloud SQL e tópico Pub/Sub. Não "padronize" esses nomes.
+- **Nome exibido do produto é `PapelHub`** (e `APP_CLIENT_NAME` por implantação); os identificadores internos permanecem `gdoc` (`@gdoc/*`, `gdoc_dev`/`gdoc_ci`, `name_prefix = "gdoc"` no Terraform) **por decisão** — renomear o `name_prefix` faria o Terraform destruir e recriar bucket, Cloud SQL e tópico Pub/Sub. Não "padronize" esses nomes.
 
 ## Manual do usuário: `docs/manual/`
 
