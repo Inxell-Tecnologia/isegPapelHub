@@ -38,7 +38,7 @@ cors_allowed_origins = [
 # acesso-ao-manual-no-shell). Vazio (padrão) = a aplicação adota o endereço
 # canônico do manual publicado por este repositório (design.md D2 do change
 # corrige-alcance-do-manual).
-# app_manual_url = "https://carlossalesnaturaltec.github.io/gdoc/"
+# app_manual_url = "https://carlossalesnaturaltec.github.io/GDoc/"
 
 # E-mail do administrador global criado pelo Job de bootstrap (obrigatório —
 # ver infra/terraform/README.md, seção "Bootstrap do administrador global").
