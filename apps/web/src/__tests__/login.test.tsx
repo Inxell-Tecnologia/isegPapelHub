@@ -61,7 +61,10 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
   it('identificação do cliente configurada aparece abaixo do heading, que mantém o nome acessível puro', async () => {
     mockFetch({
       'GET /auth/me': { status: 401 },
-      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: 'SETES' } },
+      'GET /auth/public-config': {
+        status: 200,
+        body: { appName: 'PapelHub', clientName: 'SETES' },
+      },
     });
     renderApp(['/login']);
 
@@ -108,7 +111,10 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
   it('título do documento compõe "PapelHub - SETES" com identificação configurada', async () => {
     mockFetch({
       'GET /auth/me': { status: 401 },
-      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: 'SETES' } },
+      'GET /auth/public-config': {
+        status: 200,
+        body: { appName: 'PapelHub', clientName: 'SETES' },
+      },
     });
     renderApp(['/login']);
 

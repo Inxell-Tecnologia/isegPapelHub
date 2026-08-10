@@ -36,7 +36,10 @@ export function authRouter(ports: Ports): Router {
   // Contrato travado a exatamente `{ appName, clientName }`; nenhum outro
   // valor de configuração entra aqui. Não abre transação tenant.
   router.get('/auth/public-config', (_req, res) => {
-    const response: PublicConfigResponse = { appName: 'PapelHub', clientName: config.appClientName };
+    const response: PublicConfigResponse = {
+      appName: 'PapelHub',
+      clientName: config.appClientName,
+    };
     res.json(response);
   });
 
