@@ -4,7 +4,7 @@ import { UserRole } from '@gdoc/shared';
 import { mockFetch } from './mock-fetch';
 import { renderApp } from './render-app';
 
-const MANUAL_URL = 'https://carlossalesnaturaltec.github.io/gdoc/';
+const MANUAL_URL = 'https://carlossalesnaturaltec.github.io/GDoc/';
 
 /**
  * Acesso ao manual no rodapé do shell (change acesso-ao-manual-no-shell,

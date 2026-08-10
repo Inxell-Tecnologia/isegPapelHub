@@ -39,7 +39,7 @@ function optional(name: string, fallback: string): string {
 // build (colidiria com o allowlist "docs-only pula deploy" do deploy.yml —
 // uma mudança de `site_url` ficaria sem efeito em produção até tocar
 // código fora de docs/).
-export const CANONICAL_MANUAL_URL = 'https://carlossalesnaturaltec.github.io/gdoc/';
+export const CANONICAL_MANUAL_URL = 'https://carlossalesnaturaltec.github.io/GDoc/';
 
 // Resolução do endereço do manual (change corrige-alcance-do-manual,
 // design.md D2/D5): trata `undefined` e string vazia como o mesmo caso —

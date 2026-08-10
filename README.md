@@ -154,7 +154,7 @@ verificável contra o GCS real, após o Terraform ser aplicado.
 
 O manual do usuário é um site [MkDocs](https://www.mkdocs.org/) (tema Material,
 `docs/manual/docs/*.md`), publicado no GitHub Pages em
-<https://carlossalesnaturaltec.github.io/gdoc/>. Para buildar e servir localmente
+<https://carlossalesnaturaltec.github.io/GDoc/>. Para buildar e servir localmente
 (requer Python 3):
 
 ```bash
