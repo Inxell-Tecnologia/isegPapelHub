@@ -327,17 +327,38 @@ describe('Autenticação: /auth/login, /auth/logout, /auth/me', () => {
     });
   });
 
-  describe('GET /auth/public-config (change rebranding-doc7-setes)', () => {
-    it('responde 200 sem cookie de sessão, com apenas appName e clientName (design.md D4)', async () => {
+  describe('GET /auth/public-config (change rebranding-doc7-setes; manualUrl pela change acesso-ao-manual-no-shell)', () => {
+    it('responde 200 sem cookie de sessão, com apenas appName, clientName e manualUrl (design.md D4, D3 de acesso-ao-manual-no-shell)', async () => {
       const app = createApp(ports);
       const res = await request(app).get('/auth/public-config');
 
       expect(res.status).toBe(200);
-      // `clientName` reflete `APP_CLIENT_NAME` do ambiente (design.md D8), não
-      // um valor fixo — a trava desta rota é o contrato: exatamente estas duas
-      // chaves, nenhum outro dado de configuração.
-      expect(res.body).toEqual({ appName: 'PapelHub', clientName: config.appClientName });
-      expect(Object.keys(res.body)).toEqual(['appName', 'clientName']);
+      // `clientName`/`manualUrl` refletem o ambiente (design.md D8 de
+      // rebranding-doc7-setes; D2 de acesso-ao-manual-no-shell), não um valor
+      // fixo — a trava desta rota é o contrato: exatamente estas três chaves,
+      // nenhum outro dado de configuração. Alteração deliberada de contrato
+      // (design.md D3) — manter a asserção por chaves exatas, nunca afrouxar
+      // para `toMatchObject`.
+      expect(res.body).toEqual({
+        appName: 'PapelHub',
+        clientName: config.appClientName,
+        manualUrl: config.appManualUrl,
+      });
+      expect(Object.keys(res.body)).toEqual(['appName', 'clientName', 'manualUrl']);
+    });
+
+    it('APP_MANUAL_URL inválida (esquema não http/https) derruba createApp no arranque, nomeando a variável', () => {
+      expect(() => createApp(ports, { appManualUrl: 'javascript:alert(1)' })).toThrow(
+        /APP_MANUAL_URL/,
+      );
+    });
+
+    it('APP_MANUAL_URL vazia arranca normalmente e responde manualUrl vazio', async () => {
+      const app = createApp(ports, { appManualUrl: '' });
+      const res = await request(app).get('/auth/public-config');
+
+      expect(res.status).toBe(200);
+      expect(res.body.manualUrl).toBe('');
     });
   });
 

@@ -37,13 +37,13 @@ tratado como extensão natural do contrato. Todo valor da lista SHALL ser
 público por natureza — nenhum SHALL transitar pelo `SecretsPort`. O endpoint
 NÃO SHALL abrir contexto de unidade nem consultar dado tenant-scoped.
 
-#### Scenario: Requisição sem sessão obtém a configuração pública
+#### Scenario: Requisição sem sessão obtém a identidade visual
 - **WHEN** um cliente sem sessão autenticada requisita a configuração pública
   de apresentação
 - **THEN** recebe o nome da aplicação, a identificação do cliente e o endereço
   do manual, sem erro de autenticação
 
-#### Scenario: A resposta não carrega configuração fora da lista nominal
+#### Scenario: A resposta não carrega configuração além de identidade visual
 - **WHEN** um cliente requisita a configuração pública de apresentação
 - **THEN** a resposta contém apenas os valores da lista nominal, e nenhum dado
   de ambiente, versão, limite ou infraestrutura

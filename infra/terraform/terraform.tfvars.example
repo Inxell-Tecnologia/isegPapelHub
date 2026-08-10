@@ -33,6 +33,11 @@ cors_allowed_origins = [
 # change rebranding-doc7-setes). Vazio (padrão) = nenhuma identificação exibida.
 # app_client_name = "SETES"
 
+# Endereço do manual do usuário desta implantação, exibido no rodapé do shell
+# autenticado (design.md D2 do change acesso-ao-manual-no-shell). Vazio
+# (padrão) = nenhum acesso ao manual é apresentado.
+# app_manual_url = "https://carlossalesnaturaltec.github.io/gdoc/"
+
 # E-mail do administrador global criado pelo Job de bootstrap (obrigatório —
 # ver infra/terraform/README.md, seção "Bootstrap do administrador global").
 # A senha NÃO vai aqui: é criada como versão do secret bootstrap-admin-password

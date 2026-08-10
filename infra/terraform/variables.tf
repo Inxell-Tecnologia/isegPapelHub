@@ -224,6 +224,19 @@ variable "app_client_name" {
   default     = ""
 }
 
+variable "app_manual_url" {
+  description = <<-EOT
+    Endereço do manual do usuário desta implantação, exibido no rodapé do
+    shell autenticado (change acesso-ao-manual-no-shell, design.md D2). Não
+    é segredo — aponta para o site MkDocs público — mesmo tratamento de
+    app_client_name: env var comum do Cloud Run, não Secret Manager. Vazio
+    (padrão) = nenhum acesso ao manual é apresentado. Se preenchido, deve ser
+    um endereço http/https válido — a API falha no arranque caso contrário.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "github_repository" {
   description = <<-EOT
     Repositório GitHub ("owner/repo") autorizado a assumir a service account

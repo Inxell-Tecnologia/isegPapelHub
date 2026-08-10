@@ -272,10 +272,18 @@ export const resetPasswordResponseSchema: z.ZodType<ResetPasswordResponse> = z.o
   generatedPassword: z.string(),
 });
 
-/** Espelha `PublicConfigResponse` (change `rebranding-doc7-setes`) — fronteira de `GET /auth/public-config`. */
+/**
+ * Espelha `PublicConfigResponse` (change `rebranding-doc7-setes`; `manualUrl`
+ * acrescentado pela change `acesso-ao-manual-no-shell`, design.md D3) —
+ * fronteira de `GET /auth/public-config`. `manualUrl` aceita string vazia
+ * (ausência, design.md D4) ou um endereço `http`/`https` — a API já barra
+ * esquema inválido no arranque (design.md D5); esta validação é defesa em
+ * profundidade contra um backend divergente, não a linha principal.
+ */
 export const publicConfigResponseSchema: z.ZodType<PublicConfigResponse> = z.object({
   appName: z.string(),
   clientName: z.string(),
+  manualUrl: z.union([z.literal(''), z.url({ protocol: /^https?$/ })]),
 });
 
 /** Espelha `FolderDownloadManifestEntry` (design.md D1/D7, `download-pasta-zip`). */

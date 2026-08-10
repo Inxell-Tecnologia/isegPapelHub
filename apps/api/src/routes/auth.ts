@@ -26,19 +26,25 @@ interface UserAuthRow {
  * funcionar sem sessão prévia. `/auth/me` aplica `attachTenantContext`
  * diretamente nesta rota (não no router inteiro), já que só ela exige
  * identidade resolvida.
+ *
+ * `appManualUrl` chega já validado por `createApp` (design.md D5 da change
+ * `acesso-ao-manual-no-shell`) — este router só o repassa na resposta.
  */
-export function authRouter(ports: Ports): Router {
+export function authRouter(ports: Ports, appManualUrl: string): Router {
   const router = Router();
 
-  // Identidade visual da implantação (change rebranding-doc7-setes,
-  // design.md D1/D2/D4): sem attachTenantContext — a tela de login é
-  // pré-autenticação e precisa desta configuração antes de haver sessão.
-  // Contrato travado a exatamente `{ appName, clientName }`; nenhum outro
-  // valor de configuração entra aqui. Não abre transação tenant.
+  // Configuração pública de apresentação da implantação (change
+  // rebranding-doc7-setes, design.md D1/D2/D4; manualUrl acrescentado pela
+  // change acesso-ao-manual-no-shell, design.md D3): sem attachTenantContext
+  // — a tela de login é pré-autenticação e precisa desta configuração antes
+  // de haver sessão. Contrato travado a uma allowlist nominal de três
+  // valores; nenhum outro dado de configuração entra aqui. Não abre
+  // transação tenant.
   router.get('/auth/public-config', (_req, res) => {
     const response: PublicConfigResponse = {
       appName: 'PapelHub',
       clientName: config.appClientName,
+      manualUrl: appManualUrl,
     };
     res.json(response);
   });
