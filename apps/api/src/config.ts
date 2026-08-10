@@ -31,6 +31,26 @@ function optional(name: string, fallback: string): string {
   return process.env[name] ?? fallback;
 }
 
+// Endereço canônico do manual do usuário publicado por este repositório —
+// deve ser igual a `site_url` de `docs/manual/mkdocs.yml` (change
+// corrige-alcance-do-manual, design.md D1). A duplicação é deliberada e
+// vigiada por um teste que lê o mkdocs.yml e falha se os dois divergirem;
+// não é derivada em runtime (a imagem da API não carrega `docs/`) nem em
+// build (colidiria com o allowlist "docs-only pula deploy" do deploy.yml —
+// uma mudança de `site_url` ficaria sem efeito em produção até tocar
+// código fora de docs/).
+export const CANONICAL_MANUAL_URL = 'https://carlossalesnaturaltec.github.io/gdoc/';
+
+// Resolução do endereço do manual (change corrige-alcance-do-manual,
+// design.md D2/D5): trata `undefined` e string vazia como o mesmo caso —
+// ausência de escolha — e devolve o canônico nos dois. Exportada como
+// função pura (entrada explícita, sem ler `process.env`) para ser testada
+// diretamente, em vez de através do singleton `config` que já leu o
+// ambiente no carregamento do módulo.
+export function resolveManualUrl(rawValue: string | undefined): string {
+  return rawValue || CANONICAL_MANUAL_URL;
+}
+
 export const config = {
   nodeEnv: optional('NODE_ENV', 'development'),
   port: Number(optional('PORT', '8080')),
@@ -108,10 +128,11 @@ export const config = {
   // nenhuma identificação de cliente é exibida.
   appClientName: optional('APP_CLIENT_NAME', ''),
 
-  // Endereço do manual do usuário publicado, exibido no rodapé do shell
-  // (change acesso-ao-manual-no-shell, design.md D2/D4) — mesmo tratamento
-  // de appClientName: dado público, não passa pelo SecretsPort. Vazio ⇒
-  // nenhum acesso ao manual é apresentado. Validado (esquema http/https) no
-  // arranque de `createApp` (app.ts), não aqui — design.md D5.
-  appManualUrl: optional('APP_MANUAL_URL', ''),
+  // Endereço do manual do usuário exibido no rodapé do shell (change
+  // acesso-ao-manual-no-shell, design.md D2/D4) — dado público, não passa
+  // pelo SecretsPort. Ausente ou vazia ⇒ endereço canônico (change
+  // corrige-alcance-do-manual, design.md D2) — não há valor que suprima o
+  // acesso (design.md D3). Validado (esquema http/https) no arranque de
+  // `createApp` (app.ts), não aqui — design.md D5.
+  appManualUrl: resolveManualUrl(process.env.APP_MANUAL_URL),
 };

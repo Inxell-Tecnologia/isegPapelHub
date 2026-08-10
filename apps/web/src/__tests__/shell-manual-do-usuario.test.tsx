@@ -11,6 +11,13 @@ const MANUAL_URL = 'https://carlossalesnaturaltec.github.io/gdoc/';
  * design.md D6/D8) — item presente/ausente conforme `publicConfig.manualUrl`,
  * sempre com `href`/`target`/`rel` corretos, sem participar de
  * `selectedKeys` e com nome acessível anunciando a saída da aplicação.
+ *
+ * `manualUrl` vazia não é mais um estado alcançável por configuração (change
+ * corrige-alcance-do-manual, design.md D3): a API sempre resolve para o
+ * endereço canônico quando a implantação não define um override. O ramo
+ * `manualUrl ? item : nada` da SPA continua existindo só para a degradação
+ * de `GET /auth/public-config` indisponível (`DEFAULT_PUBLIC_CONFIG`) — os
+ * dois casos abaixo cobrem essa degradação, não mais "não configurado".
  */
 describe('Acesso ao manual no rodapé do shell (acesso-ao-manual-no-shell)', () => {
   it('item presente com href, target e rel corretos quando manualUrl está configurada', async () => {
@@ -34,7 +41,7 @@ describe('Acesso ao manual no rodapé do shell (acesso-ao-manual-no-shell)', () 
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  it('item ausente quando manualUrl está vazia', async () => {
+  it('item ausente quando manualUrl chega vazia (degradação de configuração, não mais estado alcançável em produção)', async () => {
     mockFetch({
       'GET /auth/me': {
         status: 200,

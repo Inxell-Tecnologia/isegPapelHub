@@ -4,7 +4,7 @@ import type { Pool } from 'pg';
 import * as argon2 from 'argon2';
 import { createHmac } from 'node:crypto';
 import { createApp } from '../app.js';
-import { config } from '../config.js';
+import { config, CANONICAL_MANUAL_URL } from '../config.js';
 import { PgDatabasePort } from '../adapters/pg-database-port.js';
 import { InAppNotificationPort } from '../adapters/in-app-notification-port.js';
 import { EnvSecretsPort } from '../adapters/env-secrets-port.js';
@@ -327,22 +327,28 @@ describe('Autenticação: /auth/login, /auth/logout, /auth/me', () => {
     });
   });
 
-  describe('GET /auth/public-config (change rebranding-doc7-setes; manualUrl pela change acesso-ao-manual-no-shell)', () => {
+  describe('GET /auth/public-config (change rebranding-doc7-setes; manualUrl pela change acesso-ao-manual-no-shell, corrige-alcance-do-manual)', () => {
     it('responde 200 sem cookie de sessão, com apenas appName, clientName e manualUrl (design.md D4, D3 de acesso-ao-manual-no-shell)', async () => {
       const app = createApp(ports);
       const res = await request(app).get('/auth/public-config');
 
       expect(res.status).toBe(200);
-      // `clientName`/`manualUrl` refletem o ambiente (design.md D8 de
-      // rebranding-doc7-setes; D2 de acesso-ao-manual-no-shell), não um valor
-      // fixo — a trava desta rota é o contrato: exatamente estas três chaves,
-      // nenhum outro dado de configuração. Alteração deliberada de contrato
-      // (design.md D3) — manter a asserção por chaves exatas, nunca afrouxar
-      // para `toMatchObject`.
+      // `clientName` reflete o ambiente (design.md D8 de rebranding-doc7-setes)
+      // e não tem valor canônico — comparar com `config.appClientName` é
+      // legítimo ali. `manualUrl` deixou de ser assim (change
+      // corrige-alcance-do-manual, design.md D2): sem override de
+      // implantação, o valor é sempre o endereço canônico, então a
+      // asserção compara com esse valor esperado, não com
+      // `config.appManualUrl` — o mesmo dado que a rota devolveria mesmo se
+      // a resolução estivesse quebrada (era exatamente esse o teste
+      // tautológico apontado na proposal). A trava desta rota é o contrato:
+      // exatamente estas três chaves, nenhum outro dado de configuração.
+      // Alteração deliberada de contrato (design.md D3) — manter a asserção
+      // por chaves exatas, nunca afrouxar para `toMatchObject`.
       expect(res.body).toEqual({
         appName: 'PapelHub',
         clientName: config.appClientName,
-        manualUrl: config.appManualUrl,
+        manualUrl: CANONICAL_MANUAL_URL,
       });
       expect(Object.keys(res.body)).toEqual(['appName', 'clientName', 'manualUrl']);
     });
@@ -353,12 +359,12 @@ describe('Autenticação: /auth/login, /auth/logout, /auth/me', () => {
       );
     });
 
-    it('APP_MANUAL_URL vazia arranca normalmente e responde manualUrl vazio', async () => {
+    it('APP_MANUAL_URL vazia arranca normalmente e responde o endereço canônico do manual (design.md D2, D3 de corrige-alcance-do-manual — vazio deixou de suprimir o acesso)', async () => {
       const app = createApp(ports, { appManualUrl: '' });
       const res = await request(app).get('/auth/public-config');
 
       expect(res.status).toBe(200);
-      expect(res.body.manualUrl).toBe('');
+      expect(res.body.manualUrl).toBe(CANONICAL_MANUAL_URL);
     });
   });
 

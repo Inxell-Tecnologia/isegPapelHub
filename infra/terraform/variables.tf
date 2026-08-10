@@ -226,12 +226,15 @@ variable "app_client_name" {
 
 variable "app_manual_url" {
   description = <<-EOT
-    Endereço do manual do usuário desta implantação, exibido no rodapé do
-    shell autenticado (change acesso-ao-manual-no-shell, design.md D2). Não
-    é segredo — aponta para o site MkDocs público — mesmo tratamento de
-    app_client_name: env var comum do Cloud Run, não Secret Manager. Vazio
-    (padrão) = nenhum acesso ao manual é apresentado. Se preenchido, deve ser
-    um endereço http/https válido — a API falha no arranque caso contrário.
+    Override opcional do endereço do manual do usuário desta implantação,
+    exibido no rodapé do shell autenticado (change acesso-ao-manual-no-shell,
+    design.md D2). Não é segredo — aponta para o site MkDocs público — mesmo
+    tratamento de app_client_name: env var comum do Cloud Run, não Secret
+    Manager. Vazio (padrão) = a aplicação adota o endereço canônico do manual
+    publicado por este repositório (change corrige-alcance-do-manual,
+    design.md D2) — não existe valor que suprima o acesso. Se preenchido,
+    deve ser um endereço http/https válido — a API falha no arranque caso
+    contrário.
   EOT
   type        = string
   default     = ""

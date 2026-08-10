@@ -72,6 +72,22 @@ node scripts/generate-dev-signer-key.mjs
 
 if [ ! -f "$PROJECT_DIR/.env" ]; then
   cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
+else
+  # Reconciliação (design.md D4, change corrige-alcance-do-manual):
+  # idempotência aqui significa convergir para o conjunto de chaves do
+  # exemplo, não apenas "não fazer nada se o arquivo já existe" — senão toda
+  # variável nova introduzida depois da criação do .env local fica invisível
+  # para sempre neste sandbox. Só acrescenta chave AUSENTE, com o valor do
+  # exemplo; nunca sobrescreve, remove ou reordena o que já está em .env.
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ''|'#'*) continue ;;
+    esac
+    key="${line%%=*}"
+    if ! grep -q "^${key}=" "$PROJECT_DIR/.env"; then
+      echo "$line" >>"$PROJECT_DIR/.env"
+    fi
+  done <"$PROJECT_DIR/.env.example"
 fi
 
 npm run migrate --workspace apps/api
