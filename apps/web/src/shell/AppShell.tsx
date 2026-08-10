@@ -15,6 +15,7 @@ import {
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { UserRole } from '@gdoc/shared';
 import { useSession } from '../auth/session-context';
+import { BrandMark } from './BrandMark';
 import { NotificationCenter } from './NotificationCenter';
 
 const { Header, Sider, Content } = Layout;
@@ -97,9 +98,15 @@ export function AppShell() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}>
         <div style={{ minHeight: 48, margin: 16 }}>
-          <div style={{ color: '#fff', fontWeight: 600, fontSize: 18, lineHeight: '24px' }}>
-            {collapsed ? 'D7' : 'Doc7'}
-          </div>
+          {collapsed ? (
+            <div style={{ color: '#fff', fontWeight: 600, fontSize: 18, lineHeight: '24px' }}>
+              PH
+            </div>
+          ) : (
+            // Shell expandido (design.md D7): não há texto irmão do nome aqui, então
+            // a logomarca carrega o nome acessível diretamente via `alt`.
+            <BrandMark height={40} alt="PapelHub" />
+          )}
           {/* Identificação do cliente só no estado expandido (design.md D6) —
               o colapsado não tem largura para o subtítulo sem truncar. */}
           {!collapsed && publicConfig.clientName && (

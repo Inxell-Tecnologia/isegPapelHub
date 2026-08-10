@@ -1,6 +1,6 @@
 # Limites
 
-Os valores abaixo são os vigentes **nesta implantação** do Doc7. Todos são
+Os valores abaixo são os vigentes **nesta implantação** do PapelHub. Todos são
 **padrões de variável de ambiente**, ajustáveis por quem administra a infraestrutura
 — não são constantes fixas do produto, e podem ser diferentes em outra implantação.
 

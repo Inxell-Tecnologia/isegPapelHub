@@ -1,7 +1,7 @@
-# Roadmap do Frontend (`apps/web`) — Doc7
+# Roadmap do Frontend (`apps/web`) — PapelHub
 
 Documento auxiliar para **implementação em partes**. Cataloga todas as fatias
-necessárias para levar a SPA do Doc7 de zero a paridade com o backend (Épicos
+necessárias para levar a SPA do PapelHub de zero a paridade com o backend (Épicos
 1–9, já completos). Cada fatia é uma **change OpenSpec** própria, referencia as
 histórias do PRD (`docs/prd_final.md`) já implementadas no back e depende do
 shell da fatia 1.

@@ -6,5 +6,5 @@ const ports = createPorts();
 const app = createApp(ports);
 
 app.listen(config.port, () => {
-  console.log(`Doc7 API listening on :${config.port} (env=${config.nodeEnv})`);
+  console.log(`PapelHub API listening on :${config.port} (env=${config.nodeEnv})`);
 });

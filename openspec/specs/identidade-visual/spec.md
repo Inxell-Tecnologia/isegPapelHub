@@ -3,46 +3,49 @@
 ## Purpose
 
 Definir os requisitos verificáveis da identidade visual do produto — o nome
-comercial da aplicação (**Doc7**) e a identificação do cliente da implantação
-(ex.: **SETES**) — como propriedade **configurada por implantação**, entregue
-ao SPA por um endpoint público restrito a branding (porque a tela onde ela
-aparece é anterior ao login), exibida na tela de login e no shell autenticado
-sem contaminar o nome acessível do heading, e degradando de forma transparente
-para "sem identificação de cliente" quando a configuração está ausente ou
-indisponível. Não decorre de uma US do PRD (`docs/prd_final.md`) — é um pedido
-direto do cliente sobre nome comercial e identificação da organização. Onde
-toca comportamento já normatizado, preserva-o: o nome acessível do heading de
-login continua sendo o nome da aplicação puro, conforme a US 1.2.
+comercial da aplicação (**PapelHub**), a logomarca oficial e a identificação do
+cliente da implantação (ex.: **SETES**) — como propriedade **configurada por
+implantação**, entregue ao SPA por um endpoint público restrito a branding
+(porque a tela onde ela aparece é anterior ao login), exibida na tela de login
+e no shell autenticado sem contaminar o nome acessível do heading, e
+degradando de forma transparente para "sem identificação de cliente" quando a
+configuração está ausente ou indisponível. Não decorre de uma US do PRD
+(`docs/prd_final.md`) — é um pedido direto do cliente sobre nome comercial,
+logomarca e identificação da organização. Onde toca comportamento já
+normatizado, preserva-o: o nome acessível do heading de login continua sendo o
+nome da aplicação puro, conforme a US 1.2. A logomarca, sem fundo transparente
+na arte fornecida, é sempre apresentada contida numa moldura escura própria —
+nunca solta sobre fundo claro.
 
 ## Requirements
 
-### Requirement: Nome da aplicação exibido é Doc7
+### Requirement: Nome da aplicação exibido é PapelHub
 
-A aplicação SHALL exibir **Doc7** como nome do produto em toda a camada de
-apresentação: título do documento no navegador, cabeçalho da tela de login, marca
-do shell autenticado e tela de Início. O nome NÃO SHALL variar por papel, por
-unidade ou por estado de autenticação.
+A aplicação SHALL exibir **PapelHub** como nome do produto em toda a camada
+de apresentação: título do documento no navegador, cabeçalho da tela de
+login, marca do shell autenticado e tela de Início. O nome NÃO SHALL variar
+por papel, por unidade ou por estado de autenticação.
 
-O **título do documento** SHALL ser composto pelo nome da aplicação seguido da
-identificação do cliente, quando esta estiver configurada, no formato
-`Doc7 - SETES`. O título estático servido no documento SHALL conter **apenas o
-nome da aplicação**, e a composição com a identificação do cliente SHALL ocorrer
-em tempo de execução, após a resolução da configuração — de modo que a
-identificação NÃO SHALL ser fixada em tempo de compilação. Sem identificação
-configurada, o título SHALL permanecer apenas com o nome da aplicação.
-Identificadores internos de código e infraestrutura (scope npm, nomes de banco,
-`name_prefix` do Terraform) permanecem inalterados e não são objeto deste
-requisito.
+O **título do documento** SHALL ser composto pelo nome da aplicação seguido
+da identificação do cliente, quando esta estiver configurada, no formato
+`PapelHub - SETES`. O título estático servido no documento SHALL conter
+**apenas o nome da aplicação**, e a composição com a identificação do cliente
+SHALL ocorrer em tempo de execução, após a resolução da configuração — de
+modo que a identificação NÃO SHALL ser fixada em tempo de compilação. Sem
+identificação configurada, o título SHALL permanecer apenas com o nome da
+aplicação. Identificadores internos de código e infraestrutura (scope npm,
+nomes de banco, `name_prefix` do Terraform) permanecem inalterados e não são
+objeto deste requisito.
 
 #### Scenario: Título do documento compõe nome e identificação do cliente
 - **WHEN** uma pessoa abre a aplicação no navegador com a identificação do cliente
   configurada como `SETES`
-- **THEN** o título do documento apresenta `Doc7 - SETES`
+- **THEN** o título do documento apresenta `PapelHub - SETES`
 
 #### Scenario: Sem identificação configurada o título fica só com o nome
 - **WHEN** uma pessoa abre a aplicação numa implantação sem identificação de
   cliente configurada
-- **THEN** o título do documento apresenta apenas `Doc7`
+- **THEN** o título do documento apresenta apenas `PapelHub`
 
 #### Scenario: Identificação do cliente não é fixada em tempo de compilação
 - **WHEN** a identificação do cliente é alterada na configuração da implantação
@@ -51,13 +54,64 @@ requisito.
 
 #### Scenario: Tela de login apresenta o nome da aplicação
 - **WHEN** uma pessoa não autenticada abre a tela de login
-- **THEN** o cabeçalho da tela apresenta o nome **Doc7**
+- **THEN** o cabeçalho da tela apresenta o nome **PapelHub**
 
 #### Scenario: Shell autenticado apresenta a marca em ambos os estados
 - **WHEN** uma pessoa autenticada visualiza o shell com a navegação expandida e
   depois colapsada
-- **THEN** a marca apresenta o nome **Doc7** no estado expandido e uma forma
-  abreviada equivalente no estado colapsado
+- **THEN** a marca apresenta o nome **PapelHub** no estado expandido e uma
+  forma abreviada equivalente no estado colapsado
+
+### Requirement: Logomarca oficial é exibida na tela de login e no shell expandido
+
+A aplicação SHALL exibir a logomarca oficial do produto na tela de login e no
+shell autenticado com a navegação expandida. A logomarca SHALL ser
+apresentada sempre contida numa moldura escura própria, e NÃO SHALL ser
+exibida diretamente sobre um fundo claro sem essa moldura.
+
+#### Scenario: Logomarca aparece na tela de login
+- **WHEN** uma pessoa não autenticada abre a tela de login
+- **THEN** a logomarca oficial é exibida, contida numa moldura escura, junto
+  ao cabeçalho com o nome da aplicação
+
+#### Scenario: Logomarca aparece no shell expandido
+- **WHEN** uma pessoa autenticada visualiza o shell com a navegação expandida
+- **THEN** a logomarca oficial é exibida, contida numa moldura escura, no
+  lugar da marca
+
+### Requirement: Logomarca não é exibida no estado colapsado do shell
+
+O shell autenticado, com a navegação colapsada, SHALL continuar apresentando
+apenas a forma abreviada em texto da marca — a logomarca NÃO SHALL ser
+exibida nesse estado.
+
+#### Scenario: Navegação colapsada mantém a abreviação em texto
+- **WHEN** uma pessoa autenticada colapsa a navegação do shell
+- **THEN** apenas a forma abreviada em texto da marca é exibida, sem a
+  logomarca
+
+### Requirement: Logomarca no shell expandido preserva o nome acessível da marca
+
+A aplicação SHALL fornecer à logomarca do shell expandido um nome acessível
+equivalente ao nome da aplicação, já que ali a imagem substitui o texto do
+nome e é a única portadora dele nesse estado — a marca SHALL continuar
+perceptível por tecnologia assistiva.
+
+#### Scenario: Tecnologia assistiva consulta a marca do shell expandido
+- **WHEN** uma tecnologia assistiva consulta a marca do shell com a
+  navegação expandida
+- **THEN** o nome acessível da marca é o nome da aplicação
+
+### Requirement: Favicon reflete a logomarca oficial
+
+O favicon da aplicação SHALL ser derivado da logomarca oficial do produto,
+mantendo proporção quadrada sem distorcer a arte original — por recorte, não
+por estiramento da imagem original.
+
+#### Scenario: Aba do navegador exibe o favicon derivado da logomarca
+- **WHEN** uma pessoa abre a aplicação no navegador
+- **THEN** o ícone exibido na aba é derivado da logomarca oficial, sem
+  aparecer esticado ou distorcido
 
 ### Requirement: Identificação do cliente é configurada por implantação
 

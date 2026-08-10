@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { App, Button, Card, Form, Input, theme, Typography } from 'antd';
-import { FolderOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
+import { App, Button, Card, Form, Input, Typography } from 'antd';
+import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { Navigate, useNavigate } from 'react-router-dom';
 import type { LoginRequest } from '@gdoc/shared';
 import { useSession } from './session-context';
 import { ApiError } from '../lib/api-client';
+import { BrandMark } from '../shell/BrandMark';
 
 export function LoginPage() {
   const { status, login, publicConfig } = useSession();
   const { message } = App.useApp();
-  const { token } = theme.useToken();
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
@@ -47,28 +47,15 @@ export function LoginPage() {
       }}
     >
       <Card style={{ width: 360 }}>
-        {/* Cabeçalho: badge + título + identificação do cliente + subtítulo. O ícone
-            e a identificação do cliente ficam FORA do heading para não poluir seu
-            nome acessível (a US 1.2 e os testes exigem "Doc7" puro — design.md D6). */}
-        <div style={{ textAlign: 'center', marginBottom: 24 }} aria-hidden="true">
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 56,
-              height: 56,
-              borderRadius: '50%',
-              background: token.colorPrimary,
-              color: '#fff',
-              fontSize: 26,
-            }}
-          >
-            <FolderOutlined />
-          </span>
+        {/* Cabeçalho: logomarca + título + identificação do cliente + subtítulo. A
+            logomarca e a identificação do cliente ficam FORA do heading para não
+            poluir seu nome acessível (a US 1.2 e os testes exigem "PapelHub" puro —
+            design.md D7). */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+          <BrandMark height={64} />
         </div>
         <Typography.Title level={3} style={{ textAlign: 'center', marginTop: 0, marginBottom: 4 }}>
-          Doc7
+          PapelHub
         </Typography.Title>
         {publicConfig.clientName && (
           <Typography.Text

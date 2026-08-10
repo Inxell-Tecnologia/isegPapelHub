@@ -336,7 +336,7 @@ describe('Autenticação: /auth/login, /auth/logout, /auth/me', () => {
       // `clientName` reflete `APP_CLIENT_NAME` do ambiente (design.md D8), não
       // um valor fixo — a trava desta rota é o contrato: exatamente estas duas
       // chaves, nenhum outro dado de configuração.
-      expect(res.body).toEqual({ appName: 'Doc7', clientName: config.appClientName });
+      expect(res.body).toEqual({ appName: 'PapelHub', clientName: config.appClientName });
       expect(Object.keys(res.body)).toEqual(['appName', 'clientName']);
     });
   });

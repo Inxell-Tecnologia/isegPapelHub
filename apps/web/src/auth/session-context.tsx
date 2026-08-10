@@ -7,7 +7,7 @@ type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 
 // Fallback quando `GET /auth/public-config` falha ou ainda não resolveu
 // (design.md D7/D9): sem identificação de cliente, título só com o nome.
-const DEFAULT_PUBLIC_CONFIG: PublicConfigResponse = { appName: 'Doc7', clientName: '' };
+const DEFAULT_PUBLIC_CONFIG: PublicConfigResponse = { appName: 'PapelHub', clientName: '' };
 
 interface SessionContextValue {
   status: SessionStatus;

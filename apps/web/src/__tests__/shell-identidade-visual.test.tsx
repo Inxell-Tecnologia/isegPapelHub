@@ -12,17 +12,52 @@ describe('Identidade visual no shell (identidade-visual)', () => {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
       },
-      'GET /auth/public-config': { status: 200, body: { appName: 'Doc7', clientName: 'SETES' } },
+      'GET /auth/public-config': {
+        status: 200,
+        body: { appName: 'PapelHub', clientName: 'SETES' },
+      },
     });
     renderApp(['/']);
 
-    await screen.findByText('Doc7');
+    await screen.findByRole('img', { name: 'PapelHub' });
     expect(screen.getByText('SETES')).toBeInTheDocument();
 
     const trigger = document.querySelector('.ant-layout-sider-trigger') as HTMLElement;
     await userEvent.click(trigger);
 
-    await screen.findByText('D7');
+    await screen.findByText('PH');
     expect(screen.queryByText('SETES')).not.toBeInTheDocument();
+  });
+
+  it('no shell expandido, a logomarca tem nome acessível igual ao nome da aplicação', async () => {
+    mockFetch({
+      'GET /auth/me': {
+        status: 200,
+        body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
+      },
+      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: '' } },
+    });
+    renderApp(['/']);
+
+    expect(await screen.findByRole('img', { name: 'PapelHub' })).toBeInTheDocument();
+  });
+
+  it('no shell colapsado, nenhuma logomarca é exibida — só a abreviação em texto', async () => {
+    mockFetch({
+      'GET /auth/me': {
+        status: 200,
+        body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
+      },
+      'GET /auth/public-config': { status: 200, body: { appName: 'PapelHub', clientName: '' } },
+    });
+    renderApp(['/']);
+
+    await screen.findByRole('img', { name: 'PapelHub' });
+
+    const trigger = document.querySelector('.ant-layout-sider-trigger') as HTMLElement;
+    await userEvent.click(trigger);
+
+    await screen.findByText('PH');
+    expect(screen.queryByRole('img', { name: 'PapelHub' })).not.toBeInTheDocument();
   });
 });

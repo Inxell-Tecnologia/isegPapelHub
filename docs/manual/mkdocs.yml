@@ -1,5 +1,5 @@
-site_name: Manual do Usuário — Doc7
-site_description: Manual funcional do Doc7 — como usar o sistema no dia a dia.
+site_name: Manual do Usuário — PapelHub
+site_description: Manual funcional do PapelHub — como usar o sistema no dia a dia.
 site_url: https://carlossalesnaturaltec.github.io/gdoc/
 docs_dir: docs
 strict: true
@@ -7,6 +7,8 @@ strict: true
 theme:
   name: material
   language: pt-BR
+  logo: assets/logo-papelhub.png
+  favicon: assets/logo-papelhub.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
