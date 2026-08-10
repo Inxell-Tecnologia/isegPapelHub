@@ -138,24 +138,38 @@ pessoa autenticada.
 
 ### Requirement: Configuração de identidade visual disponível sem autenticação
 
-O sistema SHALL expor a identidade visual (nome da aplicação e identificação do
-cliente) por um endpoint que responde **sem sessão autenticada**, porque a tela
-onde ela precisa aparecer é anterior ao login. Esse endpoint SHALL devolver
-**exclusivamente** o nome da aplicação e a identificação do cliente, e NÃO SHALL
-expor nenhum outro valor de configuração, ambiente, versão, limite ou recurso de
-infraestrutura. O endpoint NÃO SHALL abrir contexto de unidade nem consultar dado
-tenant-scoped.
+O sistema SHALL expor a configuração pública de apresentação por um endpoint
+que responde **sem sessão autenticada**, porque a tela onde parte dela precisa
+aparecer é anterior ao login. Esse endpoint SHALL devolver **exclusivamente**
+os valores desta lista nominal:
+
+- o nome da aplicação;
+- a identificação do cliente;
+- o endereço do manual do usuário (capability `documentacao-usuario`).
+
+O endpoint NÃO SHALL expor nenhum outro valor de configuração, ambiente,
+versão, limite ou recurso de infraestrutura. Acrescentar um quarto valor à
+resposta SHALL exigir a modificação explícita desta lista, e NÃO SHALL ser
+tratado como extensão natural do contrato. Todo valor da lista SHALL ser
+público por natureza — nenhum SHALL transitar pelo `SecretsPort`. O endpoint
+NÃO SHALL abrir contexto de unidade nem consultar dado tenant-scoped.
 
 #### Scenario: Requisição sem sessão obtém a identidade visual
-- **WHEN** um cliente sem sessão autenticada requisita a configuração de
-  identidade visual
-- **THEN** recebe o nome da aplicação e a identificação do cliente, sem erro de
-  autenticação
+- **WHEN** um cliente sem sessão autenticada requisita a configuração pública
+  de apresentação
+- **THEN** recebe o nome da aplicação, a identificação do cliente e o endereço
+  do manual, sem erro de autenticação
 
 #### Scenario: A resposta não carrega configuração além de identidade visual
-- **WHEN** um cliente requisita a configuração de identidade visual
-- **THEN** a resposta contém apenas o nome da aplicação e a identificação do
-  cliente, e nenhum outro dado de configuração do sistema
+- **WHEN** um cliente requisita a configuração pública de apresentação
+- **THEN** a resposta contém apenas os valores da lista nominal, e nenhum dado
+  de ambiente, versão, limite ou infraestrutura
+
+#### Scenario: Valor não configurado é devolvido como ausência, não omitido
+- **WHEN** a identificação do cliente ou o endereço do manual não está
+  configurado na implantação
+- **THEN** o valor correspondente é devolvido vazio, mantendo a forma da
+  resposta estável para o consumidor
 
 ### Requirement: Rota de identidade visual não introduz prefixo de topo novo
 
