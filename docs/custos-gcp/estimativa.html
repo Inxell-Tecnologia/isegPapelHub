@@ -1,0 +1,952 @@
+<title>Custos GCP do PapelHub</title>
+<style>
+/* ---------- TOKENS: tema claro completo no :root ---------- */
+:root{
+  --ground:#F6F8FA;
+  --surface:#FFFFFF;
+  --surface-2:#EEF2F6;
+  --ink:#141D26;
+  --ink-2:#3D4C5A;
+  --ink-3:#6B7C8B;
+  --rule:#D9E1E8;
+  --rule-strong:#B9C6D1;
+  --accent:#0B6E4F;
+  --accent-soft:#E2F0EA;
+  --accent-ink:#08553D;
+  --warn:#A6540B;
+  --warn-soft:#F7ECDF;
+  --crit:#9B2C2C;
+  --crit-soft:#F8E7E7;
+  --shadow:0 1px 2px rgba(20,29,38,.06),0 8px 24px -12px rgba(20,29,38,.18);
+
+  --f-display:"Hoefler Text","Iowan Old Style","Palatino Linotype",Palatino,"URW Palladio L",Georgia,serif;
+  --f-ui:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-data:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+
+  --measure:64ch;
+  --pad:clamp(1.1rem,4vw,2.75rem);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1317;
+    --surface:#141C22;
+    --surface-2:#1B252C;
+    --ink:#E7EEF3;
+    --ink-2:#B4C3CE;
+    --ink-3:#8899A6;
+    --rule:#243039;
+    --rule-strong:#334450;
+    --accent:#46C295;
+    --accent-soft:#12302A;
+    --accent-ink:#7BD9B5;
+    --warn:#E0993F;
+    --warn-soft:#33260F;
+    --crit:#E37A7A;
+    --crit-soft:#331A1A;
+    --shadow:0 1px 2px rgba(0,0,0,.5),0 8px 24px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1317;
+  --surface:#141C22;
+  --surface-2:#1B252C;
+  --ink:#E7EEF3;
+  --ink-2:#B4C3CE;
+  --ink-3:#8899A6;
+  --rule:#243039;
+  --rule-strong:#334450;
+  --accent:#46C295;
+  --accent-soft:#12302A;
+  --accent-ink:#7BD9B5;
+  --warn:#E0993F;
+  --warn-soft:#33260F;
+  --crit:#E37A7A;
+  --crit-soft:#331A1A;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 8px 24px -12px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--f-ui);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:0 var(--pad) 6rem}
+
+/* ---------- TIPOGRAFIA ---------- */
+h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;margin:0}
+h1{font-size:clamp(2.1rem,5.2vw,3.4rem);line-height:1.08;letter-spacing:-.015em}
+h2{font-size:clamp(1.45rem,3vw,2rem);line-height:1.16;letter-spacing:-.01em}
+h3{font-size:1.06rem;line-height:1.3;font-family:var(--f-ui);font-weight:650;letter-spacing:-.005em}
+p{margin:0;max-width:var(--measure)}
+.lede{font-size:1.12rem;color:var(--ink-2);max-width:60ch}
+small,.small{font-size:.82rem;line-height:1.5}
+.eyebrow{
+  font-family:var(--f-ui);font-size:.7rem;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+.num{font-family:var(--f-data);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+strong{font-weight:650;color:var(--ink)}
+
+/* ---------- CABEÇALHO ---------- */
+header.top{
+  border-bottom:1px solid var(--rule);
+  background:var(--surface);
+  margin-bottom:3.5rem;
+}
+.top-inner{max-width:1120px;margin:0 auto;padding:clamp(2.5rem,6vw,4.5rem) var(--pad) 2.25rem;
+  display:flex;flex-direction:column;gap:1.5rem}
+.stamp{
+  display:inline-flex;align-items:center;gap:.55rem;align-self:flex-start;
+  border:1px solid var(--accent);color:var(--accent);
+  padding:.3rem .7rem;border-radius:2px;
+  font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+}
+.stamp::before{content:"";width:6px;height:6px;background:var(--accent);border-radius:50%}
+.meta-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:.5rem;
+}
+.meta-grid div{background:var(--surface);padding:.75rem .9rem}
+.meta-grid dt{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:0 0 .2rem}
+.meta-grid dd{margin:0;font-family:var(--f-data);font-size:.86rem;color:var(--ink)}
+
+/* ---------- DATA-BASE (valores congelados) ---------- */
+.datebar{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem 1.1rem;
+  border:1px solid var(--warn);border-left-width:4px;
+  background:var(--warn-soft);padding:.85rem 1.1rem;border-radius:0 3px 3px 0;
+}
+.datebar .k{
+  font-size:.68rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--warn);
+}
+.datebar .d{
+  font-family:var(--f-data);font-size:1.35rem;font-weight:650;color:var(--ink);
+  line-height:1.1;font-variant-numeric:tabular-nums;
+}
+.datebar .why{font-size:.83rem;color:var(--ink-2);flex:1 1 22rem;min-width:16rem}
+
+/* ---------- CONTROLE DE MOEDA ---------- */
+.currency{
+  display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;
+  background:var(--surface-2);border:1px solid var(--rule);
+  padding:.7rem .9rem;border-radius:3px;
+}
+.currency label{font-size:.78rem;color:var(--ink-2);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:3px;overflow:hidden}
+.seg button{
+  appearance:none;border:0;background:var(--surface);color:var(--ink-2);
+  font-family:var(--f-ui);font-size:.78rem;font-weight:650;padding:.35rem .8rem;cursor:pointer;
+}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+:root[data-theme="dark"] .seg button[aria-pressed="true"],
+:root:not([data-theme="light"]) .seg button[aria-pressed="true"]{color:#08211A}
+.seg button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.currency input{
+  width:5.5rem;font-family:var(--f-data);font-size:.85rem;padding:.3rem .45rem;
+  border:1px solid var(--rule-strong);border-radius:3px;background:var(--surface);color:var(--ink);
+}
+
+/* ---------- SEÇÕES ---------- */
+section{margin-top:4rem;display:flex;flex-direction:column;gap:1.25rem}
+.sec-head{display:flex;flex-direction:column;gap:.5rem;border-top:2px solid var(--ink);padding-top:.9rem}
+
+/* ---------- CARTÕES DE DESTAQUE ---------- */
+.findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem}
+.finding{
+  background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+  padding:1.15rem 1.2rem;display:flex;flex-direction:column;gap:.5rem;box-shadow:var(--shadow);
+}
+.finding .big{font-family:var(--f-data);font-size:1.75rem;font-weight:600;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums}
+.finding p{font-size:.88rem;color:var(--ink-2);max-width:none}
+
+/* ---------- TABELAS ---------- */
+.tscroll{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:520px}
+caption{text-align:left;padding:.9rem 1rem .1rem;color:var(--ink-3);font-size:.8rem}
+th,td{padding:.55rem .85rem;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{
+  font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:700;background:var(--surface-2);border-bottom:1px solid var(--rule-strong);
+  position:sticky;top:0;
+}
+tbody tr:last-child td{border-bottom:0}
+td.money,th.money{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+td.key{font-weight:600}
+tbody tr:hover{background:var(--surface-2)}
+tr.band td{background:var(--accent-soft);font-weight:650}
+tr.band:hover td{background:var(--accent-soft)}
+.spec{font-family:var(--f-data);font-size:.78rem;color:var(--ink-3);white-space:nowrap}
+
+/* ---------- PLANOS ---------- */
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:1rem}
+.plan{
+  border:1px solid var(--rule);border-radius:3px;background:var(--surface);
+  padding:1.25rem;display:flex;flex-direction:column;gap:.8rem;
+}
+.plan.rec{border-color:var(--accent);border-width:2px}
+.plan ul{margin:0;padding-left:1.05rem;display:flex;flex-direction:column;gap:.35rem}
+.plan li{font-size:.86rem;color:var(--ink-2)}
+.plan .tag{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.plan.rec .tag{color:var(--accent)}
+
+/* ---------- BARRAS DE COMPOSIÇÃO ---------- */
+.comp{display:flex;flex-direction:column;gap:1.1rem}
+.comp-row{display:flex;flex-direction:column;gap:.4rem}
+.comp-label{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap}
+.comp-label b{font-size:.9rem;font-weight:650}
+.comp-label .num{font-size:.85rem;color:var(--ink-2)}
+.bar{display:flex;height:26px;border-radius:2px;overflow:hidden;border:1px solid var(--rule)}
+.bar span{display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:700;color:#fff;min-width:0;overflow:hidden}
+.s-app{background:#3D6E8F}
+.s-db{background:#6A5D9B}
+.s-st{background:var(--accent)}
+.s-eg{background:#B4772A}
+:root[data-theme="dark"] .bar span,
+:root:not([data-theme="light"]) .bar span{color:#0B1216}
+.legend{display:flex;flex-wrap:wrap;gap:1rem;font-size:.78rem;color:var(--ink-2)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:.35rem;vertical-align:-1px}
+
+/* ---------- CALLOUTS ---------- */
+.note{
+  border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:.9rem 1.1rem;border-radius:0 3px 3px 0;
+}
+.note.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.note.crit{border-left-color:var(--crit);background:var(--crit-soft)}
+.note p{max-width:none;font-size:.9rem;color:var(--ink-2)}
+.note h3{margin-bottom:.35rem}
+
+/* ---------- LISTAS DE FATOS ---------- */
+.facts{display:grid;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.fact{background:var(--surface);padding:.95rem 1.1rem;display:grid;grid-template-columns:minmax(140px,210px) 1fr;gap:1rem}
+.fact dt{font-weight:650;font-size:.88rem}
+.fact dd{margin:0;font-size:.88rem;color:var(--ink-2)}
+@media(max-width:620px){.fact{grid-template-columns:1fr;gap:.25rem}}
+
+.pill{
+  display:inline-block;padding:.1rem .5rem;border-radius:2px;
+  font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+}
+.pill.ok{background:var(--accent-soft);color:var(--accent-ink)}
+.pill.no{background:var(--crit-soft);color:var(--crit)}
+.pill.mid{background:var(--warn-soft);color:var(--warn)}
+
+/* ---------- DIAGRAMA ---------- */
+.diagram{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:1.25rem;overflow-x:auto}
+.diagram svg{display:block;min-width:520px;width:100%;height:auto}
+
+footer{margin-top:5rem;border-top:1px solid var(--rule);padding-top:1.5rem;color:var(--ink-3);font-size:.82rem}
+footer a{color:var(--accent)}
+a{color:var(--accent)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <span class="stamp">Documento de apoio comercial</span>
+    <h1>Quanto custa hospedar o PapelHub</h1>
+    <p class="lede">Estimativa de custo mensal de infraestrutura no Google Cloud, separada em
+      <strong>aplicação</strong>, <strong>banco de dados</strong> e <strong>armazenamento</strong>,
+      para acervos de 200&nbsp;GB a 50&nbsp;TB e times de 50 a 300 pessoas.</p>
+
+    <div class="datebar">
+      <span class="k">Data-base dos preços</span>
+      <span class="d">12 de agosto de 2026</span>
+      <span class="why">Os valores deste documento estão <strong>congelados</strong> nessa data.
+        O Google altera preços sem aviso prévio — <strong>reconferir antes de fechar qualquer proposta</strong>,
+        e obrigatoriamente em contratos com mais de 12 meses. Para atualizar, rode
+        <span class="num">modelo.py</span> (ver README ao lado deste arquivo).</span>
+    </div>
+
+    <dl class="meta-grid">
+      <div><dt>Região</dt><dd>us-central1 · Iowa, EUA</dd></div>
+      <div><dt>Moeda</dt><dd>USD, sem impostos</dd></div>
+      <div><dt>Base de cobrança</dt><dd>1 GB = 1 GiB (padrão Google)</dd></div>
+      <div><dt>Origem dos valores</dt><dd>preço de lista, sem desconto</dd></div>
+    </dl>
+
+    <div class="currency">
+      <label for="rate">Exibir valores em</label>
+      <span class="seg" role="group" aria-label="Moeda de exibição">
+        <button type="button" id="btn-usd" aria-pressed="true">US$</button>
+        <button type="button" id="btn-brl" aria-pressed="false">R$</button>
+      </span>
+      <label for="rate">Cotação US$&nbsp;1 =</label>
+      <input type="number" id="rate" value="5.40" min="0.01" step="0.01" aria-label="Cotação do dólar em reais">
+      <span class="small" style="color:var(--ink-3)">Informe a cotação do dia. Impostos não inclusos.</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ============ LEIA PRIMEIRO ============ -->
+<section id="resumo" style="margin-top:0">
+  <div class="sec-head">
+    <span class="eyebrow">Leia primeiro</span>
+    <h2>Três coisas que mudam qualquer proposta</h2>
+  </div>
+
+  <div class="findings">
+    <div class="finding">
+      <span class="eyebrow">O que pesa na conta</span>
+      <span class="big">2&nbsp;TB</span>
+      <p>É o ponto de virada. Abaixo disso o cliente paga <strong>pela plataforma</strong> (servidor e banco, custo quase fixo). Acima de 5&nbsp;TB ele paga <strong>pelo espaço</strong>, e o número de funcionários vira detalhe.</p>
+    </div>
+    <div class="finding">
+      <span class="eyebrow">O item mais imprevisível</span>
+      <span class="big" data-usd="0.12">US$&nbsp;0,12</span>
+      <p>Por GB baixado pelos usuários. É o único item que não dá para prever no papel — pode ir de 5% a 40% da conta. <strong>Cotar como repasse por GB</strong>, nunca como valor fechado.</p>
+    </div>
+    <div class="finding">
+      <span class="eyebrow">Bloqueio contratual hoje</span>
+      <span class="big">2,9&nbsp;TB</span>
+      <p>Teto de acervo para 300 pessoas com a cota atual de 10&nbsp;GB por usuário. Qualquer proposta acima de 3&nbsp;TB <strong>exige ajustar a cota</strong> antes de assinar.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ COMO O CUSTO SE FORMA ============ -->
+<section id="como">
+  <div class="sec-head">
+    <span class="eyebrow">Entendendo a conta</span>
+    <h2>Por que o sistema custa menos do que parece</h2>
+  </div>
+  <p>Na maioria dos sistemas de documentos, cada arquivo baixado passa <em>duas vezes</em> pela infraestrutura:
+    sai do disco, entra no servidor, sai do servidor, chega no usuário — e o cliente paga pelas duas pernas.
+    O PapelHub não funciona assim.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 720 230" role="img" aria-label="Diagrama: o servidor autoriza o acesso, mas o arquivo vai direto do armazenamento para o usuário.">
+      <defs>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="system-ui,sans-serif" font-size="12.5">
+        <!-- usuário -->
+        <rect x="8" y="80" width="132" height="62" rx="3" fill="var(--surface-2)" stroke="var(--rule-strong)"/>
+        <text x="74" y="106" text-anchor="middle" fill="var(--ink)" font-weight="650">Navegador</text>
+        <text x="74" y="124" text-anchor="middle" fill="var(--ink-3)" font-size="11">do funcionário</text>
+
+        <!-- API -->
+        <rect x="286" y="14" width="150" height="66" rx="3" fill="var(--surface-2)" stroke="var(--rule-strong)"/>
+        <text x="361" y="40" text-anchor="middle" fill="var(--ink)" font-weight="650">Aplicação</text>
+        <text x="361" y="58" text-anchor="middle" fill="var(--ink-3)" font-size="11">confere a permissão</text>
+
+        <!-- storage -->
+        <rect x="560" y="80" width="150" height="66" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="635" y="106" text-anchor="middle" fill="var(--ink)" font-weight="650">Armazenamento</text>
+        <text x="635" y="124" text-anchor="middle" fill="var(--ink-3)" font-size="11">cofre privado</text>
+
+        <!-- setas permissão -->
+        <g color="var(--ink-3)" stroke="currentColor" stroke-width="1.4" fill="none">
+          <path d="M120,86 L292,56" marker-end="url(#ar)"/>
+          <path d="M430,62 L556,88" marker-end="url(#ar)"/>
+        </g>
+        <text x="188" y="60" fill="var(--ink-3)" font-size="11">1. posso baixar?</text>
+        <text x="452" y="52" fill="var(--ink-3)" font-size="11">2. libera uma chave</text>
+        <text x="452" y="68" fill="var(--ink-3)" font-size="11">    temporária</text>
+
+        <!-- seta bytes -->
+        <g color="var(--accent)" stroke="currentColor" stroke-width="2.4" fill="none">
+          <path d="M146,130 L552,130" marker-end="url(#ar)"/>
+        </g>
+        <text x="349" y="152" text-anchor="middle" fill="var(--accent)" font-size="12" font-weight="650">3. o arquivo vem direto — sem passar pelo servidor</text>
+
+        <text x="8" y="196" fill="var(--ink-3)" font-size="11.5">O servidor decide quem pode o quê; ele nunca carrega o peso dos arquivos.</text>
+        <text x="8" y="214" fill="var(--ink-3)" font-size="11.5">Resultado: o servidor pode ser pequeno mesmo com um acervo de 50 TB.</text>
+      </g>
+    </svg>
+  </div>
+
+  <p>Por isso a coluna de <strong>aplicação</strong> nas tabelas a seguir quase não cresce com o volume de
+    documentos: ela acompanha o número de <em>pessoas usando ao mesmo tempo</em>. O mesmo vale para o banco de
+    dados, que guarda apenas o índice — quem enviou, quando, quem pode ver — e nunca o conteúdo dos arquivos.</p>
+</section>
+
+<!-- ============ PLANOS ============ -->
+<section id="planos">
+  <div class="sec-head">
+    <span class="eyebrow">Configurações</span>
+    <h2>Três níveis de serviço</h2>
+  </div>
+  <p>As tabelas de custo usam estes três níveis. O <strong>Padrão</strong> é o recomendado para contrato com
+    cliente: é o menor arranjo que ainda oferece domínio próprio, recuperação por ponto no tempo e garantia
+    formal de disponibilidade do Google.</p>
+
+  <div class="plans">
+    <div class="plan">
+      <span class="tag">Essencial</span>
+      <h3>O que está no ar hoje</h3>
+      <ul>
+        <li>Servidor desliga quando ninguém usa (primeiro acesso do dia demora alguns segundos)</li>
+        <li>Banco no menor porte disponível</li>
+        <li>Backup diário, 7 cópias</li>
+        <li>Endereço genérico da Google, sem domínio próprio</li>
+      </ul>
+      <p class="small" style="color:var(--crit);font-weight:600">Sem garantia de disponibilidade do banco. Adequado para piloto, não para contrato.</p>
+    </div>
+
+    <div class="plan rec">
+      <span class="tag">Padrão · recomendado</span>
+      <h3>Pronto para contrato</h3>
+      <ul>
+        <li>Servidor sempre ligado — resposta imediata</li>
+        <li>Banco com porte dedicado e reserva de capacidade</li>
+        <li>Backup diário <strong>+ recuperação para qualquer minuto</strong> dos últimos dias</li>
+        <li>Domínio próprio do cliente com certificado gerenciado</li>
+      </ul>
+      <p class="small" style="color:var(--ink-2)">Garantia de disponibilidade de 99,95% na aplicação e 99,9% no armazenamento.</p>
+    </div>
+
+    <div class="plan">
+      <span class="tag">Alta disponibilidade</span>
+      <h3>Para operação crítica</h3>
+      <ul>
+        <li>Servidor com duas instâncias permanentes</li>
+        <li>Banco <strong>espelhado em dois data centers</strong>, troca automática em falha</li>
+        <li>Mesmos backups do plano Padrão</li>
+        <li>Garantia formal de 99,95% também no banco</li>
+      </ul>
+      <p class="small" style="color:var(--ink-2)">Custo aproximadamente o dobro no banco de dados. Não altera o custo de armazenamento.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TABELA A ============ -->
+<section id="aplicacao">
+  <div class="sec-head">
+    <span class="eyebrow">Componente 1 de 3</span>
+    <h2>Aplicação</h2>
+  </div>
+  <p>O servidor que atende as telas, valida permissões e gera as chaves temporárias de acesso aos arquivos.
+    Inclui o balanceador e o certificado do domínio próprio nos planos Padrão e Alta disponibilidade.
+    <strong>Não varia com o volume de documentos.</strong></p>
+
+  <div class="tscroll">
+    <table>
+      <caption>Custo mensal da aplicação, em US$</caption>
+      <thead>
+        <tr><th scope="col">Funcionários</th><th scope="col" class="money">Essencial</th><th scope="col" class="money">Padrão</th><th scope="col" class="money">Alta disp.</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="key">50</td><td class="money" data-usd="7.19"></td><td class="money" data-usd="37.74"></td><td class="money" data-usd="50.88"></td></tr>
+        <tr><td class="key">100</td><td class="money" data-usd="11.77"></td><td class="money" data-usd="41.74"></td><td class="money" data-usd="54.88"></td></tr>
+        <tr><td class="key">200</td><td class="money" data-usd="19.10"></td><td class="money" data-usd="48.19"></td><td class="money" data-usd="61.33"></td></tr>
+        <tr><td class="key">300</td><td class="money" data-usd="26.43"></td><td class="money" data-usd="54.64"></td><td class="money" data-usd="67.78"></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small" style="color:var(--ink-3)">O salto do Essencial para o Padrão é quase todo do domínio próprio (balanceador, ~US$&nbsp;18/mês fixos) e de manter o servidor sempre ligado.</p>
+</section>
+
+<!-- ============ TABELA B ============ -->
+<section id="banco">
+  <div class="sec-head">
+    <span class="eyebrow">Componente 2 de 3</span>
+    <h2>Banco de dados</h2>
+  </div>
+  <p>Guarda o índice do acervo: pastas, nomes, datas, quem enviou, quem pode ver o quê e o histórico de
+    auditoria. <strong>Nenhum byte de arquivo passa por aqui</strong> — por isso o porte acompanha o número de
+    pessoas simultâneas, não o tamanho do acervo.</p>
+
+  <div class="tscroll">
+    <table>
+      <caption>Custo mensal do banco, em US$ — inclui disco e backups</caption>
+      <thead>
+        <tr><th scope="col">Funcionários</th><th scope="col" class="money">Essencial</th><th scope="col" class="money">Padrão</th><th scope="col" class="money">Alta disp.</th><th scope="col">Porte no plano Padrão</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="key">50</td><td class="money" data-usd="10.17"></td><td class="money" data-usd="55.11"></td><td class="money" data-usd="107.82"></td><td class="spec">1 vCPU · 3,75 GB · 20 GB disco</td></tr>
+        <tr><td class="key">100</td><td class="money" data-usd="10.17"></td><td class="money" data-usd="58.01"></td><td class="money" data-usd="112.42"></td><td class="spec">1 vCPU · 3,75 GB · 30 GB disco</td></tr>
+        <tr><td class="key">200</td><td class="money" data-usd="10.17"></td><td class="money" data-usd="113.12"></td><td class="money" data-usd="220.25"></td><td class="spec">2 vCPU · 7,5 GB · 50 GB disco</td></tr>
+        <tr><td class="key">300</td><td class="money" data-usd="10.17"></td><td class="money" data-usd="120.37"></td><td class="money" data-usd="231.75"></td><td class="spec">2 vCPU · 7,5 GB · 75 GB disco</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <h3>Por que o porte parece pequeno para 300 pessoas</h3>
+    <p>300 funcionários geram cerca de 450 mil requisições por mês — menos de 1 por segundo em média e
+      4&nbsp;a&nbsp;5 no pico da manhã. Um banco de 2&nbsp;vCPU atende isso com folga larga. Se a medição em
+      produção indicar necessidade, dobrar o porte é uma troca de configuração em minutos, sem migração e sem
+      parada — e acrescenta cerca de <span class="num" data-usd="98.63"></span> por mês.</p>
+  </div>
+</section>
+
+<!-- ============ TABELA C ============ -->
+<section id="armazenamento">
+  <div class="sec-head">
+    <span class="eyebrow">Componente 3 de 3</span>
+    <h2>Armazenamento</h2>
+  </div>
+  <p>O espaço ocupado pelos arquivos. É linear e previsível: <strong>US$&nbsp;0,02 por GB por mês</strong>.
+    Igual nos três planos — o nível de serviço não muda o preço do espaço.</p>
+
+  <div class="tscroll">
+    <table>
+      <caption>Custo mensal de armazenamento, em US$ — inclui a retenção de segurança de 7 dias</caption>
+      <thead>
+        <tr><th scope="col">Acervo</th><th scope="col" class="money">Custo mensal</th><th scope="col" class="money">Custo por funcionário (300 pessoas)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="key">200 GB</td><td class="money" data-usd="4.08"></td><td class="money" data-usd="0.014"></td></tr>
+        <tr><td class="key">300 GB</td><td class="money" data-usd="6.09"></td><td class="money" data-usd="0.021"></td></tr>
+        <tr><td class="key">400 GB</td><td class="money" data-usd="8.11"></td><td class="money" data-usd="0.027"></td></tr>
+        <tr><td class="key">500 GB</td><td class="money" data-usd="10.12"></td><td class="money" data-usd="0.034"></td></tr>
+        <tr><td class="key">600 GB</td><td class="money" data-usd="12.13"></td><td class="money" data-usd="0.040"></td></tr>
+        <tr><td class="key">700 GB</td><td class="money" data-usd="14.15"></td><td class="money" data-usd="0.047"></td></tr>
+        <tr><td class="key">800 GB</td><td class="money" data-usd="16.16"></td><td class="money" data-usd="0.054"></td></tr>
+        <tr><td class="key">900 GB</td><td class="money" data-usd="18.18"></td><td class="money" data-usd="0.061"></td></tr>
+        <tr class="band"><td class="key">1 TB</td><td class="money" data-usd="20.67"></td><td class="money" data-usd="0.069"></td></tr>
+        <tr><td class="key">10 TB</td><td class="money" data-usd="206.28"></td><td class="money" data-usd="0.688"></td></tr>
+        <tr><td class="key">20 TB</td><td class="money" data-usd="412.52"></td><td class="money" data-usd="1.375"></td></tr>
+        <tr><td class="key">30 TB</td><td class="money" data-usd="618.75"></td><td class="money" data-usd="2.063"></td></tr>
+        <tr><td class="key">40 TB</td><td class="money" data-usd="824.98"></td><td class="money" data-usd="2.750"></td></tr>
+        <tr class="band"><td class="key">50 TB</td><td class="money" data-usd="1031.22"></td><td class="money" data-usd="3.437"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn">
+    <h3>O volume contratado precisa incluir a lixeira</h3>
+    <p>Arquivos excluídos por um usuário permanecem recuperáveis por 30 dias e continuam ocupando espaço
+      cobrado durante esse período. Um cliente que exclui e reenvia muito documento paga por ambos por um mês.
+      Ao dimensionar, some uma margem sobre o acervo útil.</p>
+  </div>
+</section>
+
+<!-- ============ TABELA D — MATRIZ ============ -->
+<section id="matriz">
+  <div class="sec-head">
+    <span class="eyebrow">Consolidado</span>
+    <h2>Custo mensal total</h2>
+  </div>
+  <p>Aplicação + banco + armazenamento no plano <strong>Padrão</strong>.
+    <strong>Não inclui o tráfego de download</strong>, que é tratado na seção seguinte por ser o único item
+    genuinamente variável.</p>
+
+  <div class="tscroll">
+    <table>
+      <caption>Custo-base mensal em US$ · plano Padrão · sem tráfego de download</caption>
+      <thead>
+        <tr>
+          <th scope="col">Acervo</th>
+          <th scope="col" class="money">50 func.</th>
+          <th scope="col" class="money">100 func.</th>
+          <th scope="col" class="money">200 func.</th>
+          <th scope="col" class="money">300 func.</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="key">200 GB</td><td class="money" data-usd="96.90"></td><td class="money" data-usd="103.83"></td><td class="money" data-usd="165.44"></td><td class="money" data-usd="179.19"></td></tr>
+        <tr><td class="key">300 GB</td><td class="money" data-usd="98.92"></td><td class="money" data-usd="105.84"></td><td class="money" data-usd="167.45"></td><td class="money" data-usd="181.21"></td></tr>
+        <tr><td class="key">400 GB</td><td class="money" data-usd="100.93"></td><td class="money" data-usd="107.86"></td><td class="money" data-usd="169.47"></td><td class="money" data-usd="183.22"></td></tr>
+        <tr><td class="key">500 GB</td><td class="money" data-usd="102.94"></td><td class="money" data-usd="109.87"></td><td class="money" data-usd="171.48"></td><td class="money" data-usd="185.23"></td></tr>
+        <tr><td class="key">600 GB</td><td class="money" data-usd="104.96"></td><td class="money" data-usd="111.88"></td><td class="money" data-usd="173.50"></td><td class="money" data-usd="187.25"></td></tr>
+        <tr><td class="key">700 GB</td><td class="money" data-usd="106.97"></td><td class="money" data-usd="113.90"></td><td class="money" data-usd="175.51"></td><td class="money" data-usd="189.26"></td></tr>
+        <tr><td class="key">800 GB</td><td class="money" data-usd="108.99"></td><td class="money" data-usd="115.91"></td><td class="money" data-usd="177.52"></td><td class="money" data-usd="191.28"></td></tr>
+        <tr><td class="key">900 GB</td><td class="money" data-usd="111.00"></td><td class="money" data-usd="117.93"></td><td class="money" data-usd="179.54"></td><td class="money" data-usd="193.29"></td></tr>
+        <tr class="band"><td class="key">1 TB</td><td class="money" data-usd="113.50"></td><td class="money" data-usd="120.42"></td><td class="money" data-usd="182.04"></td><td class="money" data-usd="195.79"></td></tr>
+        <tr><td class="key">10 TB</td><td class="money" data-usd="299.11"></td><td class="money" data-usd="306.03"></td><td class="money" data-usd="367.65"></td><td class="money" data-usd="381.40"></td></tr>
+        <tr><td class="key">20 TB</td><td class="money" data-usd="505.34"></td><td class="money" data-usd="512.27"></td><td class="money" data-usd="573.88"></td><td class="money" data-usd="587.63"></td></tr>
+        <tr><td class="key">30 TB</td><td class="money" data-usd="711.58"></td><td class="money" data-usd="718.50"></td><td class="money" data-usd="780.11"></td><td class="money" data-usd="793.87"></td></tr>
+        <tr><td class="key">40 TB</td><td class="money" data-usd="917.81"></td><td class="money" data-usd="924.73"></td><td class="money" data-usd="986.35"></td><td class="money" data-usd="1000.10"></td></tr>
+        <tr class="band"><td class="key">50 TB</td><td class="money" data-usd="1124.04"></td><td class="money" data-usd="1130.97"></td><td class="money" data-usd="1192.58"></td><td class="money" data-usd="1206.33"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="small" style="color:var(--ink-3)">Leia as linhas de cima para baixo: dobrar o acervo de 200&nbsp;GB
+    para 400&nbsp;GB muda pouco a conta. Dobrar de 20&nbsp;TB para 40&nbsp;TB praticamente a dobra. As colunas
+    contam a história oposta — sextuplicar o número de pessoas nunca dobra o custo.</p>
+</section>
+
+<!-- ============ EGRESS ============ -->
+<section id="download">
+  <div class="sec-head">
+    <span class="eyebrow">Custo variável</span>
+    <h2>Tráfego de download</h2>
+  </div>
+  <p>Cada GB que sai da nuvem para o computador do funcionário custa <strong>US$&nbsp;0,12</strong>
+    (cai para US$&nbsp;0,11 acima de 10&nbsp;TB por mês). Enviar arquivos <em>para</em> a nuvem é gratuito;
+    só a saída é cobrada.</p>
+
+  <div class="tscroll">
+    <table>
+      <caption>Custo mensal de download por perfil de uso, em US$</caption>
+      <thead>
+        <tr>
+          <th scope="col">Funcionários</th>
+          <th scope="col" class="money">Leve<br><span class="spec">2 GB/pessoa</span></th>
+          <th scope="col" class="money">Moderado<br><span class="spec">8 GB/pessoa</span></th>
+          <th scope="col" class="money">Intenso<br><span class="spec">25 GB/pessoa</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="key">50</td><td class="money" data-usd="12.00"></td><td class="money" data-usd="48.00"></td><td class="money" data-usd="150.00"></td></tr>
+        <tr><td class="key">100</td><td class="money" data-usd="24.00"></td><td class="money" data-usd="96.00"></td><td class="money" data-usd="300.00"></td></tr>
+        <tr><td class="key">200</td><td class="money" data-usd="48.00"></td><td class="money" data-usd="192.00"></td><td class="money" data-usd="600.00"></td></tr>
+        <tr><td class="key">300</td><td class="money" data-usd="72.00"></td><td class="money" data-usd="288.00"></td><td class="money" data-usd="900.00"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note crit">
+    <h3>Como cotar isto sem tomar prejuízo</h3>
+    <p>Este é o único item que pode surpreender. Um time de 300 pessoas em uso intenso gera
+      <span class="num" data-usd="900.00"></span> por mês só de download — mais do que todo o resto da
+      infraestrutura somada. <strong>Recomendação: incluir uma franquia mensal em GB na proposta e cotar o
+      excedente por GB.</strong> No primeiro mês de operação real, medir o consumo e ajustar a franquia.</p>
+  </div>
+</section>
+
+<!-- ============ COMPOSIÇÃO ============ -->
+<section id="composicao">
+  <div class="sec-head">
+    <span class="eyebrow">Visão</span>
+    <h2>Para onde vai cada real</h2>
+  </div>
+  <p>Quatro cenários reais, com perfil de download moderado. Repare como o peso migra da plataforma
+    para o espaço conforme o acervo cresce.</p>
+
+  <div class="legend">
+    <span><i class="s-app" style="background:#3D6E8F"></i>Aplicação</span>
+    <span><i class="s-db" style="background:#6A5D9B"></i>Banco</span>
+    <span><i class="s-st" style="background:var(--accent)"></i>Armazenamento</span>
+    <span><i class="s-eg" style="background:#B4772A"></i>Download</span>
+  </div>
+
+  <div class="comp">
+    <div class="comp-row">
+      <div class="comp-label"><b>200 GB · 50 funcionários</b><span class="num" data-usd="144.90"></span></div>
+      <div class="bar" role="img" aria-label="Aplicação 26%, banco 38%, armazenamento 3%, download 33%">
+        <span class="s-app" style="width:26.0%">26%</span><span class="s-db" style="width:38.0%">38%</span><span class="s-st" style="width:2.8%"></span><span class="s-eg" style="width:33.1%">33%</span>
+      </div>
+    </div>
+    <div class="comp-row">
+      <div class="comp-label"><b>1 TB · 100 funcionários</b><span class="num" data-usd="216.42"></span></div>
+      <div class="bar" role="img" aria-label="Aplicação 19%, banco 27%, armazenamento 10%, download 44%">
+        <span class="s-app" style="width:19.3%">19%</span><span class="s-db" style="width:26.8%">27%</span><span class="s-st" style="width:9.6%">10%</span><span class="s-eg" style="width:44.4%">44%</span>
+      </div>
+    </div>
+    <div class="comp-row">
+      <div class="comp-label"><b>10 TB · 200 funcionários</b><span class="num" data-usd="559.65"></span></div>
+      <div class="bar" role="img" aria-label="Aplicação 9%, banco 20%, armazenamento 37%, download 34%">
+        <span class="s-app" style="width:8.6%">9%</span><span class="s-db" style="width:20.2%">20%</span><span class="s-st" style="width:36.9%">37%</span><span class="s-eg" style="width:34.3%">34%</span>
+      </div>
+    </div>
+    <div class="comp-row">
+      <div class="comp-label"><b>50 TB · 300 funcionários</b><span class="num" data-usd="1494.33"></span></div>
+      <div class="bar" role="img" aria-label="Aplicação 4%, banco 8%, armazenamento 69%, download 19%">
+        <span class="s-app" style="width:3.7%"></span><span class="s-db" style="width:8.1%">8%</span><span class="s-st" style="width:69.0%">69%</span><span class="s-eg" style="width:19.3%">19%</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ECONOMIA ============ -->
+<section id="economia">
+  <div class="sec-head">
+    <span class="eyebrow">Alavanca comercial</span>
+    <h2>Como baixar a conta em acervos grandes</h2>
+  </div>
+  <p>Documento antigo quase nunca é aberto. Movê-lo automaticamente para uma faixa de armazenamento mais
+    barata após 90 dias corta o item que mais pesa acima de 10&nbsp;TB — sem tirar nada do cliente:
+    o arquivo continua no lugar, com o mesmo acesso.</p>
+
+  <div class="tscroll">
+    <table>
+      <caption>Economia com arquivamento automático · assumindo 70% do acervo com mais de 90 dias</caption>
+      <thead>
+        <tr><th scope="col">Acervo</th><th scope="col" class="money">Tudo em faixa padrão</th><th scope="col" class="money">Com arquivamento</th><th scope="col" class="money">Economia/mês</th><th scope="col">Redução</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="key">10 TB</td><td class="money" data-usd="204.80"></td><td class="money" data-usd="133.12"></td><td class="money" data-usd="71.68"></td><td>35%</td></tr>
+        <tr><td class="key">30 TB</td><td class="money" data-usd="614.40"></td><td class="money" data-usd="399.36"></td><td class="money" data-usd="215.04"></td><td>35%</td></tr>
+        <tr><td class="key">50 TB</td><td class="money" data-usd="1024.00"></td><td class="money" data-usd="665.60"></td><td class="money" data-usd="358.40"></td><td>35%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn">
+    <h3>Duas condições antes de prometer isso</h3>
+    <p><strong>Primeira:</strong> ler um arquivo arquivado tem custo extra de US$&nbsp;0,01 por GB. Só compensa
+      se o acervo for realmente frio. <strong>Segunda:</strong> este arquivamento automático ainda
+      <em>não está configurado</em> no sistema — é uma melhoria a implementar, não um recurso disponível hoje.
+      Não incluir em proposta sem confirmar o prazo de entrega.</p>
+  </div>
+</section>
+
+<!-- ============ BACKUPS E GARANTIAS ============ -->
+<section id="garantias">
+  <div class="sec-head">
+    <span class="eyebrow">Perguntas do cliente</span>
+    <h2>Backups e garantias</h2>
+  </div>
+
+  <h3 style="margin-top:.5rem">O que já existe hoje</h3>
+  <dl class="facts">
+    <div class="fact">
+      <dt>Lixeira de 30 dias</dt>
+      <dd>Arquivo excluído por engano fica recuperável pelo próprio usuário por 30 dias. Depois disso, uma
+        rotina automática às 03h remove definitivamente. <span class="pill ok">Ativo</span></dd>
+    </div>
+    <div class="fact">
+      <dt>Rede de segurança adicional</dt>
+      <dd>Mesmo após a exclusão definitiva, o arquivo permanece mais 7 dias recuperável pelo suporte técnico.
+        <span class="pill ok">Ativo</span></dd>
+    </div>
+    <div class="fact">
+      <dt>Backup do banco de dados</dt>
+      <dd>Cópia automática diária, com as 7 últimas retidas. Restaura o índice completo do acervo.
+        <span class="pill ok">Ativo</span></dd>
+    </div>
+    <div class="fact">
+      <dt>Recuperação para um minuto exato</dt>
+      <dd>Voltar o banco ao estado de qualquer minuto dos últimos dias — a proteção contra um erro de operação
+        no meio do expediente. <span class="pill no">Desligado hoje</span> — incluído no plano Padrão.</dd>
+    </div>
+    <div class="fact">
+      <dt>Proteção contra exclusão acidental</dt>
+      <dd>O banco de dados não pode ser destruído por comando de administração; exige desbloqueio explícito.
+        <span class="pill ok">Ativo</span></dd>
+    </div>
+    <div class="fact">
+      <dt>Cópias do arquivo físico</dt>
+      <dd>O Google mantém redundância interna dentro da região e declara durabilidade projetada de 99,999999999%
+        ao ano (onze noves). <span class="pill mid">Redundância dentro de uma região</span></dd>
+    </div>
+  </dl>
+
+  <h3 style="margin-top:1.5rem">Garantia formal de disponibilidade (SLA do Google)</h3>
+  <div class="tscroll">
+    <table>
+      <caption>Compromisso contratual de tempo no ar, por mês</caption>
+      <thead>
+        <tr><th scope="col">Serviço</th><th scope="col">Essencial</th><th scope="col">Padrão</th><th scope="col">Alta disp.</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="key">Aplicação</td><td>99,95%</td><td>99,95%</td><td>99,95%</td></tr>
+        <tr><td class="key">Armazenamento</td><td>99,9%</td><td>99,9%</td><td>99,9%</td></tr>
+        <tr><td class="key">Banco de dados</td><td><span class="pill no">Sem SLA</span></td><td><span class="pill no">Sem SLA</span></td><td>99,95%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note crit">
+    <h3>Ponto sensível para contrato</h3>
+    <p>O Google só oferece garantia formal de disponibilidade do banco de dados quando ele está
+      <strong>espelhado em dois data centers</strong> — ou seja, apenas no plano Alta disponibilidade.
+      Nos planos Essencial e Padrão o banco roda em um único data center: na prática ele fica no ar quase
+      sempre, mas <em>não há compromisso contratual</em>. Se a proposta prometer disponibilidade fim a fim
+      com multa, o plano Alta disponibilidade é obrigatório.</p>
+  </div>
+
+  <h3 style="margin-top:1.5rem">Tempo de recuperação em caso de desastre</h3>
+  <div class="tscroll">
+    <table>
+      <caption>Quanto se perde e quanto demora para voltar</caption>
+      <thead>
+        <tr><th scope="col">Cenário</th><th scope="col">Essencial</th><th scope="col">Padrão</th><th scope="col">Alta disp.</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="key">Dados perdidos, na pior hipótese</td><td>até 24 h</td><td>menos de 1 h</td><td>segundos</td></tr>
+        <tr><td class="key">Tempo até voltar ao ar</td><td>horas</td><td>horas</td><td>automático, minutos</td></tr>
+        <tr><td class="key">Falha de um data center</td><td>parada</td><td>parada</td><td>troca automática</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ CRIPTOGRAFIA ============ -->
+<section id="criptografia">
+  <div class="sec-head">
+    <span class="eyebrow">Perguntas do cliente</span>
+    <h2>Criptografia e proteção de acesso</h2>
+  </div>
+  <p>Todos os itens abaixo já estão ativos, sem custo adicional na conta.</p>
+
+  <dl class="facts">
+    <div class="fact">
+      <dt>Arquivos guardados</dt>
+      <dd>Criptografados em disco com AES-256 pelo Google, automaticamente e sem exceção — inclusive as
+        cópias de backup.</dd>
+    </div>
+    <div class="fact">
+      <dt>Dados em trânsito</dt>
+      <dd>Todo o tráfego usa HTTPS. O acesso por endereço não seguro é redirecionado automaticamente. O
+        certificado é emitido e renovado pelo Google.</dd>
+    </div>
+    <div class="fact">
+      <dt>Senhas dos usuários</dt>
+      <dd>Guardadas com <span class="num">Argon2id</span>, o algoritmo recomendado atualmente para senhas.
+        Não são reversíveis: nem a Natural Tecnologia consegue ler a senha de um usuário.</dd>
+    </div>
+    <div class="fact">
+      <dt>Sessão do usuário</dt>
+      <dd>Cookie inacessível a scripts da página e restrito ao site de origem — proteção contra roubo de
+        sessão e contra requisições forjadas por outros sites.</dd>
+    </div>
+    <div class="fact">
+      <dt>Acesso aos arquivos</dt>
+      <dd>O cofre é privado e bloqueado contra qualquer abertura pública. O acesso só acontece por link
+        temporário assinado, válido por 5 minutos para visualizar e 30 para baixar. Link vencido não abre.</dd>
+    </div>
+    <div class="fact">
+      <dt>Separação entre unidades</dt>
+      <dd>Imposta no próprio banco de dados, não só na tela: uma consulta feita no contexto de uma unidade é
+        fisicamente incapaz de retornar linhas de outra. Nem o administrador global vê arquivos ou auditoria
+        de outra unidade.</dd>
+    </div>
+    <div class="fact">
+      <dt>Senhas de sistema</dt>
+      <dd>Guardadas em cofre gerenciado do Google e entregues à aplicação em memória. Não existem em arquivo,
+        em código-fonte nem no repositório.</dd>
+    </div>
+  </dl>
+
+  <div class="note">
+    <h3>Se o cliente exigir controlar a própria chave</h3>
+    <p>É possível trocar as chaves gerenciadas pelo Google por chaves sob custódia do cliente, com poder de
+      revogação — exigência comum em contratos com bancos e órgãos públicos. Custo adicional a partir de
+      cerca de <span class="num" data-usd="3.00"></span> por chave/mês mais o volume de operações. Requer
+      configuração; não está ativo hoje.</p>
+  </div>
+</section>
+
+<!-- ============ ATENÇÃO ============ -->
+<section id="atencao">
+  <div class="sec-head">
+    <span class="eyebrow">Antes de assinar</span>
+    <h2>Quatro condicionantes</h2>
+  </div>
+
+  <dl class="facts">
+    <div class="fact">
+      <dt>Teto de 10 GB por pessoa</dt>
+      <dd>O sistema limita hoje cada usuário a 10&nbsp;GB. Isso trava o acervo total em
+        <span class="num">0,49&nbsp;TB</span> (50 pessoas), <span class="num">0,98&nbsp;TB</span> (100),
+        <span class="num">1,95&nbsp;TB</span> (200) e <span class="num">2,93&nbsp;TB</span> (300).
+        <strong>Toda a faixa de 10 a 50&nbsp;TB deste documento exige elevar essa cota antes da contratação.</strong>
+        A mudança é de configuração, mas precisa ser combinada.</dd>
+    </div>
+    <div class="fact">
+      <dt>Os dados estão nos Estados Unidos</dt>
+      <dd>A região atual é Iowa (EUA), escolhida por custo. Isso adiciona cerca de 150&nbsp;ms de atraso a
+        cada ação para usuários no Brasil e <strong>precisa ser declarado ao cliente</strong> se houver
+        exigência de residência de dados no país. Migrar para São Paulo eleva o custo em torno de 20% a 35%
+        e é um projeto com janela de indisponibilidade — não uma troca de configuração.</dd>
+    </div>
+    <div class="fact">
+      <dt>Impostos e câmbio não estão inclusos</dt>
+      <dd>Todos os valores são preço de lista em dólar. À proposta final é preciso somar a variação cambial,
+        o IOF ou os tributos da fatura em reais, e a margem da Natural Tecnologia.</dd>
+    </div>
+    <div class="fact">
+      <dt>Sem desconto por compromisso</dt>
+      <dd>As tabelas usam preço cheio. Contratos de 1 ou 3 anos de compromisso reduzem o custo de servidor e
+        banco em torno de 20% a 45%. Vale avaliar em contratos longos, mas cria obrigação de pagamento mesmo
+        se o cliente sair.</dd>
+    </div>
+  </dl>
+</section>
+
+<!-- ============ PREMISSAS ============ -->
+<section id="premissas">
+  <div class="sec-head">
+    <span class="eyebrow">Transparência</span>
+    <h2>Premissas do cálculo</h2>
+  </div>
+  <p>Toda estimativa carrega hipóteses. Estas são as que mais influenciam os números —
+    revisá-las é a forma de adaptar a tabela a um cliente específico.</p>
+
+  <dl class="facts">
+    <div class="fact">
+      <dt>Atividade por pessoa/mês</dt>
+      <dd>40 envios, 250 visualizações ou downloads e 1.500 ações de navegação. Um cliente de digitalização
+        pesada supera isso com folga.</dd>
+    </div>
+    <div class="fact">
+      <dt>Servidor ativo</dt>
+      <dd>De 70 h/mês (50 pessoas) a 280 h/mês (300 pessoas) com requisição em andamento; o restante do mês
+        ligado e ocioso, cobrado em tarifa reduzida.</dd>
+    </div>
+    <div class="fact">
+      <dt>Renovação do acervo</dt>
+      <dd>3% do volume é substituído por mês, o que define o custo da retenção de segurança de 7 dias.</dd>
+    </div>
+    <div class="fact">
+      <dt>Franquia gratuita ignorada</dt>
+      <dd>O Google oferece uma cota mensal gratuita de servidor e requisições que não foi descontada. Os
+        valores são, portanto, <strong>conservadores</strong> — a conta real tende a ficar alguns dólares abaixo.</dd>
+    </div>
+    <div class="fact">
+      <dt>Mês faturável</dt>
+      <dd>730 horas. Cobrança proporcional ao segundo em todos os serviços.</dd>
+    </div>
+    <div class="fact">
+      <dt>Origem dos preços</dt>
+      <dd>Preços de lista publicados pelo Google para us-central1, consultados em 12 de agosto de 2026:
+        armazenamento US$&nbsp;0,020/GB, saída de dados US$&nbsp;0,12/GB, vCPU de banco US$&nbsp;0,0413/h,
+        memória US$&nbsp;0,007/GB/h, disco US$&nbsp;0,17/GB, backup US$&nbsp;0,08/GB,
+        servidor US$&nbsp;0,000024/vCPU·s. Preços mudam sem aviso — reconferir antes de fechar contrato longo.</dd>
+    </div>
+  </dl>
+</section>
+
+<footer>
+  <p style="max-width:70ch">Documento interno de apoio à formalização de propostas.
+    Valores são estimativas de infraestrutura, não preço de venda. Fontes:
+    <a href="https://cloud.google.com/storage/pricing">preços do Cloud Storage</a>,
+    <a href="https://cloud.google.com/sql/pricing">Cloud SQL</a>,
+    <a href="https://cloud.google.com/run/pricing">Cloud Run</a> e os
+    <a href="https://cloud.google.com/storage/sla">acordos de nível de serviço</a> do Google Cloud.
+    Configuração de referência lida da infraestrutura declarada em <span class="num">infra/terraform/</span>.</p>
+  <p style="max-width:70ch;margin-top:.75rem">Este arquivo vive em
+    <span class="num">docs/custos-gcp/estimativa.html</span>. O cálculo que produziu os números está em
+    <span class="num">modelo.py</span>, na mesma pasta, com instruções de atualização no
+    <span class="num">README.md</span>.</p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var cells = Array.prototype.slice.call(document.querySelectorAll('[data-usd]'));
+  var rateEl = document.getElementById('rate');
+  var bUsd = document.getElementById('btn-usd');
+  var bBrl = document.getElementById('btn-brl');
+  var mode = 'usd';
+
+  function fmt(v, currency){
+    var digits = Math.abs(v) < 1 ? 3 : 2;
+    var s = v.toLocaleString('pt-BR', {minimumFractionDigits:digits, maximumFractionDigits:digits});
+    return (currency === 'brl' ? 'R$ ' : 'US$ ') + s;
+  }
+
+  function render(){
+    var rate = parseFloat(rateEl.value);
+    if (!isFinite(rate) || rate <= 0) rate = 1;
+    cells.forEach(function(el){
+      var usd = parseFloat(el.getAttribute('data-usd'));
+      el.textContent = mode === 'brl' ? fmt(usd * rate, 'brl') : fmt(usd, 'usd');
+    });
+    bUsd.setAttribute('aria-pressed', mode === 'usd');
+    bBrl.setAttribute('aria-pressed', mode === 'brl');
+    rateEl.disabled = (mode === 'usd');
+  }
+
+  bUsd.addEventListener('click', function(){ mode = 'usd'; render(); });
+  bBrl.addEventListener('click', function(){ mode = 'brl'; render(); });
+  rateEl.addEventListener('input', function(){ if (mode === 'brl') render(); });
+  render();
+})();
+</script>
