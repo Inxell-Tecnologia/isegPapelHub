@@ -36,6 +36,12 @@ Pastas muito grandes são recusadas com uma mensagem que informa **qual** limite
 atingido (quantidade de arquivos ou tamanho total) e orienta a baixar as subpastas
 separadamente — ver os tetos vigentes em [Limites](../referencia/limites.md).
 
+!!! warning "Não disponível em celular e tablet"
+    Baixar pasta depende de montar o pacote compactado no próprio aparelho, o que
+    não é confiável em celular ou tablet. Os dois botões continuam visíveis nessas
+    telas, mas a ação é recusada ao tocar, com uma mensagem que orienta a usar um
+    computador. Baixar um **arquivo** avulso não é afetado.
+
 ## Acesso por link direto
 
 Se alguém lhe passar o endereço direto de um arquivo para o qual você **não tem

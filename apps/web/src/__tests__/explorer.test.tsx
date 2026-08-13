@@ -1,10 +1,11 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { UserRole } from '@gdoc/shared';
 import type { FileSummaryResponse, FolderContentsResponse, FolderResponse } from '@gdoc/shared';
 import { mockFetch } from './mock-fetch';
 import { renderApp } from './render-app';
+import { mockViewportWidth, NARROW_VIEWPORT } from './viewport';
 
 const IDENTITY = { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR };
 
@@ -204,5 +205,86 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
     await screen.findByText('Sem permissão');
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByText('folder-blocked')).not.toBeInTheDocument();
+  });
+
+  describe('Modo estreito (responsividade-mobile-tablet, design.md D4/D5)', () => {
+    it('abaixo do limiar, Visualizar permanece direta e as demais ações do arquivo agrupam num menu', async () => {
+      mockViewportWidth(NARROW_VIEWPORT);
+      const fileX = file({ id: 'file-x', fileName: 'relatorio.pdf' });
+
+      mockFetch({
+        'GET /auth/me': { status: 200, body: IDENTITY },
+        'GET /folders/root/contents': { status: 200, body: contents({ files: [fileX] }) },
+      });
+
+      renderApp(['/pastas']);
+
+      await screen.findByText('relatorio.pdf');
+      const row = screen.getByText('relatorio.pdf').closest('tr')!;
+
+      // Visualizar é o verbo central da consulta e permanece direta.
+      expect(within(row).getByRole('button', { name: /visualizar/i })).toBeInTheDocument();
+      // As demais não ficam soltas na linha — só o gatilho do menu agrupado.
+      expect(within(row).queryByRole('button', { name: /renomear/i })).not.toBeInTheDocument();
+      expect(within(row).queryByRole('button', { name: /^baixar$/i })).not.toBeInTheDocument();
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Mais ações' }));
+
+      // O popup do menu agrupado é renderizado fora da linha, num portal
+      // (`.ant-dropdown`) — nenhuma ação foi suprimida, só reagrupada ali.
+      await screen.findByText(/renomear/i);
+      const menu = within(document.querySelector('.ant-dropdown')!);
+      expect(menu.getByRole('button', { name: /renomear/i })).toBeInTheDocument();
+      expect(menu.getByRole('button', { name: /baixar/i })).toBeInTheDocument();
+      expect(menu.getByRole('button', { name: /excluir/i })).toBeInTheDocument();
+    });
+
+    it('a confirmação de exclusão continua exigida dentro do menu agrupado', async () => {
+      mockViewportWidth(NARROW_VIEWPORT);
+      const fileX = file({ id: 'file-x', fileName: 'descartavel.pdf' });
+
+      mockFetch({
+        'GET /auth/me': { status: 200, body: IDENTITY },
+        'GET /folders/root/contents': [
+          { status: 200, body: contents({ files: [fileX] }) },
+          { status: 200, body: contents() },
+        ],
+        'DELETE /files/file-x': { status: 204 },
+      });
+
+      renderApp(['/pastas']);
+
+      await screen.findByText('descartavel.pdf');
+      const row = screen.getByText('descartavel.pdf').closest('tr')!;
+      await userEvent.click(within(row).getByRole('button', { name: 'Mais ações' }));
+
+      await userEvent.click(await screen.findByRole('button', { name: /excluir/i }));
+      // Ainda não excluído: a confirmação do Popconfirm segue exigida.
+      expect(screen.getByText('descartavel.pdf')).toBeInTheDocument();
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Sim, excluir' }));
+      await waitFor(() => expect(screen.queryByText('descartavel.pdf')).not.toBeInTheDocument());
+    });
+
+    it('abaixo do limiar, baixar pasta é recusado no acionamento, sem chamar o manifesto (design.md D5)', async () => {
+      mockViewportWidth(NARROW_VIEWPORT);
+      mockFetch({
+        'GET /auth/me': { status: 200, body: IDENTITY },
+        'GET /folders/root/contents': { status: 200, body: contents() },
+      });
+
+      renderApp(['/pastas']);
+
+      const downloadButton = await screen.findByRole('button', { name: /baixar esta pasta/i });
+      await userEvent.click(downloadButton);
+
+      await screen.findByText(
+        'Baixar pasta não está disponível neste dispositivo. Use um computador.',
+      );
+
+      const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+      const manifestCalled = calls.some((call) => String(call[0]).includes('/download-manifest'));
+      expect(manifestCalled).toBe(false);
+    });
   });
 });

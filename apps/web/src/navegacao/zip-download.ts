@@ -80,7 +80,16 @@ export async function buildFolderZip(
   return zipResponse.blob();
 }
 
-/** Dispara o download de um `Blob` gerado no cliente (design.md D1) — sem URL de servidor a navegar. */
+/**
+ * Dispara o download de um `Blob` gerado no cliente (design.md D1) — sem URL
+ * de servidor a navegar. Motivo técnico da recusa por dispositivo em tela
+ * estreita (design.md D5 do change `responsividade-mobile-tablet`): mesmo
+ * com o `.zip` montado em streaming acima, este passo materializa o `Blob`
+ * **inteiro** em memória antes de disparar o download, e o Safari iOS tem
+ * histórico irregular com `download` em URLs de blob (abre inline em vez de
+ * salvar). A recusa acontece em `ExplorerPage` antes de chegar aqui — esta
+ * implementação do modo largo **não muda**.
+ */
 export function triggerBlobDownload(blob: Blob, fileName: string): void {
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

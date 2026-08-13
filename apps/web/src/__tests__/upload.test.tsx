@@ -10,6 +10,7 @@ import type {
 import { mockFetch } from './mock-fetch';
 import { mockXhr } from './mock-xhr';
 import { renderApp } from './render-app';
+import { mockViewportWidth, NARROW_VIEWPORT } from './viewport';
 
 const IDENTITY = { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR };
 
@@ -284,5 +285,26 @@ describe('Envio de arquivos e pastas (web-upload)', () => {
 
     await screen.findByText('Permissão insuficiente para enviar arquivos neste destino.');
     expect(screen.queryByText('a.txt')).not.toBeInTheDocument();
+  });
+
+  it('abaixo do limiar, enviar pasta é recusado no acionamento — botão continua visível (design.md D5, `web-responsividade`)', async () => {
+    mockViewportWidth(NARROW_VIEWPORT);
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': { status: 200, body: contents() },
+    });
+
+    renderApp(['/pastas']);
+    const folderButton = await screen.findByRole('button', { name: /enviar pasta/i });
+
+    await userEvent.click(folderButton);
+
+    await screen.findByText(
+      'Enviar pasta não está disponível neste dispositivo. Use um computador.',
+    );
+    // Distinguível da recusa por permissão insuficiente do mesmo fluxo.
+    expect(
+      screen.queryByText('Permissão insuficiente para enviar arquivos neste destino.'),
+    ).not.toBeInTheDocument();
   });
 });

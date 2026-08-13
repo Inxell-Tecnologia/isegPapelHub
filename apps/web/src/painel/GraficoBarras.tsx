@@ -1,4 +1,5 @@
 import { theme } from 'antd';
+import { useNarrowMode } from '../app/responsive';
 
 export interface GraficoBarrasItem {
   label: string;
@@ -13,14 +14,27 @@ export interface GraficoBarrasItem {
  */
 export function GraficoBarras({ items }: { items: GraficoBarrasItem[] }) {
   const { token } = theme.useToken();
+  const isNarrow = useNarrowMode();
   const max = Math.max(1, ...items.map((item) => item.value));
+  // design.md D7 (`web-responsividade`): rótulo com largura fixa de 160px
+  // some espaço demais em 360px — reduzido abaixo do limiar, com reticências
+  // em vez de quebrar a barra.
+  const labelWidth = isNarrow ? 88 : 160;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {items.map((item) => (
         <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span
-            style={{ width: 160, flexShrink: 0, color: token.colorTextSecondary, fontSize: 13 }}
+            style={{
+              width: labelWidth,
+              flexShrink: 0,
+              color: token.colorTextSecondary,
+              fontSize: 13,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
           >
             {item.label}
           </span>

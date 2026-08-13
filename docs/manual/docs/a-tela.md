@@ -8,27 +8,29 @@ Na tela de **login** e no menu lateral, logo abaixo do nome **PapelHub**, aparec
 identificação da sua organização (por exemplo, "SETES") — ela confirma que você
 está na implantação correta quando existe mais de uma.
 
-## Menu lateral
+## Menu de navegação
 
-Depois de entrar, você vê um **menu lateral** à esquerda. Os itens disponíveis
-dependem do seu perfil:
+Depois de entrar, você vê a navegação com os itens disponíveis para o seu
+perfil, terminando sempre pelo **Manual do usuário**:
 
-| Item do menu | Para quem            | Serve para                                                           |
-| ------------ | --------------------- | --------------------------------------------------------------------- |
-| **Início**   | Todos                 | Página inicial de boas-vindas.                                       |
-| **Arquivos** | Todos                 | Navegar por pastas, enviar, baixar, visualizar e gerenciar arquivos. |
-| **Buscar**   | Todos                 | Encontrar arquivos por nome e filtros.                               |
-| **Lixeira**  | Todos                 | Recuperar ou acompanhar itens excluídos.                             |
-| **Pessoas**  | Administradores       | Cadastrar, editar, ativar/desativar contas e redefinir senhas.       |
-| **Painel**   | Administradores       | Ver estatísticas e gráficos de uso.                                  |
-| **Unidades** | Administrador global  | Criar, renomear e ativar/desativar unidades.                         |
+| Item do menu           | Para quem             | Serve para                                                           |
+| ----------------------- | ---------------------- | --------------------------------------------------------------------- |
+| **Início**              | Todos                 | Página inicial de boas-vindas.                                       |
+| **Arquivos**            | Todos                 | Navegar por pastas, enviar, baixar, visualizar e gerenciar arquivos. |
+| **Buscar**              | Todos                 | Encontrar arquivos por nome e filtros.                               |
+| **Lixeira**             | Todos                 | Recuperar ou acompanhar itens excluídos.                             |
+| **Pessoas**             | Administradores       | Cadastrar, editar, ativar/desativar contas e redefinir senhas.       |
+| **Painel**              | Administradores       | Ver estatísticas e gráficos de uso.                                  |
+| **Unidades**            | Administrador global  | Criar, renomear e ativar/desativar unidades.                         |
+| **Manual do usuário**   | Todos                 | Abre este material numa nova aba, sem fechar o que você estava fazendo. |
 
-## Manual do usuário
-
-Ao pé do menu lateral, separado dos itens acima, fica o acesso ao **Manual do
-usuário** — este material que você está lendo agora. Ele aparece para
-qualquer perfil, em qualquer tela, e abre em uma nova aba do navegador, sem
-fechar ou perder o que você estava fazendo na aplicação.
+Numa tela larga (computador), esses itens ficam num **menu lateral** sempre
+visível à esquerda. Num celular ou tablet, a navegação some da tela para dar
+mais espaço ao conteúdo — toque no ícone de menu (☰), no canto superior
+esquerdo do cabeçalho, para abrir um painel com os mesmos itens, na mesma
+ordem. Tocar num item leva até a tela correspondente e fecha o painel; tocar
+no Manual do usuário abre a nova aba e mantém o painel como estava — é o
+único item que leva para fora da aplicação.
 
 ## Sino de notificações
 

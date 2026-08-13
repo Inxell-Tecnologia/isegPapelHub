@@ -61,6 +61,7 @@ export function NotificationCenter() {
     <div
       style={{
         width: 360,
+        maxWidth: 'calc(100vw - 32px)',
         maxHeight: 420,
         overflowY: 'auto',
         background: '#fff',

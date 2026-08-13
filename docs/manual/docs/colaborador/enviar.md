@@ -6,7 +6,10 @@ Na página **Arquivos**, use os botões de envio para adicionar conteúdo à pas
   **próprio progresso** e indica sucesso ou falha de forma independente. Se um falhar,
   os outros continuam salvos e você pode clicar em **Repetir** apenas no que falhou.
 - **Enviar pasta** — selecione uma **pasta inteira**; a estrutura de subpastas é
-  recriada igual dentro do sistema.
+  recriada igual dentro do sistema. Em celular ou tablet, o botão continua visível,
+  mas a ação é recusada ao tocar — o seletor de pasta do aparelho não suporta essa
+  operação (ver [Limites](../referencia/limites.md)). Use um computador para enviar
+  uma pasta inteira.
 
 Ao enviar um arquivo, **você se torna o dono dele** e passa a poder consultar quem o
 acessou (ver [Auditoria](auditoria.md)).

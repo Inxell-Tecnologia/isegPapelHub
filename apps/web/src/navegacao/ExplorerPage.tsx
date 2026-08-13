@@ -1,5 +1,17 @@
+import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
-import { App, Breadcrumb, Button, Popconfirm, Result, Space, Spin, Table, Tag } from 'antd';
+import {
+  App,
+  Breadcrumb,
+  Button,
+  Dropdown,
+  Popconfirm,
+  Result,
+  Space,
+  Spin,
+  Table,
+  Tag,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   AuditOutlined,
@@ -12,12 +24,14 @@ import {
   FolderAddOutlined,
   FolderOutlined,
   LockOutlined,
+  MoreOutlined,
 } from '@ant-design/icons';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { FileSummaryResponse, FolderResponse } from '@gdoc/shared';
 import { GrantResourceType, UserRole } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
 import { useSession } from '../auth/session-context';
+import { useNarrowMode } from '../app/responsive';
 import { AuditoriaModal } from '../auditoria/AuditoriaModal';
 import { PermissoesModal } from '../permissoes/PermissoesModal';
 import { PreviewModal } from '../visualizacao/PreviewModal';
@@ -34,6 +48,43 @@ import {
 import { NewFolderModal } from './NewFolderModal';
 import { RenameFileModal } from './RenameFileModal';
 import { formatDate, formatFileSize } from './format';
+
+/** Mensagem da recusa de download de pasta por dispositivo (design.md D5, `web-responsividade`)
+ * — texto distinguível da recusa por limite (`DownloadFolderModal`) e da recusa por permissão. */
+const DOWNLOAD_FOLDER_DEVICE_REFUSAL =
+  'Baixar pasta não está disponível neste dispositivo. Use um computador.';
+
+/**
+ * Ações agrupadas do item (design.md D4, tasks.md 4.1): abaixo do limiar, as
+ * ações que não são "Visualizar" colapsam num único menu por linha, sem que
+ * nenhuma deixe de ser oferecida — inclusive a confirmação de exclusão
+ * (Popconfirm) continua dentro do agrupamento (tasks.md 4.3). Usa
+ * `popupRender` (mesmo padrão de `NotificationCenter`) em vez do `items` do
+ * `Menu`, para o clique num botão interno (ex.: abrir o Popconfirm) não
+ * fechar o Dropdown sozinho.
+ */
+function GroupedActions({ actions }: { actions: ReactNode[] }) {
+  return (
+    <Dropdown
+      trigger={['click']}
+      popupRender={() => (
+        <Space
+          direction="vertical"
+          style={{
+            padding: 8,
+            background: '#fff',
+            borderRadius: 8,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+        >
+          {actions}
+        </Space>
+      )}
+    >
+      <Button size="small" icon={<MoreOutlined />} aria-label="Mais ações" />
+    </Dropdown>
+  );
+}
 
 interface ManagingResource {
   resourceType: GrantResourceType;
@@ -61,6 +112,7 @@ export function ExplorerPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { identity } = useSession();
+  const isNarrow = useNarrowMode();
   // US 4.1 / design.md D2 (`web-permissoes`): ação "Permissões" só para admin,
   // espelhando o admin-only das rotas de `grants` no backend.
   const isAdmin =
@@ -138,6 +190,18 @@ export function ExplorerPage() {
     }
   }
 
+  // design.md D5 (`web-responsividade`): abaixo do limiar o botão permanece
+  // visível e a recusa acontece aqui, antes de qualquer chamada ao servidor
+  // — nenhuma URL assinada é emitida, nenhuma auditoria é registrada
+  // (`DownloadFolderModal` só abre e busca o manifesto no modo largo).
+  function handleOpenDownloadFolder(target: DownloadingFolder) {
+    if (isNarrow) {
+      message.error(DOWNLOAD_FOLDER_DEVICE_REFUSAL);
+      return;
+    }
+    setDownloadingFolder(target);
+  }
+
   const breadcrumbItems = useMemo(() => {
     if (!data) return [];
     if (data.folder === null) {
@@ -201,34 +265,39 @@ export function ExplorerPage() {
     {
       title: 'Ações',
       key: 'actions',
-      render: (_, row) =>
-        row.kind === 'folder' ? (
-          <Space>
+      render: (_, row) => {
+        if (row.kind === 'folder') {
+          const folderActions: ReactNode[] = [
             <Button
+              key="baixar"
               size="small"
               icon={<DownloadOutlined />}
               onClick={() =>
-                setDownloadingFolder({ folderId: row.folder.id, folderName: row.folder.name })
+                handleOpenDownloadFolder({ folderId: row.folder.id, folderName: row.folder.name })
               }
             >
               Baixar pasta
-            </Button>
-            {isAdmin && (
-              <Button
-                size="small"
-                icon={<LockOutlined />}
-                onClick={() =>
-                  setManagingResource({
-                    resourceType: GrantResourceType.FOLDER,
-                    resourceId: row.folder.id,
-                    resourceName: row.folder.name,
-                  })
-                }
-              >
-                Permissões
-              </Button>
-            )}
+            </Button>,
+            ...(isAdmin
+              ? [
+                  <Button
+                    key="permissoes"
+                    size="small"
+                    icon={<LockOutlined />}
+                    onClick={() =>
+                      setManagingResource({
+                        resourceType: GrantResourceType.FOLDER,
+                        resourceId: row.folder.id,
+                        resourceName: row.folder.name,
+                      })
+                    }
+                  >
+                    Permissões
+                  </Button>,
+                ]
+              : []),
             <Popconfirm
+              key="excluir"
               title="Excluir pasta"
               description="A pasta e seu conteúdo vão para a lixeira."
               okText="Sim, excluir"
@@ -238,64 +307,96 @@ export function ExplorerPage() {
               <Button danger size="small" icon={<DeleteOutlined />}>
                 Excluir
               </Button>
-            </Popconfirm>
-          </Space>
-        ) : (
+            </Popconfirm>,
+          ];
+
+          // design.md D4: pasta não tem "visualizar" — abrir a pasta (link do
+          // nome) já é a interação direta, então no modo estreito todas as
+          // ações desta linha colapsam no menu agrupado.
+          return isNarrow ? (
+            <GroupedActions actions={folderActions} />
+          ) : (
+            <Space>{folderActions}</Space>
+          );
+        }
+
+        const secondaryActions: ReactNode[] = [
+          <Button
+            key="baixar"
+            size="small"
+            icon={<CloudDownloadOutlined />}
+            loading={downloading}
+            onClick={() => download(row.file.id)}
+          >
+            Baixar
+          </Button>,
+          <Button
+            key="renomear"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => setRenamingFile(row.file)}
+          >
+            Renomear
+          </Button>,
+          ...(isAdmin
+            ? [
+                <Button
+                  key="permissoes"
+                  size="small"
+                  icon={<LockOutlined />}
+                  onClick={() =>
+                    setManagingResource({
+                      resourceType: GrantResourceType.FILE,
+                      resourceId: row.file.id,
+                      resourceName: row.file.fileName,
+                    })
+                  }
+                >
+                  Permissões
+                </Button>,
+              ]
+            : []),
+          // US 7.1/US 7.2, design.md D1 (`web-auditoria`, Opção A): estende o
+          // gate de admin ao dono do arquivo — visibilidade é UX, o 403
+          // fail-closed do servidor (`canReadAudit`) é a defesa real.
+          ...(isAdmin || row.file.ownerId === identity?.id
+            ? [
+                <Button
+                  key="auditoria"
+                  size="small"
+                  icon={<AuditOutlined />}
+                  onClick={() => setAuditingFile(row.file)}
+                >
+                  Auditoria
+                </Button>,
+              ]
+            : []),
+          <Popconfirm
+            key="excluir"
+            title="Excluir arquivo"
+            description="O arquivo vai para a lixeira."
+            okText="Sim, excluir"
+            cancelText="Cancelar"
+            onConfirm={() => handleDeleteFile(row.file.id)}
+          >
+            <Button danger size="small" icon={<DeleteOutlined />}>
+              Excluir
+            </Button>
+          </Popconfirm>,
+        ];
+
+        // design.md D4: "Visualizar" é o verbo central da consulta e
+        // permanece direta em qualquer largura; as demais colapsam no menu
+        // agrupado abaixo do limiar — nenhuma ação é suprimida, só reagrupada.
+        return (
           <Space>
             <Button size="small" icon={<EyeOutlined />} onClick={() => setPreviewingFile(row.file)}>
               Visualizar
             </Button>
-            <Button
-              size="small"
-              icon={<CloudDownloadOutlined />}
-              loading={downloading}
-              onClick={() => download(row.file.id)}
-            >
-              Baixar
-            </Button>
-            <Button size="small" icon={<EditOutlined />} onClick={() => setRenamingFile(row.file)}>
-              Renomear
-            </Button>
-            {isAdmin && (
-              <Button
-                size="small"
-                icon={<LockOutlined />}
-                onClick={() =>
-                  setManagingResource({
-                    resourceType: GrantResourceType.FILE,
-                    resourceId: row.file.id,
-                    resourceName: row.file.fileName,
-                  })
-                }
-              >
-                Permissões
-              </Button>
-            )}
-            {/* US 7.1/US 7.2, design.md D1 (`web-auditoria`, Opção A): estende o
-                gate de admin ao dono do arquivo — visibilidade é UX, o 403
-                fail-closed do servidor (`canReadAudit`) é a defesa real. */}
-            {(isAdmin || row.file.ownerId === identity?.id) && (
-              <Button
-                size="small"
-                icon={<AuditOutlined />}
-                onClick={() => setAuditingFile(row.file)}
-              >
-                Auditoria
-              </Button>
-            )}
-            <Popconfirm
-              title="Excluir arquivo"
-              description="O arquivo vai para a lixeira."
-              okText="Sim, excluir"
-              cancelText="Cancelar"
-              onConfirm={() => handleDeleteFile(row.file.id)}
-            >
-              <Button danger size="small" icon={<DeleteOutlined />}>
-                Excluir
-              </Button>
-            </Popconfirm>
+            {isNarrow ? <GroupedActions actions={secondaryActions} /> : secondaryActions}
           </Space>
-        ),
+        );
+      },
     },
   ];
 
@@ -328,18 +429,24 @@ export function ExplorerPage() {
 
   return (
     <div>
-      <Breadcrumb items={breadcrumbItems} style={{ marginBottom: 16 }} />
-      <Space style={{ marginBottom: 16 }}>
+      {/* design.md D7 (`web-responsividade`): a trilha de uma subpasta
+          profunda é o texto que mais facilmente estoura em 360px — rola
+          dentro do próprio contêiner em vez do documento. */}
+      <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+        <Breadcrumb items={breadcrumbItems} style={{ whiteSpace: 'nowrap' }} />
+      </div>
+      <Space wrap style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<FolderAddOutlined />} onClick={() => setNewFolderOpen(true)}>
           Nova pasta
         </Button>
         {/* Oferecida uniformemente, inclusive na raiz da unidade — a recusa
             por limite é que ensina o teto, não a ausência da ação
-            (design.md D9). */}
+            (design.md D9). Abaixo do limiar, a recusa é por dispositivo
+            (design.md D5 de `responsividade-mobile-tablet`). */}
         <Button
           icon={<DownloadOutlined />}
           onClick={() =>
-            setDownloadingFolder({
+            handleOpenDownloadFolder({
               folderId: currentFolderId,
               folderName: data.folder?.name ?? 'Arquivos',
             })
@@ -362,7 +469,13 @@ export function ExplorerPage() {
         )}
       </Space>
       <UploadArea destinationFolderId={currentFolderId} />
-      <Table<Row> rowKey="key" columns={columns} dataSource={rows} pagination={false} />
+      <Table<Row>
+        rowKey="key"
+        columns={columns}
+        dataSource={rows}
+        pagination={false}
+        scroll={{ x: 'max-content' }}
+      />
       <NewFolderModal
         open={newFolderOpen}
         submitting={createFolder.isPending}

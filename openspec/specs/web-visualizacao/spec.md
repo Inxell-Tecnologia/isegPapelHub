@@ -28,7 +28,19 @@ apresentação a partir da categoria de MIME do arquivo
 texto — sem que o arquivo seja transferido como download. Reabrir o preview
 SHALL emitir uma nova chamada (nova URL assinada).
 
-Referência: PRD US 9.2 (cenário 1), RF #16; design.md D1/D2/D3.
+Abaixo do ponto de ruptura definido pela capability `web-responsividade`, o
+preview SHALL aproveitar a **largura útil** da tela, e NÃO SHALL ficar limitado a
+uma largura fixa menor que ela. A altura da área de conteúdo SHALL acompanhar a
+área efetivamente visível do navegador, de modo que a redução do viewport — pelo
+recolhimento da barra de endereço ou pela abertura do teclado virtual — não
+deixe parte do conteúdo inalcançável.
+
+Quando o navegador não renderizar inline um formato declarado como
+pré-visualizável, a SPA SHALL apresentar indisponibilidade explicável, e NÃO
+SHALL deixar área vazia sem explicação.
+
+Referência: PRD US 9.2 (cenário 1), RF #16; design.md D1/D2/D3 do change
+`web-visualizacao`; design.md D6 do change `responsividade-mobile-tablet`.
 
 #### Scenario: Visualizar arquivo em formato suportado
 - **WHEN** o usuário abre a visualização de um arquivo pré-visualizável (PDF,
@@ -41,6 +53,23 @@ Referência: PRD US 9.2 (cenário 1), RF #16; design.md D1/D2/D3.
 - **THEN** a SPA renderiza uma imagem como imagem, um PDF ou texto em visualizador
   embutido, e vídeo/áudio com controles de reprodução, conforme a categoria de
   MIME do arquivo, apontando para a URL assinada
+
+#### Scenario: Preview aproveita a largura útil em tela estreita
+- **WHEN** o usuário abre a visualização de um arquivo numa tela mais estreita
+  que o ponto de ruptura
+- **THEN** o preview ocupa a largura útil disponível, em vez de permanecer
+  limitado a uma largura fixa menor que a tela
+
+#### Scenario: Redução do viewport não torna o conteúdo inalcançável
+- **WHEN** a área visível do navegador é reduzida enquanto o preview está aberto
+- **THEN** o conteúdo do preview permanece inteiramente alcançável, sem que parte
+  dele fique fora da área utilizável
+
+#### Scenario: Formato não renderizado pelo navegador explica a indisponibilidade
+- **WHEN** o navegador do dispositivo não renderiza inline um formato declarado
+  como pré-visualizável
+- **THEN** a SPA informa a indisponibilidade e orienta a alternativa, em vez de
+  apresentar área vazia
 
 ### Requirement: Formato sem pré-visualização informa indisponibilidade e oferece download conforme permissão
 

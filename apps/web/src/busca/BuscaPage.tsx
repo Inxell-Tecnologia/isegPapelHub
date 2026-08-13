@@ -11,6 +11,7 @@ import type { Dayjs } from 'dayjs';
 import type { FileCategory, FileSummaryResponse, SearchFilesQuery } from '@gdoc/shared';
 import { UserRole, fileCategory } from '@gdoc/shared';
 import { useSession } from '../auth/session-context';
+import { useNarrowMode } from '../app/responsive';
 import { PreviewModal } from '../visualizacao/PreviewModal';
 import { useDownloadFile } from '../visualizacao/useDownloadFile';
 import { formatDate, formatFileSize } from '../navegacao/format';
@@ -73,6 +74,7 @@ function hasActiveCriteria(filters: FilterState): boolean {
  */
 export function BuscaPage() {
   const { identity } = useSession();
+  const isNarrow = useNarrowMode();
   const isAdmin =
     identity?.role === UserRole.UNIT_ADMIN || identity?.role === UserRole.GLOBAL_ADMIN;
 
@@ -140,11 +142,14 @@ export function BuscaPage() {
 
   return (
     <div>
+      {/* design.md D7 (`web-responsividade`): larguras fixas somadas estourariam
+          360px — abaixo do limiar, cada filtro ocupa a largura útil da linha
+          do `Space wrap`, que já degrada sem quebrar. */}
       <Space wrap style={{ marginBottom: 16 }}>
         <Input.Search
           allowClear
           placeholder="Buscar por nome"
-          style={{ width: 240 }}
+          style={{ width: isNarrow ? '100%' : 240 }}
           value={filters.q}
           onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
           onSearch={handleSearch}
@@ -152,12 +157,13 @@ export function BuscaPage() {
         <Select
           allowClear
           placeholder="Tipo"
-          style={{ width: 200 }}
+          style={{ width: isNarrow ? '100%' : 200 }}
           options={CATEGORY_OPTIONS}
           value={filters.type}
           onChange={(value) => setFilters((prev) => ({ ...prev, type: value }))}
         />
         <RangePicker
+          style={{ width: isNarrow ? '100%' : undefined }}
           value={filters.dateRange}
           onChange={(range) =>
             setFilters((prev) => ({ ...prev, dateRange: range as [Dayjs, Dayjs] | null }))
@@ -168,7 +174,7 @@ export function BuscaPage() {
             allowClear
             showSearch
             placeholder="Autor"
-            style={{ width: 200 }}
+            style={{ width: isNarrow ? '100%' : 200 }}
             loading={authorOptions.isLoading}
             options={authorOptions.data ?? []}
             optionFilterProp="label"
@@ -209,6 +215,7 @@ export function BuscaPage() {
           columns={columns}
           dataSource={data.files}
           pagination={false}
+          scroll={{ x: 'max-content' }}
           locale={{ emptyText: <Empty description="Nenhum resultado" /> }}
         />
       )}

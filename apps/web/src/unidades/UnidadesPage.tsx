@@ -130,7 +130,12 @@ export function UnidadesPage() {
           Nova unidade
         </Button>
       </div>
-      <Table<UnitResponse> rowKey="id" columns={columns} dataSource={data ?? []} />
+      <Table<UnitResponse>
+        rowKey="id"
+        columns={columns}
+        dataSource={data ?? []}
+        scroll={{ x: 'max-content' }}
+      />
       <UnidadeFormModal
         target={editingUnit ?? undefined}
         open={modalOpen}
