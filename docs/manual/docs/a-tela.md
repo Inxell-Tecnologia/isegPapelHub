@@ -1,5 +1,9 @@
 # Conhecendo a tela
 
+A tela de **login** traz a marca do PapelHub em destaque: um fundo azul cobre
+toda a tela, com o cartão de acesso branco centralizado — logomarca, nome
+**PapelHub** e o formulário de e-mail e senha.
+
 Na tela de **login** e no menu lateral, logo abaixo do nome **PapelHub**, aparece a
 identificação da sua organização (por exemplo, "SETES") — ela confirma que você
 está na implantação correta quando existe mais de uma.

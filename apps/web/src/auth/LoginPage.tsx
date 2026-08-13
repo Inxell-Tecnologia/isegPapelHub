@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { App, Button, Card, Form, Input, Typography } from 'antd';
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -7,11 +7,30 @@ import { useSession } from './session-context';
 import { ApiError } from '../lib/api-client';
 import { BrandMark } from '../shell/BrandMark';
 
+// Amostrada pixel a pixel de docs/images/logo_papel_hub.jpg: o pixel de maior
+// componente azul relativo da arte (design.md D1). Contraste com branco:
+// 10,8:1 (luminância relativa 0,047) — acima do mínimo AAA de 7:1 (design.md,
+// "Riscos e verificação").
+export const LOGIN_BACKGROUND_COLOR = '#063c7c';
+
 export function LoginPage() {
   const { status, login, publicConfig } = useSession();
   const { message } = App.useApp();
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // design.md D4: o overscroll elástico (iOS) revela a cor do elemento raiz
+    // do documento, não a do container do login, mesmo com este medindo
+    // certo. Pinta o elemento raiz só enquanto a rota de login está montada e
+    // restaura ao sair, para não vazar a cor para as telas do shell.
+    const root = document.documentElement;
+    const previousBackground = root.style.backgroundColor;
+    root.style.backgroundColor = LOGIN_BACKGROUND_COLOR;
+    return () => {
+      root.style.backgroundColor = previousBackground;
+    };
+  }, []);
 
   if (status === 'authenticated') {
     return <Navigate to="/" replace />;
@@ -41,12 +60,14 @@ export function LoginPage() {
     <div
       style={{
         display: 'flex',
-        minHeight: '100vh',
+        minHeight: '100dvh',
         alignItems: 'center',
         justifyContent: 'center',
+        padding: '24px 16px',
+        backgroundColor: LOGIN_BACKGROUND_COLOR,
       }}
     >
-      <Card style={{ width: 360 }}>
+      <Card style={{ width: '100%', maxWidth: 360 }}>
         {/* Cabeçalho: logomarca + título + identificação do cliente + subtítulo. A
             logomarca e a identificação do cliente ficam FORA do heading para não
             poluir seu nome acessível (a US 1.2 e os testes exigem "PapelHub" puro —
