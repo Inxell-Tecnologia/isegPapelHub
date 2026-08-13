@@ -152,7 +152,19 @@ A ação de baixar pasta SHALL ser oferecida uniformemente em **toda** pasta,
 incluindo a raiz da unidade, e NÃO SHALL ser ocultada em função do tamanho provável
 do conteúdo — pedidos que excedam os limites SHALL ser recusados com a mensagem
 acionável acima, em vez de a ação desaparecer da interface sem explicação.
-Referência: design.md D5, D9.
+
+A mesma forma de recusa SHALL valer quando o **dispositivo em uso** não comportar
+a montagem do pacote no cliente: a ação SHALL permanecer visível e SHALL ser
+recusada no acionamento, com mensagem que informe a indisponibilidade naquele
+dispositivo e oriente a alternativa. A ação NÃO SHALL ser ocultada nem
+desabilitada em função da classe do dispositivo, e a recusa por dispositivo SHALL
+ser distinguível tanto da recusa por limite quanto da recusa por permissão
+insuficiente. Nenhuma URL assinada SHALL ser emitida e nenhum evento de auditoria
+SHALL ser registrado num pedido recusado por esse motivo.
+
+Referência: design.md D5, D9 do change `download-pasta-zip`; design.md D5 do
+change `responsividade-mobile-tablet`; requisito "Capacidade ausente no
+dispositivo é recusada com explicação" da capability `web-responsividade`.
 
 #### Scenario: A ação é oferecida também na raiz da unidade
 - **WHEN** uma pessoa visualiza a raiz da unidade
@@ -175,6 +187,24 @@ Referência: design.md D5, D9.
   exceder a soma de bytes
 - **THEN** cada recusa identifica o seu próprio limite, sem que as duas produzam a
   mesma mensagem
+
+#### Scenario: A ação permanece oferecida em dispositivo que não a comporta
+- **WHEN** uma pessoa visualiza uma pasta num dispositivo onde a montagem do
+  pacote no cliente não é viável
+- **THEN** a ação de baixar a pasta continua visível na interface, em vez de
+  desaparecer sem explicação
+
+#### Scenario: Recusa por dispositivo não assina nem audita
+- **WHEN** essa pessoa aciona a ação de baixar a pasta
+- **THEN** a operação é recusada com mensagem que informa a indisponibilidade
+  naquele dispositivo e orienta a alternativa, sem que nenhuma URL assinada seja
+  emitida nem nenhum evento de auditoria seja registrado
+
+#### Scenario: Recusa por dispositivo é distinguível das demais recusas
+- **WHEN** uma pessoa é recusada por dispositivo, outra por exceder um limite e
+  outra por permissão insuficiente
+- **THEN** as três mensagens são distinguíveis entre si, sem que uma situação seja
+  apresentada com o texto de outra
 
 ### Requirement: Itens na lixeira nunca integram o pacote
 

@@ -54,7 +54,16 @@ SHALL oferecer a ação e, quando o servidor responder **403**, exibir um aviso 
 **permissão insuficiente**, sem aplicar a mudança. Renomear **pasta** NÃO faz
 parte desta capacidade enquanto o backend não expuser o endpoint correspondente.
 
-Referência: PRD US 2.2 (cenários 1 e 2); design.md D4/D5/D7.
+Abaixo do ponto de ruptura definido pela capability `web-responsividade`, as
+ações do item SHALL permanecer **todas alcançáveis**, podendo ser agrupadas num
+menu de ações quando não couberem lado a lado. A ação de **visualizar** SHALL
+permanecer diretamente acionável, sem exigir a abertura do agrupamento, por ser
+o verbo central da consulta. O agrupamento SHALL decorrer **exclusivamente** do
+espaço disponível, e NÃO SHALL ser usado para omitir ação alguma nem para
+antecipar no cliente a decisão de permissão do servidor.
+
+Referência: PRD US 2.2 (cenários 1 e 2); design.md D4/D5/D7 do change
+`web-navegacao`; design.md D4 do change `responsividade-mobile-tablet`.
 
 #### Scenario: Renomear arquivo com permissão
 - **WHEN** o usuário renomeia um arquivo sobre o qual tem permissão
@@ -76,6 +85,23 @@ Referência: PRD US 2.2 (cenários 1 e 2); design.md D4/D5/D7.
 - **WHEN** o usuário tenta renomear ou excluir um item para o qual não tem
   permissão e o servidor responde 403
 - **THEN** a ação não é aplicada e a SPA exibe um aviso de permissão insuficiente
+
+#### Scenario: Em tela estreita as ações do item continuam todas alcançáveis
+- **WHEN** o usuário abre o explorador numa tela mais estreita que o ponto de
+  ruptura
+- **THEN** todas as ações do item permanecem alcançáveis, agrupadas num menu de
+  ações quando não couberem lado a lado, sem que nenhuma deixe de ser oferecida
+
+#### Scenario: Visualizar permanece direta em tela estreita
+- **WHEN** o usuário percorre a listagem numa tela estreita
+- **THEN** a ação de visualizar é acionável diretamente na linha do item, sem
+  exigir a abertura do menu de ações
+
+#### Scenario: Agrupamento não antecipa a decisão de permissão
+- **WHEN** o usuário aciona, pelo menu de ações em tela estreita, uma ação para a
+  qual não tem permissão
+- **THEN** a ação é enviada ao servidor e o aviso de permissão insuficiente vem
+  do 403, do mesmo modo que na tela larga
 
 ### Requirement: Acesso direto a pasta sem permissão é bloqueado
 
