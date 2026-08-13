@@ -3,11 +3,18 @@ import { App, Button, List, Progress, Space, Typography, Upload } from 'antd';
 import { FolderOpenOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import type { BatchUploadItemRequest, BatchUploadUrlRequest } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
+import { useNarrowMode } from '../app/responsive';
 import { putObject } from './put-object';
 import { deriveRelativePath } from './relative-path';
 import { useInvalidateFolderContents, useRequestUploadUrls } from './queries';
 
 const QUOTA_ERROR = 'quota exceeded';
+
+/** Mensagem da recusa de envio de pasta por dispositivo (design.md D5, `web-responsividade`)
+ * — `webkitdirectory` não existe em Safari iOS nem em Chrome Android; texto distinguível
+ * da recusa por permissão insuficiente. */
+const UPLOAD_FOLDER_DEVICE_REFUSAL =
+  'Enviar pasta não está disponível neste dispositivo. Use um computador.';
 
 interface UploadItem {
   uid: string;
@@ -54,6 +61,7 @@ function describeError(error: string | undefined): string {
  */
 export function UploadArea({ destinationFolderId }: UploadAreaProps) {
   const { message, notification } = App.useApp();
+  const isNarrow = useNarrowMode();
   const requestUploadUrls = useRequestUploadUrls();
   const invalidate = useInvalidateFolderContents();
 
@@ -202,12 +210,29 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
 
   return (
     <div>
-      <Space>
+      <Space wrap>
         <Upload multiple showUploadList={false} beforeUpload={handleBeforeUpload}>
           <Button icon={<UploadOutlined />}>Enviar arquivos</Button>
         </Upload>
+        {/* design.md D5 (`web-responsividade`): `webkitdirectory` não existe em
+            Safari iOS nem em Chrome Android — abaixo do limiar o botão
+            permanece visível e recusa no acionamento, em vez de abrir um
+            seletor de pasta que a plataforma não suporta. O `<Upload>`
+            permanece montado nos dois modos (identidade estável do
+            componente); a recusa intercepta o clique com
+            `stopPropagation`, antes que o `rc-upload` abra o seletor. */}
         <Upload directory multiple showUploadList={false} beforeUpload={handleBeforeUpload}>
-          <Button icon={<FolderOpenOutlined />}>Enviar pasta</Button>
+          <Button
+            icon={<FolderOpenOutlined />}
+            onClick={(e) => {
+              if (isNarrow) {
+                e.stopPropagation();
+                message.error(UPLOAD_FOLDER_DEVICE_REFUSAL);
+              }
+            }}
+          >
+            Enviar pasta
+          </Button>
         </Upload>
       </Space>
       {items.length > 0 && (

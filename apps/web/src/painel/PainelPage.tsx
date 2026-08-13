@@ -105,23 +105,27 @@ export function PainelPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <Row gutter={16}>
-        <Col span={6}>
+      {/* design.md D7 (`web-responsividade`): 4 colunas fixas de span=6 dão
+          cartões de ~85px em 360px, ilegíveis — `xs`/`sm` do próprio grid do
+          design system (mesmos tokens do limiar único) reagrupam em 2x2 antes
+          de chegar a 4-a-fio a partir de `md`. */}
+      <Row gutter={[16, 16]}>
+        <Col xs={12} sm={12} md={6}>
           <Card>
             <Statistic title="Total de arquivos" value={data.cards.totalFiles} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={12} sm={12} md={6}>
           <Card>
             <Statistic title="Total de pessoas" value={data.cards.totalPeople} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={12} sm={12} md={6}>
           <Card>
             <Statistic title="Espaço utilizado" value={formatFileSize(data.cards.usedBytes)} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={12} sm={12} md={6}>
           <Card>
             <Statistic
               title="Cota utilizada"

@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { Button, Empty, Image, Modal, Result, Spin } from 'antd';
+import { Button, Empty, Image, Modal, Result, Spin, Typography } from 'antd';
 import type { FileSummaryResponse } from '@gdoc/shared';
 import { FileCategory, fileCategory } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
+import { useNarrowMode } from '../app/responsive';
 import { useViewUrl } from './queries';
 import { useDownloadFile } from './useDownloadFile';
 
@@ -19,6 +20,7 @@ interface PreviewModalProps {
 export function PreviewModal({ file, onClose }: PreviewModalProps) {
   const viewUrl = useViewUrl();
   const { download, isPending: downloading } = useDownloadFile();
+  const isNarrow = useNarrowMode();
 
   const fileId = file?.id ?? null;
   useEffect(() => {
@@ -35,7 +37,14 @@ export function PreviewModal({ file, onClose }: PreviewModalProps) {
       open={file !== null}
       onCancel={onClose}
       footer={null}
-      width={800}
+      // design.md D6 (`responsividade-mobile-tablet`): abaixo do limiar,
+      // visualizar é o ato central do uso móvel — o preview aproveita a
+      // largura útil da tela em vez do `width={800}` fixo do modo largo.
+      width={isNarrow ? '100%' : 800}
+      style={isNarrow ? { top: 8, paddingBottom: 0 } : undefined}
+      styles={
+        isNarrow ? { body: { maxHeight: 'calc(100dvh - 140px)', overflow: 'auto' } } : undefined
+      }
       destroyOnHidden
     >
       {file && renderBody()}
@@ -100,12 +109,25 @@ function renderPreview(url: string, file: FileSummaryResponse) {
     case FileCategory.AUDIO:
       return <audio src={url} controls style={{ width: '100%' }} />;
     default:
+      // design.md D6: `70vh` reproduz o problema de barra de endereço
+      // retrátil já tratado em `fundo-marca-tela-login` — `dvh` acompanha a
+      // área efetivamente visível. Nem todo navegador móvel renderiza PDF
+      // inline num `iframe`; o link abaixo garante uma saída explicável em
+      // vez de um retângulo em branco sem explicação, independente disso.
       return (
-        <iframe
-          src={url}
-          title={file.fileName}
-          style={{ width: '100%', height: '70vh', border: 'none' }}
-        />
+        <div>
+          <iframe
+            src={url}
+            title={file.fileName}
+            style={{ width: '100%', height: '70dvh', border: 'none' }}
+          />
+          <Typography.Paragraph style={{ marginTop: 8, textAlign: 'center' }}>
+            Não conseguiu visualizar aqui?{' '}
+            <Typography.Link href={url} target="_blank" rel="noopener noreferrer">
+              Abrir em nova aba
+            </Typography.Link>
+          </Typography.Paragraph>
+        </div>
       );
   }
 }

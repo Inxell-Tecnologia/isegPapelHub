@@ -191,7 +191,12 @@ export function PessoasPage() {
           Nova pessoa
         </Button>
       </div>
-      <Table<PersonResponse> rowKey="id" columns={columns} dataSource={data ?? []} />
+      <Table<PersonResponse>
+        rowKey="id"
+        columns={columns}
+        dataSource={data ?? []}
+        scroll={{ x: 'max-content' }}
+      />
       <PessoaFormModal
         target={editingPerson ?? undefined}
         open={modalOpen}

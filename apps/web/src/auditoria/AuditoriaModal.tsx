@@ -98,6 +98,14 @@ export function AuditoriaModal({ file, onClose }: AuditoriaModalProps) {
       key: `${event.actor.id}-${event.action}-${event.createdAt}-${index}`,
     }));
 
-    return <Table<AuditRow> rowKey="key" columns={columns} dataSource={rows} pagination={false} />;
+    return (
+      <Table<AuditRow>
+        rowKey="key"
+        columns={columns}
+        dataSource={rows}
+        pagination={false}
+        scroll={{ x: 'max-content' }}
+      />
+    );
   }
 }

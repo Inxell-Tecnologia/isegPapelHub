@@ -1,25 +1,19 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
+import { mockViewportWidth, WIDE_VIEWPORT } from './viewport';
 
 // CI é mais lento que o dev local, especialmente no primeiro teste do arquivo
 // (cold start de módulos/JIT) — o timeout padrão de 1000ms do
 // findBy/waitFor causava falha intermitente sem indicar bug real.
 configure({ asyncUtilTimeout: 5000 });
 
-// jsdom não implementa matchMedia — o Sider/useBreakpoint do Ant Design o exige.
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: (query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  }),
+// jsdom não implementa matchMedia — o Sider/useBreakpoint do Ant Design o
+// exige. Modo largo é o padrão de cada teste (tasks.md 1.4): a suíte já
+// pressupõe a forma larga na maioria dos casos, e só os testes do modo
+// estreito chamam `mockViewportWidth(NARROW_VIEWPORT)` explicitamente.
+beforeEach(() => {
+  mockViewportWidth(WIDE_VIEWPORT);
 });
 
 afterEach(() => {

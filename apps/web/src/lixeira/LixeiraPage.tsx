@@ -141,6 +141,7 @@ export function LixeiraPage() {
       columns={columns}
       dataSource={data.items}
       pagination={false}
+      scroll={{ x: 'max-content' }}
     />
   );
 }
