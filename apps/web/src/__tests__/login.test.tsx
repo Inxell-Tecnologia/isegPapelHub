@@ -2,8 +2,18 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { UserRole } from '@gdoc/shared';
+import { LOGIN_BACKGROUND_COLOR } from '../auth/LoginPage';
 import { mockFetch } from './mock-fetch';
 import { renderApp } from './render-app';
+
+/** Converte hex `#rrggbb` para o formato `rgb(r, g, b)` que o jsdom normaliza em `style.backgroundColor`. */
+function hexToRgb(hex: string) {
+  const value = hex.replace('#', '');
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgb(${r}, ${g}, ${b})`;
+}
 
 async function fillAndSubmit(email: string, password: string) {
   await userEvent.type(screen.getByLabelText('E-mail'), email);
@@ -137,5 +147,27 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
 
     await screen.findByRole('heading', { name: 'PapelHub' });
     await waitFor(() => expect(document.title).toBe('PapelHub'));
+  });
+
+  it('aplica a cor de marca como fundo da tela de login', async () => {
+    mockFetch({ 'GET /auth/me': { status: 401 } });
+    renderApp(['/login']);
+
+    const card = (await screen.findByRole('heading', { name: 'PapelHub' })).closest('.ant-card');
+    const background = card?.parentElement;
+
+    expect(background?.style.backgroundColor).toBe(hexToRgb(LOGIN_BACKGROUND_COLOR));
+  });
+
+  it('o cartão de acesso é fluido com teto, sem largura fixa que estoure telas estreitas', async () => {
+    mockFetch({ 'GET /auth/me': { status: 401 } });
+    renderApp(['/login']);
+
+    const card = (await screen.findByRole('heading', { name: 'PapelHub' })).closest(
+      '.ant-card',
+    ) as HTMLElement;
+
+    expect(card.style.width).toBe('100%');
+    expect(card.style.maxWidth).toBe('360px');
   });
 });
