@@ -85,23 +85,15 @@ async function findOrCreateChild(
   parentId: string | null,
   name: string,
 ): Promise<FolderRow> {
-  const readExisting = () =>
-    client.query<FolderRow>(
-      `SELECT * FROM folders
-       WHERE unit_id = $1 AND parent_id IS NOT DISTINCT FROM $2 AND lower(name) = lower($3) AND deleted_at IS NULL`,
-      [ctx.unitId, parentId, name],
-    );
-
-  const { rows: existing } = await readExisting();
-  if (existing[0]) return existing[0];
-
   // `ON CONFLICT` casa com o índice único parcial `folders_unit_parent_name_uidx`
-  // (migração 0006, restrito a `deleted_at IS NULL` pela 0008 — épico 6:
-  // pasta excluída não bloqueia recriar o nome) para os níveis internos,
-  // tornando a criação idempotente sob concorrência. Na raiz (`parent_id`
-  // NULL) o índice não pega colisões — dois NULL não são iguais em Postgres
-  // (design.md D4) — então a idempotência da raiz depende só da leitura
-  // acima; aceito e documentado, mesma classe de gap do D2.
+  // (migração 0006, restrito a `deleted_at IS NULL` pela 0008), tornando a
+  // criação idempotente sob concorrência. Desde a migração `0014`
+  // (`NULLS NOT DISTINCT`, design.md D5 de `mover-e-renomear-itens`) o
+  // índice cobre também a raiz (`parent_id IS NULL`) — antes disso dois
+  // `NULL` não colidiam em índice único do Postgres, e esta função precisava
+  // de uma leitura prévia como remendo só para a raiz. Não é mais necessário:
+  // o `INSERT ... ON CONFLICT DO NOTHING` seguido da leitura abaixo é
+  // suficiente e idêntico em qualquer nível.
   await client.query(
     `INSERT INTO folders (unit_id, owner_id, parent_id, name)
      VALUES ($1, $2, $3, $4)
@@ -109,8 +101,12 @@ async function findOrCreateChild(
     [ctx.unitId, ctx.userId, parentId, name],
   );
 
-  const { rows: after } = await readExisting();
-  return after[0]!;
+  const { rows } = await client.query<FolderRow>(
+    `SELECT * FROM folders
+     WHERE unit_id = $1 AND parent_id IS NOT DISTINCT FROM $2 AND lower(name) = lower($3) AND deleted_at IS NULL`,
+    [ctx.unitId, parentId, name],
+  );
+  return rows[0]!;
 }
 
 /**
@@ -136,6 +132,128 @@ export async function ensureFolderPath(
     parentId = folder.id;
   }
   return { ok: true, folderId: parentId };
+}
+
+/**
+ * Ids da pasta e de toda a sua subárvore (design.md D4 de
+ * `epico-6-lixeira-retencao`; movida de `routes/folders.ts` para cá em
+ * `mover-e-renomear-itens` para ser reusada pela verificação de ciclo
+ * pré-`UPDATE`, task 4.1), via CTE recursiva por `parent_id`. Guarda de
+ * ciclo (design.md D3): a cláusula `CYCLE` do Postgres (14+) descarta a
+ * travessia de qualquer nó revisitado, em vez do `UNION ALL` nu de antes —
+ * antes desta mudança um ciclo era estruturalmente impossível e a travessia
+ * nunca precisou de guarda; mover é a primeira operação que reescreve
+ * `parent_id`. Uma linha inconsistente por qualquer via termina a consulta
+ * normalmente, sem recursionar até estourar no Postgres.
+ */
+export async function collectSubtreeFolderIds(
+  client: PoolClient,
+  rootId: string,
+): Promise<string[]> {
+  const { rows } = await client.query<{ id: string }>(
+    `WITH RECURSIVE subtree(id) AS (
+       SELECT id FROM folders WHERE id = $1
+       UNION ALL
+       SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
+     )
+     CYCLE id SET is_cycle USING path
+     SELECT id FROM subtree WHERE NOT is_cycle`,
+    [rootId],
+  );
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Ciclo detectado num walk de árvore. Dois usos: (1) `assertNoCycleAfterMove`
+ * — reverificação pós-`UPDATE` que encontra um ciclo instalado por uma
+ * corrida entre movimentos concorrentes (design.md D3); lançar dentro de
+ * `withTenantTransaction` já dispara o `ROLLBACK` (`pg-database-port.ts`), e
+ * o chamador (`routes/folders.ts`) traduz para `409 folder_cycle`, o mesmo
+ * código da recusa da camada 1. (2) `buildBreadcrumb` — guarda defensiva
+ * contra uma linha de dado inconsistente por qualquer via; ali ninguém
+ * captura o tipo especificamente, e a exceção vira `500` genérico pelo
+ * tratador de erro da rota — "erro tratado" em vez de laço infinito, não uma
+ * recusa de negócio.
+ */
+export class FolderCycleError extends Error {
+  constructor() {
+    super('folder hierarchy cycle detected');
+    this.name = 'FolderCycleError';
+  }
+}
+
+/**
+ * Ciclo, camada 1 — antes do `UPDATE` (design.md D3): recusa se o destino é
+ * a própria pasta ou pertence à sua subárvore, reusando
+ * `collectSubtreeFolderIds` (a mesma travessia que já embasa a cascata de
+ * exclusão). `destinationId` nulo é sempre a raiz da unidade — nunca ciclo.
+ */
+export async function wouldCreateCycle(
+  client: PoolClient,
+  folderId: string,
+  destinationId: string | null,
+): Promise<boolean> {
+  if (destinationId === null) return false;
+  if (destinationId === folderId) return true;
+  const subtreeIds = await collectSubtreeFolderIds(client, folderId);
+  return subtreeIds.includes(destinationId);
+}
+
+const MAX_FOLDER_DEPTH = 1000;
+
+/**
+ * Ciclo, camada 2 — depois do `UPDATE` e antes do commit, na mesma
+ * transação (design.md D3): sobe a cadeia de `parent_id` a partir da pasta
+ * movida, com conjunto de visitados e teto de profundidade. Fecha a corrida
+ * que a camada 1 não vê — duas transações concorrentes que cada uma
+ * verificou "meu destino não está na minha subárvore" antes de qualquer
+ * `UPDATE` commitar, mas que juntas instalam um ciclo (A→B e B→A). Não
+ * filtra por `deleted_at`: o interesse aqui é a forma do grafo de
+ * `parent_id`, não se as pastas estão vivas.
+ */
+export async function assertNoCycleAfterMove(
+  client: PoolClient,
+  movedFolderId: string,
+): Promise<void> {
+  const visited = new Set<string>([movedFolderId]);
+  let currentId: string = movedFolderId;
+  for (let depth = 0; depth < MAX_FOLDER_DEPTH; depth++) {
+    const { rows } = await client.query<{ parent_id: string | null }>(
+      'SELECT parent_id FROM folders WHERE id = $1',
+      [currentId],
+    );
+    const parentId = rows[0]?.parent_id ?? null;
+    if (parentId === null) return;
+    if (visited.has(parentId)) throw new FolderCycleError();
+    visited.add(parentId);
+    currentId = parentId;
+  }
+  throw new FolderCycleError();
+}
+
+/**
+ * Colisão de nome (design.md D4/D5): já existe outra pasta **viva** de mesmo
+ * nome (insensível a maiúsculas) sob o mesmo pai, na mesma unidade. Dá erro
+ * legível (`409 folder_name_conflict`) antes de deixar o `23505` cru do
+ * índice único escapar — o índice continua sendo a garantia real sob
+ * concorrência; esta verificação só melhora a mensagem no caminho comum.
+ * `excludeFolderId` evita que a própria pasta (ao renomear sem mudar de pai,
+ * por exemplo) colida consigo mesma.
+ */
+export async function hasFolderNameConflict(
+  client: PoolClient,
+  unitId: string,
+  parentId: string | null,
+  name: string,
+  excludeFolderId: string,
+): Promise<boolean> {
+  const { rows } = await client.query(
+    `SELECT 1 FROM folders
+     WHERE unit_id = $1 AND parent_id IS NOT DISTINCT FROM $2 AND lower(name) = lower($3)
+       AND deleted_at IS NULL AND id != $4`,
+    [unitId, parentId, name, excludeFolderId],
+  );
+  return rows.length > 0;
 }
 
 interface SubtreeFileRow {

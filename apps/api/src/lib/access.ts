@@ -111,6 +111,36 @@ export async function canReadAudit(
 }
 
 /**
+ * Resolução de acesso para **mover e renomear pasta** (US 2.3, design.md
+ * D1/D2 de `mover-e-renomear-itens`): **dono OU admin da unidade**,
+ * deliberadamente sem o ramo de `grant` que `hasAccess` tem — nesta fatia
+ * nenhum verbo de `grants` governa reorganizar a árvore (design.md D2: abrir
+ * a terceiros via `rename` escala para destruição via
+ * `DELETE /folders/:id`, que varre a subárvore sem checar dono item a item).
+ * Molde igual ao de `canReadAudit`, porém genérico por `GrantResourceType`
+ * em vez de específico de `files` — usado tanto para o item quanto para o
+ * destino da operação, dos dois lados (arquivo/pasta). Reusa `isAdminOfUnit`,
+ * herdando a mesma trava do bypass de `global_admin` (só admin dentro da
+ * própria unidade). Fail-closed: recurso inexistente, de outra unidade ou na
+ * lixeira (`deleted_at IS NULL`) resolve para `false`, sem distinguir os
+ * casos — mesmo tratamento de `hasAccess`/`findAccessibleFile`.
+ */
+export async function canReorganize(
+  client: PoolClient,
+  ctx: TenantContext,
+  resourceType: GrantResourceType,
+  resourceId: string,
+): Promise<boolean> {
+  const { rows } = await client.query<{ owner_id: string; unit_id: string }>(
+    `SELECT owner_id, unit_id FROM ${resourceTable(resourceType)} WHERE id = $1 AND deleted_at IS NULL`,
+    [resourceId],
+  );
+  const resource = rows[0];
+  if (!resource) return false;
+  return resource.owner_id === ctx.userId || isAdminOfUnit(ctx, resource.unit_id);
+}
+
+/**
  * Fragmento SQL de alcance (dono OU grant do verbo OU admin da unidade),
  * sem filtro de `deleted_at` — a parte comum entre a visibilidade viva
  * (`visibleResourceClause`, verbo `view`) e a lixeira (`GET /trash`, verbo

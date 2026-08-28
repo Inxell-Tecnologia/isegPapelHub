@@ -208,4 +208,37 @@ describe('Épico 5: alcance administrativo por unidade', () => {
     expect(folderNames).toContain('Pasta userA');
     expect(folderNames).not.toContain('Pasta userB');
   });
+
+  it('3.5 (mover-e-renomear-itens, design.md D1): unit_admin e global_admin não movem/renomeiam pasta de outra unidade, mesmo bypassando RLS na listagem', async () => {
+    const app = createApp(ports);
+    const cookieAdminA = await sessionCookieFor(ports, unitAdminAId);
+    const cookieGlobalAdmin = await sessionCookieFor(ports, ids.globalAdmin);
+
+    const moveByUnitAdmin = await request(app)
+      .post(`/folders/${folderInUnitBId}/move`)
+      .set('Cookie', cookieAdminA)
+      .send({ destinationFolderId: null });
+    expect(moveByUnitAdmin.status).toBe(403);
+
+    const moveByGlobalAdmin = await request(app)
+      .post(`/folders/${folderInUnitBId}/move`)
+      .set('Cookie', cookieGlobalAdmin)
+      .send({ destinationFolderId: null });
+    expect(moveByGlobalAdmin.status).toBe(403);
+
+    const renameByGlobalAdmin = await request(app)
+      .patch(`/folders/${folderInUnitBId}`)
+      .set('Cookie', cookieGlobalAdmin)
+      .send({ name: 'Tentativa Cross Unit' });
+    expect(renameByGlobalAdmin.status).toBe(403);
+
+    // canReorganize (design.md D1/D2) não abre exceção alguma pelo mesmo
+    // bypass que a listagem trava explicitamente — só admin dentro da
+    // própria unidade alcança.
+    const row = await withSystemBypass(pool, (client) =>
+      client.query('SELECT name, parent_id FROM folders WHERE id = $1', [folderInUnitBId]),
+    );
+    expect(row.rows[0]?.name).toBe('Pasta userB');
+    expect(row.rows[0]?.parent_id).toBeNull();
+  });
 });

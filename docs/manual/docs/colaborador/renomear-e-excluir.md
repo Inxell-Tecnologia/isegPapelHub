@@ -1,12 +1,45 @@
-# Renomear e excluir
+# Mover, renomear e excluir
 
-## Renomear arquivos
+## Renomear arquivos e pastas
 
-Se você tem permissão, use **Renomear** na linha do arquivo para mudar o **nome**.
-Sem permissão, a ação é bloqueada com aviso.
+Se você tem permissão, use **Renomear** na linha do item para mudar o **nome** —
+vale para **arquivos e pastas**. Sem permissão, a ação é bloqueada com aviso.
 
-Essa ação vale para **arquivos**. Pastas não são renomeadas nesta versão — se
-precisar mudar o nome de uma pasta, crie a nova e mova o conteúdo reenviando-o.
+Renomear pasta muda só o nome exibido: o conteúdo e a localização de tudo o que está
+dentro dela permanecem os mesmos.
+
+## Mover arquivos e pastas
+
+Use **Mover para...** na linha do item para reorganizar o que já foi enviado, sem
+precisar excluir e reenviar. Ao clicar, um seletor mostra as pastas da unidade e
+permite navegar nível a nível até o destino desejado — inclusive a **raiz da
+unidade**, sempre disponível como opção. Confirme para concluir; o item deixa de
+aparecer na listagem de origem.
+
+Mover preserva o conteúdo, o dono, as permissões já concedidas sobre o item e o
+histórico de auditoria de arquivo — nada disso é afetado pela mudança de local. Mover
+uma pasta leva junto toda a sua subárvore, inclusive arquivos de outras pessoas que
+estejam dentro dela.
+
+!!! warning "Mover para uma pasta compartilhada não compartilha o item"
+    Quem já tinha acesso a um arquivo ou pasta continua tendo, exatamente como
+    antes. Mas mover um item para dentro de uma pasta que você compartilha com a
+    equipe **não estende** esse compartilhamento ao item movido — as permissões são
+    sempre por item, nunca herdadas da pasta que o contém. Se quiser que outra
+    pessoa acesse o item movido, peça a um administrador para conceder permissão
+    sobre ele diretamente (ver [Permissões](../administrador/permissoes.md)).
+
+Mover (arquivo ou pasta) e renomear pasta usam o mesmo alcance: **dono do item OU
+administrador da sua unidade**, exigido também sobre o **destino** — ainda que
+você tenha alguma concessão sobre o item ou sobre a pasta de destino, isso não
+habilita mover nem renomear pasta nesta versão. Você pode encontrar duas recusas
+específicas ao mover ou renomear pasta, além da falta de permissão:
+
+- **Destino inválido** — ao tentar mover uma pasta para dentro dela mesma ou de uma
+  subpasta sua, em qualquer profundidade.
+- **Nome já existente no destino** — ao mover ou renomear uma pasta para um nome que
+  já é usado por outra pasta viva no mesmo local. O sistema recusa em vez de
+  substituir ou combinar o conteúdo das duas.
 
 ## Excluir arquivos
 

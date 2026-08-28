@@ -13,14 +13,15 @@ import type {
   BatchUploadUrlRequest,
   FileRestoreResponse,
   FileSummaryResponse,
+  MoveItemRequest,
   RenameFileRequest,
   ReplaceFileRequest,
   UploadUrlRequest,
   ViewUrlResponse,
 } from '@gdoc/shared';
 import { config } from '../config.js';
-import { ensureFolderPath, validateAnchor } from '../lib/folder-tree.js';
-import { hasAccess } from '../lib/access.js';
+import { ensureFolderPath, findFolderById, validateAnchor } from '../lib/folder-tree.js';
+import { canReorganize, hasAccess } from '../lib/access.js';
 
 interface FileRow {
   id: string;
@@ -393,6 +394,64 @@ export function filesRouter(ports: Ports): Router {
 
       await recordAudit(ports, ctx, updated, AuditAction.RENAME);
       res.json(toFileSummaryResponse(updated));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/files/:id/move', async (req, res, next) => {
+    try {
+      const ctx = req.tenantContext!;
+      const { destinationFolderId } = req.body as MoveItemRequest;
+      if (destinationFolderId !== null && typeof destinationFolderId !== 'string') {
+        res.status(400).json({ error: 'invalid request body' });
+        return;
+      }
+
+      const outcome = await ports.database.withTenantTransaction(ctx, async (client) => {
+        const { rows } = await client.query<FileRow>(
+          'SELECT * FROM files WHERE id = $1 AND deleted_at IS NULL',
+          [req.params.id],
+        );
+        const file = rows[0];
+        if (!file) return { ok: false as const };
+        // Dono-ou-admin da unidade, sem ramo de grant (design.md D1/D2 de
+        // `mover-e-renomear-itens`) — `rename`/`upload` sobre item ou
+        // destino NÃO habilitam esta operação nesta fatia.
+        const allowed = await canReorganize(client, ctx, GrantResourceType.FILE, file.id);
+        if (!allowed) return { ok: false as const };
+
+        // Destino nulo = raiz da unidade, sem exigir alcance (design.md D1).
+        // Destino não-nulo exige o mesmo alcance dono-ou-admin, sobre a
+        // pasta de destino (D1: "vale para os dois lados").
+        if (destinationFolderId !== null) {
+          const destination = await findFolderById(client, destinationFolderId);
+          if (!destination) return { ok: false as const };
+          const destinationAllowed = await canReorganize(
+            client,
+            ctx,
+            GrantResourceType.FOLDER,
+            destination.id,
+          );
+          if (!destinationAllowed) return { ok: false as const };
+        }
+
+        // Só a localização lógica muda — object_path, size_bytes, owner_id,
+        // status e file_name ficam intocados (spec `gestao-arquivos`).
+        const { rows: updated } = await client.query<FileRow>(
+          'UPDATE files SET folder_id = $1 WHERE id = $2 RETURNING *',
+          [destinationFolderId, file.id],
+        );
+        return { ok: true as const, file: updated[0]! };
+      });
+
+      if (!outcome.ok) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+      }
+
+      await recordAudit(ports, ctx, outcome.file, AuditAction.MOVE);
+      res.json(toFileSummaryResponse(outcome.file));
     } catch (err) {
       next(err);
     }

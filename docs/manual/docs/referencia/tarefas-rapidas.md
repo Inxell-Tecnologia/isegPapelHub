@@ -11,7 +11,8 @@
 | Baixar um arquivo              | Arquivos      | Botão **Baixar** na linha do arquivo                       |
 | Baixar a pasta atual (ou raiz) | Arquivos      | Botão **Baixar esta pasta** (barra superior; gera um `.zip`) |
 | Baixar uma subpasta            | Arquivos      | Botão **Baixar pasta** na linha da subpasta (gera um `.zip`) |
-| Renomear um arquivo            | Arquivos      | Botão **Renomear** (precisa de permissão)                  |
+| Renomear um arquivo ou pasta   | Arquivos      | Botão **Renomear** na linha do item (dono ou administrador) |
+| Mover um arquivo ou pasta      | Arquivos      | Botão **Mover para...** na linha do item (dono ou administrador) |
 | Excluir um arquivo             | Arquivos      | Botão **Excluir** na linha do arquivo (vai para a Lixeira) |
 | Excluir a pasta atual          | Arquivos      | Botão **Excluir esta pasta** (barra superior)              |
 | Excluir uma subpasta           | Arquivos      | Botão **Excluir** na linha da subpasta                     |
