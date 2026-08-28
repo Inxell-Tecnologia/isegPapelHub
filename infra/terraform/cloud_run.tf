@@ -7,6 +7,8 @@ resource "google_service_account" "api" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-api"
   display_name = "GDoc API runtime (${var.environment})"
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_project_iam_member" "api_cloudsql_client" {

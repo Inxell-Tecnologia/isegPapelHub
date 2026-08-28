@@ -44,6 +44,8 @@ resource "google_service_account" "pubsub_push" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-pubsub-push"
   display_name = "Push subscription -> API (storage finalize)"
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "pubsub_invoker" {
