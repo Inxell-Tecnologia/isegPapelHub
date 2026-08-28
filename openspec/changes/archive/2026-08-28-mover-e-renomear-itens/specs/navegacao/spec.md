@@ -1,88 +1,15 @@
-# navegacao Specification
+# Spec — navegacao (delta)
 
-## Purpose
+Capability existente. Até aqui a hierarquia era **imutável após a criação**:
+`folders.parent_id` e `folders.name` eram escritos uma única vez, por
+`POST /folders` ou por `ensureFolderPath`, e nenhuma rota os reescrevia. Esta
+mudança implementa a **US 2.3** do PRD (`docs/prd_final.md`) na parte que toca a
+árvore de pastas — mudar o pai, mudar o nome e as recusas que tornam as duas
+operações seguras. O mover de **arquivo** é normatizado pela capability
+`gestao-arquivos`; a superfície de tela, por `web-navegacao`. Ver design.md
+D1–D6.
 
-Define os requisitos verificáveis de navegação por pastas aninhadas do GDoc —
-criação de pastas por unidade, colocação de arquivos em pastas e navegação com
-trilha (breadcrumb) — na fatia **só-por-dono** do Épico 2 / US 2.1 do PRD
-(`docs/prd_final.md`). A metade "itens que criei" do cenário 2 é vinculante
-aqui; a metade "itens que me foram liberados" e o alcance administrativo sobre
-itens de terceiros ficam para o Épico 4 (permissões) e Épico 5 (US 5.1). Os
-cenários Given/When/Then da US 2.1 são vinculantes e este spec os torna
-verificáveis no backend.
-
-A US 2.3 do PRD estende esta capability: a hierarquia de pastas, até então
-imutável após a criação, passa a admitir **mudança de pai** (mover) e
-**mudança de nome** (renomear), com recusa de ciclo e unicidade de nome válida
-também na raiz. Mover e renomear pasta usam um alcance próprio — **dono OU
-administrador da unidade**, sem ramo de concessão — distinto do "só-por-dono"
-da criação/navegação; ver design.md D1/D2 do change `mover-e-renomear-itens`.
-O mover de **arquivo** é normatizado pela capability `gestao-arquivos`.
-
-## Requirements
-
-### Requirement: Pastas aninhadas por unidade
-
-O sistema SHALL permitir que uma pessoa autenticada crie pastas em `POST /folders`,
-na raiz da sua unidade ou dentro de outra pasta da qual seja dona, formando uma
-hierarquia aninhada. Toda pasta SHALL ser vinculada à unidade (`unit_id`) e ao dono
-(`owner_id`), e o isolamento entre unidades SHALL ser imposto no banco por RLS, não
-apenas na aplicação. Referência: PRD US 2.1.
-
-#### Scenario: Criação de pasta na raiz
-- **WHEN** uma pessoa cria uma pasta sem informar pasta-pai
-- **THEN** a pasta é criada na raiz da sua unidade, vinculada a ela e ao criador como
-  dono
-
-#### Scenario: Criação de subpasta dentro de pasta própria
-- **WHEN** uma pessoa cria uma pasta informando como pai uma pasta da qual é dona
-- **THEN** a nova pasta é criada como filha dela, preservando o aninhamento
-
-#### Scenario: Pasta-pai de outra unidade não é utilizável
-- **WHEN** uma pessoa tenta criar uma subpasta apontando para uma pasta-pai de outra
-  unidade
-- **THEN** a operação é recusada e nenhuma pasta é criada, sem revelar a existência
-  da pasta de outra unidade
-
-### Requirement: Colocação de arquivos em pastas
-
-O sistema SHALL permitir que um arquivo seja associado a uma pasta no momento do
-envio, informando a pasta de destino; um arquivo sem pasta informada SHALL residir na
-raiz da unidade. A pasta de destino SHALL pertencer à mesma unidade do remetente.
-Referência: PRD US 2.1.
-
-#### Scenario: Envio para uma pasta
-- **WHEN** uma pessoa solicita o envio de um arquivo informando uma pasta de destino
-  da sua unidade
-- **THEN** o arquivo passa a residir logicamente nessa pasta
-
-#### Scenario: Envio sem pasta cai na raiz
-- **WHEN** uma pessoa solicita o envio de um arquivo sem informar pasta
-- **THEN** o arquivo passa a residir na raiz da unidade
-
-### Requirement: Navegação com trilha e visibilidade só-por-dono
-
-O sistema SHALL listar o conteúdo de uma pasta (subpastas e arquivos) em uma rota de
-navegação, exibindo **apenas os itens dos quais o solicitante é dono**, e SHALL
-devolver a trilha (breadcrumb) da raiz até a pasta corrente, permitindo retornar a
-qualquer nível anterior. A listagem SHALL respeitar o isolamento por unidade via RLS.
-Itens de outras pessoas, ainda que na mesma pasta, NÃO SHALL aparecer nesta fatia — a
-visibilidade por concessão explícita é o Épico 4. Referência: PRD US 2.1.
-
-#### Scenario: Navegar e atualizar a trilha
-- **WHEN** uma pessoa entra em uma subpasta à qual tem acesso como dona
-- **THEN** vê o conteúdo permitido dessa subpasta e a trilha é atualizada com o
-  caminho da raiz até ela, cada nível permitindo retorno com um clique
-
-#### Scenario: Item de outra pessoa não aparece na listagem
-- **WHEN** uma pasta contém itens criados por outra pessoa e itens criados pelo
-  solicitante
-- **THEN** apenas os itens dos quais o solicitante é dono são exibidos
-
-#### Scenario: Conteúdo de outra unidade nunca aparece
-- **WHEN** uma pessoa navega pelas pastas
-- **THEN** nunca vê pastas ou arquivos pertencentes a outra unidade, mesmo por
-  identificador direto de pasta
+## ADDED Requirements
 
 ### Requirement: Mover pasta para outra pasta ou para a raiz
 
@@ -109,7 +36,7 @@ NÃO SHALL alterar a cota de nenhum dono.
 Mover uma pasta SHALL relocalizar toda a sua subárvore, inclusive itens de outras
 pessoas contidos nela, sem checagem item a item — a mesma escolha já feita pela
 cascata de exclusão. Referência: PRD US 2.3, cenários 1, 2 e 6; design.md
-D1/D2/D8 do change `mover-e-renomear-itens`.
+D1/D2/D8.
 
 #### Scenario: Mover pasta própria preservando conteúdo e concessões
 - **WHEN** o dono de uma pasta a move para outra pasta própria
@@ -151,8 +78,7 @@ válidos NÃO SHALL conseguir instalar um ciclo entre si.
 As travessias da árvore — construção da trilha de navegação e coleta de subárvore
 — SHALL ser resistentes a ciclo, terminando com erro tratado em vez de laço
 infinito ou esgotamento de recursão, ainda que uma linha inconsistente exista por
-qualquer via. Referência: PRD US 2.3, cenário 3; design.md D3 do change
-`mover-e-renomear-itens`.
+qualquer via. Referência: PRD US 2.3, cenário 3; design.md D3.
 
 #### Scenario: Pasta não pode ser movida para dentro de si mesma
 - **WHEN** o dono de uma pasta escolhe a própria pasta como destino
@@ -185,8 +111,7 @@ O alcance SHALL ser **dono da pasta OU administrador da unidade da pasta**,
 resolvido **sem** consultar concessões — possuir grant `rename` sobre a pasta NÃO
 SHALL habilitar a operação nesta fatia. A recusa SHALL ser fail-closed e
 indistinguível entre pasta inexistente, de outra unidade, na lixeira ou de
-terceiro sem alcance. Referência: PRD US 2.3, cenários 2 e 5; design.md D1/D2 do
-change `mover-e-renomear-itens`.
+terceiro sem alcance. Referência: PRD US 2.3, cenários 2 e 5; design.md D1/D2.
 
 #### Scenario: Renomeação pela dona preserva local e conteúdo
 - **WHEN** a dona de uma pasta altera seu nome
@@ -212,7 +137,7 @@ com erro identificável, e a operação NÃO SHALL sobrescrever, fundir nem reno
 automaticamente qualquer das pastas envolvidas. Arquivos NÃO SHALL estar sujeitos
 a esta regra: dois arquivos de mesmo nome na mesma pasta permanecem admissíveis, e
 mover arquivo NÃO SHALL ser recusado por nome. Referência: PRD US 2.3, cenário 4;
-design.md D4/D5 do change `mover-e-renomear-itens`.
+design.md D4/D5.
 
 #### Scenario: Mover para destino com pasta homônima é recusado
 - **WHEN** o destino já contém uma pasta viva de mesmo nome que a pasta movida

@@ -1,45 +1,15 @@
-# web-navegacao Specification
+# Spec — web-navegacao (delta)
 
-## Purpose
+Capability existente. O explorador oferecia criar subpasta, excluir pasta,
+renomear arquivo e excluir arquivo, e registrava explicitamente que **renomear
+pasta ficava de fora enquanto o backend não expusesse o endpoint** — condição
+agora satisfeita. Esta mudança implementa a **US 2.3** do PRD
+(`docs/prd_final.md`) do lado do cliente: a ação de mover, o seletor de pasta de
+destino e a extensão do renomear à pasta. As regras de servidor são normatizadas
+por `navegacao` e `gestao-arquivos`, e não são re-descritas aqui. Ver design.md
+D7.
 
-Define os requisitos verificáveis da navegação de pastas e arquivos na SPA do
-GDoc — o explorador em `/pastas` e `/pastas/:folderId` com trilha de navegação
-(`Breadcrumb`), as ações de gestão por item (criar subpasta, excluir pasta,
-renomear/excluir arquivo) condicionadas à resposta do servidor, e o bloqueio de
-acesso direto a pastas sem permissão. Implementa o Épico 2 (US 2.1 e 2.2) e a
-US 4.2 do PRD (`docs/prd_final.md`) do lado do cliente, consumindo os endpoints
-`GET /folders/root/contents`, `GET /folders/:id/contents` e as mutações de
-pastas/arquivos já cobertas pelos specs de backend, sem re-descrever seus
-cenários.
-
-## Requirements
-
-### Requirement: Explorador de pastas com trilha de navegação
-
-A SPA SHALL apresentar um **explorador** de pastas e arquivos em `/pastas` (raiz
-da unidade, via `GET /folders/root/contents`) e `/pastas/:folderId` (conteúdo de
-uma pasta, via `GET /folders/:id/contents`), dentro do shell autenticado. O
-explorador SHALL exibir subpastas e arquivos em uma listagem única (pastas
-antes de arquivos) e uma **trilha de navegação** (`Breadcrumb`) construída a
-partir de `FolderContentsResponse.breadcrumb`, mais o nó raiz "Arquivos" e a
-pasta corrente. Clicar em qualquer nível anterior da trilha SHALL navegar
-diretamente para aquele nível. A listagem SHALL exibir **apenas** os itens
-retornados pela API — que já são somente os próprios ou liberados por concessão
-`view` — de modo que itens sem permissão não apareçam.
-
-Referência: PRD US 2.1 (cenários 1 e 2); design.md D1/D2/D3.
-
-#### Scenario: Navegação em subpasta atualiza conteúdo e trilha
-- **WHEN** o usuário entra em uma subpasta à qual tem acesso a partir do
-  explorador
-- **THEN** a SPA carrega o conteúdo permitido daquela pasta e atualiza a trilha
-  de navegação, permitindo retornar a qualquer nível anterior com um clique
-
-#### Scenario: Item sem permissão não é listado
-- **WHEN** o usuário abre uma pasta que contém itens para os quais não tem
-  permissão
-- **THEN** a SPA exibe apenas os itens que o usuário criou ou que lhe foram
-  liberados (o conteúdo retornado pela API), sem mostrar os demais
+## MODIFIED Requirements
 
 ### Requirement: Gestão de arquivos e pastas por item conforme permissão
 
@@ -136,6 +106,8 @@ D4/D5/D7 do change `web-navegacao`; design.md D4 do change
 - **THEN** a ação é enviada ao servidor e o aviso de permissão insuficiente vem
   do 403, do mesmo modo que na tela larga
 
+## ADDED Requirements
+
 ### Requirement: Seletor de pasta de destino
 
 A SPA SHALL apresentar, ao mover um item, um **seletor de pasta de destino** que
@@ -150,8 +122,7 @@ exigir confirmação explícita antes de enviar a operação. Ele NÃO SHALL ant
 no cliente a decisão de permissão sobre o destino: uma pasta listada que o
 servidor venha a recusar SHALL produzir o aviso vindo do 403, como qualquer outra
 ação. O seletor SHALL ser utilizável abaixo do ponto de ruptura definido pela
-capability `web-responsividade`. Referência: PRD US 2.3, cenário 1; design.md D7
-do change `mover-e-renomear-itens`.
+capability `web-responsividade`. Referência: PRD US 2.3, cenário 1; design.md D7.
 
 #### Scenario: Navegar a árvore até a pasta de destino
 - **WHEN** o usuário abre o seletor de destino e entra em uma pasta
@@ -170,20 +141,3 @@ do change `mover-e-renomear-itens`.
 - **WHEN** o usuário abre o seletor de destino numa tela mais estreita que o ponto
   de ruptura
 - **THEN** a navegação por níveis e a confirmação permanecem alcançáveis
-
-### Requirement: Acesso direto a pasta sem permissão é bloqueado
-
-Ao abrir diretamente a rota `/pastas/:folderId`, a SPA SHALL exibir um bloqueio
-de acesso (por exemplo, `Result status="403"`) **sem** renderizar qualquer
-conteúdo da pasta sempre que o usuário não tiver permissão — pasta inexistente,
-de outra unidade ou sem concessão `view` —, caso em que o backend SHALL responder
-**403**. Uma resposta **401** SHALL continuar sendo tratada centralmente,
-encerrando a sessão e redirecionando a `/login`.
-
-Referência: PRD US 4.2 (cenário 1); design.md D6.
-
-#### Scenario: Deep-link a pasta sem permissão não exibe conteúdo
-- **WHEN** o usuário abre a rota de uma pasta para a qual não tem permissão e a
-  API responde 403
-- **THEN** a SPA exibe um bloqueio de acesso e nenhum conteúdo ou nome de item
-  da pasta é mostrado

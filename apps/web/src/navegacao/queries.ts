@@ -5,7 +5,9 @@ import type {
   FolderContentsResponse,
   FolderDownloadManifestResponse,
   FolderResponse,
+  MoveItemRequest,
   RenameFileRequest,
+  RenameFolderRequest,
 } from '@gdoc/shared';
 import { apiClient } from '../lib/api-client';
 import {
@@ -22,8 +24,15 @@ export function folderContentsQueryKey(folderId: string | null) {
   return [FOLDER_CONTENTS_KEY, folderId ?? 'root'] as const;
 }
 
-/** `GET /folders/root/contents` ou `GET /folders/:id/contents` (design.md D5). */
-export function useFolderContents(folderId: string | null) {
+/**
+ * `GET /folders/root/contents` ou `GET /folders/:id/contents` (design.md D5).
+ * `enabled` (design.md D7 de `mover-e-renomear-itens`): o seletor de destino
+ * do `MoverItemModal` reusa este hook mas está sempre montado (para que o
+ * `Modal` do AntD anime a abertura) — sem desligar a busca enquanto fechado,
+ * cada abertura da página dispararia uma chamada a `/folders/root/contents`
+ * mesmo com o modal invisível.
+ */
+export function useFolderContents(folderId: string | null, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: folderContentsQueryKey(folderId),
     queryFn: async () => {
@@ -31,6 +40,7 @@ export function useFolderContents(folderId: string | null) {
       const raw = await apiClient.get<FolderContentsResponse>(path);
       return folderContentsResponseSchema.parse(raw);
     },
+    enabled: options.enabled ?? true,
   });
 }
 
@@ -61,6 +71,53 @@ export function useRenameFile() {
     mutationFn: async ({ fileId, ...body }: RenameFileRequest & { fileId: string }) => {
       const raw = await apiClient.patch<FileSummaryResponse>(`/files/${fileId}`, body);
       return fileSummaryResponseSchema.parse(raw);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useRenameFolder() {
+  const invalidate = useInvalidateFolderContents();
+  return useMutation({
+    mutationFn: async ({ folderId, ...body }: RenameFolderRequest & { folderId: string }) => {
+      const raw = await apiClient.patch<FolderResponse>(`/folders/${folderId}`, body);
+      return folderResponseSchema.parse(raw);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** `POST /files/:id/move` (US 2.3, design.md D1). */
+export function useMoveFile() {
+  const invalidate = useInvalidateFolderContents();
+  return useMutation({
+    mutationFn: async ({
+      fileId,
+      destinationFolderId,
+    }: {
+      fileId: string;
+    } & MoveItemRequest) => {
+      const body: MoveItemRequest = { destinationFolderId };
+      const raw = await apiClient.post<FileSummaryResponse>(`/files/${fileId}/move`, body);
+      return fileSummaryResponseSchema.parse(raw);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** `POST /folders/:id/move` (US 2.3, design.md D1). */
+export function useMoveFolder() {
+  const invalidate = useInvalidateFolderContents();
+  return useMutation({
+    mutationFn: async ({
+      folderId,
+      destinationFolderId,
+    }: {
+      folderId: string;
+    } & MoveItemRequest) => {
+      const body: MoveItemRequest = { destinationFolderId };
+      const raw = await apiClient.post<FolderResponse>(`/folders/${folderId}/move`, body);
+      return folderResponseSchema.parse(raw);
     },
     onSuccess: invalidate,
   });

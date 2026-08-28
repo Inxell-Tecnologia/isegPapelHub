@@ -132,6 +132,33 @@ O **objetivo principal** do GDoc é entregar um repositório de arquivos corpora
       * **Quando** tento renomeá-lo ou substituí-lo
       * **Então** a ação é bloqueada e recebo aviso de permissão insuficiente.
 
+* **US 2.3:** Como Colaborador, eu quero mover arquivos e pastas entre pastas e renomear pastas para que eu reorganize meu material sem precisar reenviá-lo.
+  * **Critérios de Aceitação:**
+    * *Cenário 1 — Mover com permissão:*
+      * **Dado** que sou dono de um arquivo ou de uma pasta e da pasta de destino
+      * **Quando** movo o item para essa pasta
+      * **Então** o item passa a residir no destino com o mesmo conteúdo e as mesmas permissões, sem que nada precise ser reenviado.
+    * *Cenário 2 — Ação sem permissão:*
+      * **Dado** que não sou dono do item nem Administrador da Unidade dele
+      * **Quando** tento movê-lo ou renomeá-lo
+      * **Então** a ação é bloqueada com aviso de permissão insuficiente e nada é alterado.
+    * *Cenário 3 — Destino dentro do próprio item:*
+      * **Dado** que quero mover uma pasta
+      * **Quando** escolho como destino a própria pasta ou uma pasta contida nela
+      * **Então** a ação é recusada com aviso, e a hierarquia permanece exatamente como estava.
+    * *Cenário 4 — Nome já existente no destino:*
+      * **Dado** que o destino já contém uma pasta com o mesmo nome
+      * **Quando** movo ou renomeio uma pasta para esse nome
+      * **Então** a ação é recusada com aviso, sem sobrescrever nem fundir o conteúdo das duas pastas.
+    * *Cenário 5 — Renomear pasta:*
+      * **Dado** que sou dono de uma pasta
+      * **Quando** altero seu nome
+      * **Então** o novo nome passa a ser exibido no mesmo lugar, e o conteúdo e a localização das subpastas e arquivos permanecem inalterados.
+    * *Cenário 6 — Alcance do Administrador de Unidade:*
+      * **Dado** que sou Administrador de Unidade
+      * **Quando** reorganizo itens de qualquer pessoa
+      * **Então** consigo fazê-lo apenas dentro da minha própria unidade, e nunca sobre itens de outra unidade.
+
 ### Épico 3: Envio e Download em Lote
 
 * **US 3.1:** Como Colaborador, eu quero enviar vários arquivos de uma vez e acompanhar o progresso de cada um para que eu saiba o que já concluiu.

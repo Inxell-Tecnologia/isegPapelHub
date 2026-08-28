@@ -1,60 +1,12 @@
-# gestao-arquivos Specification
+# Spec — gestao-arquivos (delta)
 
-## Purpose
+Capability existente. O ciclo de vida do arquivo cobria **renomear** e
+**substituir por nova versão** (US 2.2); esta mudança acrescenta **mover entre
+pastas**, implementando a **US 2.3** do PRD (`docs/prd_final.md`) no lado do
+arquivo. O mover de **pasta**, a recusa de ciclo e a unicidade de nome são
+normatizados pela capability `navegacao`. Ver design.md D1/D2/D6.
 
-Define os requisitos verificáveis de gestão do ciclo de vida de arquivos do
-GDoc — renomear, substituir por nova versão e **mover entre pastas** — nas
-fatias do Épico 2 / US 2.2 (renomear/substituir) e US 2.3 (mover) do PRD
-(`docs/prd_final.md`). Renomear/substituir têm checagem de permissão baseada
-em **dono**, com a permissão granular concedida a terceiros no Épico 4; mover
-usa alcance **dono OU administrador da unidade**, deliberadamente sem ramo de
-concessão (ver capability `navegacao` para a normatização de mover pasta, a
-recusa de ciclo e a unicidade de nome). Os cenários Given/When/Then das US 2.2
-e US 2.3 são vinculantes e este spec os torna verificáveis no backend.
-
-## Requirements
-
-### Requirement: Renomear arquivo
-
-O sistema SHALL permitir que o dono de um arquivo o renomeie em `PATCH /files/:id`,
-alterando o nome exibido sem trocar sua localização lógica nem seu conteúdo. Quem não
-tem permissão (nesta fatia, quem não é o dono) NÃO SHALL conseguir renomear.
-Referência: PRD US 2.2.
-
-#### Scenario: Renomeação pelo dono
-- **WHEN** o dono de um arquivo o renomeia
-- **THEN** o nome exibido é atualizado no mesmo local, o conteúdo permanece o mesmo, e
-  o evento fica registrado na auditoria
-
-#### Scenario: Renomeação sem permissão é bloqueada
-- **WHEN** uma pessoa que não tem permissão sobre um arquivo tenta renomeá-lo
-- **THEN** a ação é bloqueada com aviso de permissão insuficiente e nada é alterado
-
-### Requirement: Substituir arquivo por nova versão
-
-O sistema SHALL permitir que o dono de um arquivo o substitua por uma nova versão em
-`POST /files/:id/replace-url`, recebendo uma URL assinada de curta duração para enviar
-o novo conteúdo. A nova versão SHALL ocupar o **mesmo local lógico** (mesma pasta e
-mesmo nome) do arquivo vigente, e a versão anterior NÃO SHALL permanecer disponível
-para consulta (sem histórico de versões — fora de escopo no PRD). A substituição SHALL
-respeitar a cota do dono, considerando a diferença de tamanho entre a versão nova e a
-antiga. Quem não é o dono NÃO SHALL conseguir substituir. Referência: PRD US 2.2.
-
-#### Scenario: Substituição pelo dono preserva o local
-- **WHEN** o dono envia uma nova versão para um arquivo sobre o qual tem permissão
-- **THEN** o arquivo vigente é substituído no mesmo local, a versão anterior deixa de
-  estar disponível, e o evento fica registrado na auditoria
-
-#### Scenario: Substituição sem permissão é bloqueada
-- **WHEN** uma pessoa que não tem permissão tenta substituir um arquivo
-- **THEN** a ação é bloqueada com aviso de permissão insuficiente e o arquivo vigente
-  permanece intacto
-
-#### Scenario: Substituição respeita a cota pelo delta
-- **WHEN** a nova versão faria o espaço utilizado do dono ultrapassar a cota,
-  considerando a diferença para a versão anterior
-- **THEN** a substituição é bloqueada com aviso de cota atingida e o arquivo vigente
-  permanece intacto
+## ADDED Requirements
 
 ### Requirement: Mover arquivo entre pastas
 
@@ -81,7 +33,7 @@ alcançar arquivo de outra unidade, ainda que o enxergue por bypass de RLS.
 A recusa SHALL ser fail-closed e indistinguível entre os casos: arquivo ou
 destino inexistente, de outra unidade, na lixeira, ou de terceiro sem alcance
 SHALL produzir a mesma resposta. Referência: PRD US 2.3, cenários 1, 2 e 6;
-design.md D1/D2 do change `mover-e-renomear-itens`.
+design.md D1/D2.
 
 #### Scenario: Mover arquivo próprio preserva conteúdo, cota e concessões
 - **WHEN** o dono de um arquivo o move para outra pasta própria
@@ -124,7 +76,7 @@ auditoria, em coerência com a criação de pasta, que também não gera: a audi
 deste produto registra acesso, destruição e alteração de conteúdo, não
 reorganização da árvore. A consulta de auditoria por arquivo SHALL permanecer
 restrita aos eventos de **acesso**, sem passar a expor o evento de movimentação.
-Referência: design.md D6 do change `mover-e-renomear-itens`.
+Referência: design.md D6.
 
 #### Scenario: Mover arquivo é auditado
 - **WHEN** um arquivo é movido com sucesso

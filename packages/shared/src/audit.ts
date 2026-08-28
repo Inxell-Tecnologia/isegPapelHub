@@ -1,7 +1,9 @@
 /**
  * Ação registrada em `audit_events` — superset de `FileAccessAction`
  * (visualizar/baixar) mais os eventos de gestão de arquivo (US 2.2:
- * renomear, substituir).
+ * renomear, substituir; US 2.3: mover). Mover/renomear **pasta** não gera
+ * evento (design.md D6 de `mover-e-renomear-itens`) — `MOVE` é gravado só
+ * no mover de arquivo.
  */
 export const AuditAction = {
   VIEW: 'view',
@@ -10,6 +12,7 @@ export const AuditAction = {
   REPLACE: 'replace',
   DELETE: 'delete',
   RESTORE: 'restore',
+  MOVE: 'move',
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

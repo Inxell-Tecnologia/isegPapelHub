@@ -129,7 +129,10 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
 
     await screen.findByText('Relatórios');
 
-    await userEvent.click(screen.getByRole('button', { name: /renomear/i }));
+    // Pasta também ganhou "Renomear" nesta mudança (US 2.3) — escopa à linha
+    // do arquivo para não colidir com o botão homônimo da linha da pasta.
+    const fileRow = screen.getByText('antigo.pdf').closest('tr')!;
+    await userEvent.click(within(fileRow).getByRole('button', { name: /renomear/i }));
     const renameDialog = await findDialogByTitle('Renomear arquivo');
     const nameInput = within(renameDialog).getByLabelText('Nome');
     await userEvent.clear(nameInput);
@@ -207,6 +210,162 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
     expect(screen.queryByText('folder-blocked')).not.toBeInTheDocument();
   });
 
+  describe('Mover e renomear pasta (US 2.3, mover-e-renomear-itens)', () => {
+    it('renomear pasta com permissão reflete o novo nome na listagem', async () => {
+      const folderA = folder({ id: 'folder-a', name: 'Pasta A' });
+      const folderRenamed = { ...folderA, name: 'Pasta A Renomeada' };
+
+      mockFetch({
+        'GET /auth/me': { status: 200, body: IDENTITY },
+        'GET /folders/root/contents': [
+          { status: 200, body: contents({ folders: [folderA] }) },
+          { status: 200, body: contents({ folders: [folderRenamed] }) },
+        ],
+        'PATCH /folders/folder-a': { status: 200, body: folderRenamed },
+      });
+
+      renderApp(['/pastas']);
+
+      await screen.findByText('Pasta A');
+      const row = screen.getByText('Pasta A').closest('tr')!;
+      await userEvent.click(within(row).getByRole('button', { name: /renomear/i }));
+
+      const dialog = await findDialogByTitle('Renomear pasta');
+      const nameInput = within(dialog).getByLabelText('Nome');
+      await userEvent.clear(nameInput);
+      await userEvent.type(nameInput, 'Pasta A Renomeada');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Renomear' }));
+
+      await screen.findByText('Pasta A Renomeada');
+      expect(screen.queryByRole('link', { name: 'Pasta A' })).not.toBeInTheDocument();
+    });
+
+    it('mover arquivo: navega até uma subpasta no seletor e confirma o destino (US 2.3 cenário 1)', async () => {
+      const folderA = folder({ id: 'folder-a', name: 'Pasta A' });
+      const fileX = file({ id: 'file-x', fileName: 'relatorio.pdf' });
+      const fileMoved = { ...fileX, folderId: 'folder-a' };
+
+      mockFetch({
+        'GET /auth/me': { status: 200, body: IDENTITY },
+        'GET /folders/root/contents': [
+          { status: 200, body: contents({ folders: [folderA], files: [fileX] }) },
+          { status: 200, body: contents({ folders: [folderA] }) },
+        ],
+        'GET /folders/folder-a/contents': {
+          status: 200,
+          body: contents({ folder: folderA, files: [] }),
+        },
+        'POST /files/file-x/move': { status: 200, body: fileMoved },
+      });
+
+      renderApp(['/pastas']);
+
+      await screen.findByText('relatorio.pdf');
+      const row = screen.getByText('relatorio.pdf').closest('tr')!;
+      await userEvent.click(within(row).getByRole('button', { name: /mover para/i }));
+
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Entrar' }));
+
+      await within(dialog).findByRole('button', { name: 'Mover para "Pasta A"' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Mover para "Pasta A"' }));
+
+      await waitFor(() => expect(screen.queryByText('relatorio.pdf')).not.toBeInTheDocument());
+      const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+      const moveCall = calls.find((call) => String(call[0]).includes('/files/file-x/move'));
+      expect(moveCall).toBeDefined();
+      const body = JSON.parse((moveCall![1] as RequestInit).body as string) as {
+        destinationFolderId: string | null;
+      };
+      expect(body.destinationFolderId).toBe('folder-a');
+    });
+
+    it('mover pasta para a raiz: destino nulo é enviado sem navegar', async () => {
+      const folderA = folder({ id: 'folder-a', name: 'Pasta A' });
+
+      mockFetch({
+        'GET /auth/me': { status: 200, body: IDENTITY },
+        'GET /folders/root/contents': [
+          { status: 200, body: contents({ folders: [folderA] }) },
+          { status: 200, body: contents({ folders: [folderA] }) },
+        ],
+        'POST /folders/folder-a/move': { status: 200, body: folderA },
+      });
+
+      renderApp(['/pastas']);
+
+      await screen.findByText('Pasta A');
+      const row = screen.getByText('Pasta A').closest('tr')!;
+      await userEvent.click(within(row).getByRole('button', { name: /mover para/i }));
+
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Mover para a raiz da unidade' }),
+      );
+
+      const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+      const moveCall = calls.find((call) => String(call[0]).includes('/folders/folder-a/move'));
+      expect(moveCall).toBeDefined();
+      const body = JSON.parse((moveCall![1] as RequestInit).body as string) as {
+        destinationFolderId: string | null;
+      };
+      expect(body.destinationFolderId).toBeNull();
+    });
+
+    it('recusa por ciclo é distinguível do aviso de permissão insuficiente (design.md D5 de web-navegacao)', async () => {
+      const folderA = folder({ id: 'folder-a', name: 'Pasta A' });
+
+      mockFetch({
+        'GET /auth/me': { status: 200, body: IDENTITY },
+        'GET /folders/root/contents': { status: 200, body: contents({ folders: [folderA] }) },
+        'POST /folders/folder-a/move': { status: 409, body: { error: 'folder_cycle' } },
+      });
+
+      renderApp(['/pastas']);
+
+      await screen.findByText('Pasta A');
+      const row = screen.getByText('Pasta A').closest('tr')!;
+      await userEvent.click(within(row).getByRole('button', { name: /mover para/i }));
+
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Mover para a raiz da unidade' }),
+      );
+
+      await screen.findByText(
+        'Não é possível mover uma pasta para dentro dela mesma ou de uma subpasta dela.',
+      );
+      // "Pasta A" também aparece no seletor de destino do modal (ainda
+      // aberto após a recusa) — escopa à tabela da listagem.
+      expect(within(screen.getByRole('table')).getByText('Pasta A')).toBeInTheDocument();
+    });
+
+    it('recusa por conflito de nome é distinguível do aviso de ciclo (design.md D5 de web-navegacao)', async () => {
+      const folderA = folder({ id: 'folder-a', name: 'Pasta A' });
+
+      mockFetch({
+        'GET /auth/me': { status: 200, body: IDENTITY },
+        'GET /folders/root/contents': { status: 200, body: contents({ folders: [folderA] }) },
+        'PATCH /folders/folder-a': { status: 409, body: { error: 'folder_name_conflict' } },
+      });
+
+      renderApp(['/pastas']);
+
+      await screen.findByText('Pasta A');
+      const row = screen.getByText('Pasta A').closest('tr')!;
+      await userEvent.click(within(row).getByRole('button', { name: /renomear/i }));
+
+      const dialog = await findDialogByTitle('Renomear pasta');
+      const nameInput = within(dialog).getByLabelText('Nome');
+      await userEvent.clear(nameInput);
+      await userEvent.type(nameInput, 'Já Existe');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Renomear' }));
+
+      await screen.findByText('Já existe uma pasta com esse nome no destino.');
+      expect(screen.getByText('Pasta A')).toBeInTheDocument();
+    });
+  });
+
   describe('Modo estreito (responsividade-mobile-tablet, design.md D4/D5)', () => {
     it('abaixo do limiar, Visualizar permanece direta e as demais ações do arquivo agrupam num menu', async () => {
       mockViewportWidth(NARROW_VIEWPORT);
@@ -264,6 +423,31 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
 
       await userEvent.click(await screen.findByRole('button', { name: 'Sim, excluir' }));
       await waitFor(() => expect(screen.queryByText('descartavel.pdf')).not.toBeInTheDocument());
+    });
+
+    it('abaixo do limiar, mover e renomear pasta continuam alcançáveis no menu agrupado', async () => {
+      mockViewportWidth(NARROW_VIEWPORT);
+      const folderA = folder({ id: 'folder-a', name: 'Pasta A' });
+
+      mockFetch({
+        'GET /auth/me': { status: 200, body: IDENTITY },
+        'GET /folders/root/contents': { status: 200, body: contents({ folders: [folderA] }) },
+      });
+
+      renderApp(['/pastas']);
+
+      await screen.findByText('Pasta A');
+      const row = screen.getByText('Pasta A').closest('tr')!;
+
+      expect(within(row).queryByRole('button', { name: /renomear/i })).not.toBeInTheDocument();
+      expect(within(row).queryByRole('button', { name: /mover para/i })).not.toBeInTheDocument();
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Mais ações' }));
+
+      await screen.findByText(/mover para/i);
+      const menu = within(document.querySelector('.ant-dropdown')!);
+      expect(menu.getByRole('button', { name: /renomear/i })).toBeInTheDocument();
+      expect(menu.getByRole('button', { name: /mover para/i })).toBeInTheDocument();
     });
 
     it('abaixo do limiar, baixar pasta é recusado no acionamento, sem chamar o manifesto (design.md D5)', async () => {

@@ -25,6 +25,7 @@ import {
   FolderOutlined,
   LockOutlined,
   MoreOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { FileSummaryResponse, FolderResponse } from '@gdoc/shared';
@@ -43,11 +44,35 @@ import {
   useDeleteFile,
   useDeleteFolder,
   useFolderContents,
+  useMoveFile,
+  useMoveFolder,
   useRenameFile,
+  useRenameFolder,
 } from './queries';
 import { NewFolderModal } from './NewFolderModal';
-import { RenameFileModal } from './RenameFileModal';
+import { MoverItemModal, type MovingItem } from './MoverItemModal';
+import { RenameItemModal, type RenamingItem } from './RenameItemModal';
 import { formatDate, formatFileSize } from './format';
+
+function isFolderCycleError(err: unknown): boolean {
+  return (
+    err instanceof ApiError &&
+    err.status === 409 &&
+    typeof err.details === 'object' &&
+    err.details !== null &&
+    (err.details as { error?: unknown }).error === 'folder_cycle'
+  );
+}
+
+function isFolderNameConflictError(err: unknown): boolean {
+  return (
+    err instanceof ApiError &&
+    err.status === 409 &&
+    typeof err.details === 'object' &&
+    err.details !== null &&
+    (err.details as { error?: unknown }).error === 'folder_name_conflict'
+  );
+}
 
 /** Mensagem da recusa de download de pasta por dispositivo (design.md D5, `web-responsividade`)
  * — texto distinguível da recusa por limite (`DownloadFolderModal`) e da recusa por permissão. */
@@ -121,11 +146,15 @@ export function ExplorerPage() {
   const { data, isLoading, isError, error } = useFolderContents(currentFolderId);
   const createFolder = useCreateFolder();
   const renameFile = useRenameFile();
+  const renameFolder = useRenameFolder();
+  const moveFile = useMoveFile();
+  const moveFolder = useMoveFolder();
   const deleteFile = useDeleteFile();
   const deleteFolder = useDeleteFolder();
 
   const [newFolderOpen, setNewFolderOpen] = useState(false);
-  const [renamingFile, setRenamingFile] = useState<FileSummaryResponse | null>(null);
+  const [renamingItem, setRenamingItem] = useState<RenamingItem | null>(null);
+  const [movingItem, setMovingItem] = useState<MovingItem | null>(null);
   const [previewingFile, setPreviewingFile] = useState<FileSummaryResponse | null>(null);
   const [managingResource, setManagingResource] = useState<ManagingResource | null>(null);
   const [auditingFile, setAuditingFile] = useState<FileSummaryResponse | null>(null);
@@ -142,6 +171,23 @@ export function ExplorerPage() {
     message.error('Não foi possível concluir a ação. Tente novamente.');
   }
 
+  // US 2.3, design.md D3/D4/D5 (`mover-e-renomear-itens`) e design.md D5 de
+  // `web-navegacao`: ciclo e conflito de nome são recusas distinguíveis entre
+  // si e do aviso de permissão insuficiente, todas vindas do servidor.
+  function handleMoveOrRenameFolderError(err: unknown) {
+    if (isFolderCycleError(err)) {
+      message.error(
+        'Não é possível mover uma pasta para dentro dela mesma ou de uma subpasta dela.',
+      );
+      return;
+    }
+    if (isFolderNameConflictError(err)) {
+      message.error('Já existe uma pasta com esse nome no destino.');
+      return;
+    }
+    handlePermissionError(err);
+  }
+
   async function handleCreateFolder(name: string) {
     try {
       await createFolder.mutateAsync({ name, parentId: currentFolderId ?? undefined });
@@ -151,13 +197,31 @@ export function ExplorerPage() {
     }
   }
 
-  async function handleRenameFile(fileName: string) {
-    if (!renamingFile) return;
+  async function handleRenameItem(name: string) {
+    if (!renamingItem) return;
     try {
-      await renameFile.mutateAsync({ fileId: renamingFile.id, fileName });
-      setRenamingFile(null);
+      if (renamingItem.kind === 'folder') {
+        await renameFolder.mutateAsync({ folderId: renamingItem.id, name });
+      } else {
+        await renameFile.mutateAsync({ fileId: renamingItem.id, fileName: name });
+      }
+      setRenamingItem(null);
     } catch (err) {
-      handlePermissionError(err);
+      handleMoveOrRenameFolderError(err);
+    }
+  }
+
+  async function handleMoveConfirm(destinationFolderId: string | null) {
+    if (!movingItem) return;
+    try {
+      if (movingItem.kind === 'folder') {
+        await moveFolder.mutateAsync({ folderId: movingItem.id, destinationFolderId });
+      } else {
+        await moveFile.mutateAsync({ fileId: movingItem.id, destinationFolderId });
+      }
+      setMovingItem(null);
+    } catch (err) {
+      handleMoveOrRenameFolderError(err);
     }
   }
 
@@ -278,6 +342,26 @@ export function ExplorerPage() {
             >
               Baixar pasta
             </Button>,
+            <Button
+              key="renomear"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() =>
+                setRenamingItem({ id: row.folder.id, name: row.folder.name, kind: 'folder' })
+              }
+            >
+              Renomear
+            </Button>,
+            <Button
+              key="mover"
+              size="small"
+              icon={<SwapOutlined />}
+              onClick={() =>
+                setMovingItem({ id: row.folder.id, name: row.folder.name, kind: 'folder' })
+              }
+            >
+              Mover para...
+            </Button>,
             ...(isAdmin
               ? [
                   <Button
@@ -334,9 +418,21 @@ export function ExplorerPage() {
             key="renomear"
             size="small"
             icon={<EditOutlined />}
-            onClick={() => setRenamingFile(row.file)}
+            onClick={() =>
+              setRenamingItem({ id: row.file.id, name: row.file.fileName, kind: 'file' })
+            }
           >
             Renomear
+          </Button>,
+          <Button
+            key="mover"
+            size="small"
+            icon={<SwapOutlined />}
+            onClick={() =>
+              setMovingItem({ id: row.file.id, name: row.file.fileName, kind: 'file' })
+            }
+          >
+            Mover para...
           </Button>,
           ...(isAdmin
             ? [
@@ -482,11 +578,17 @@ export function ExplorerPage() {
         onCancel={() => setNewFolderOpen(false)}
         onSubmit={handleCreateFolder}
       />
-      <RenameFileModal
-        file={renamingFile}
-        submitting={renameFile.isPending}
-        onCancel={() => setRenamingFile(null)}
-        onSubmit={handleRenameFile}
+      <RenameItemModal
+        item={renamingItem}
+        submitting={renamingItem?.kind === 'folder' ? renameFolder.isPending : renameFile.isPending}
+        onCancel={() => setRenamingItem(null)}
+        onSubmit={handleRenameItem}
+      />
+      <MoverItemModal
+        item={movingItem}
+        submitting={movingItem?.kind === 'folder' ? moveFolder.isPending : moveFile.isPending}
+        onCancel={() => setMovingItem(null)}
+        onConfirm={handleMoveConfirm}
       />
       <PreviewModal file={previewingFile} onClose={() => setPreviewingFile(null)} />
       <AuditoriaModal file={auditingFile} onClose={() => setAuditingFile(null)} />

@@ -15,6 +15,38 @@ export interface FolderResponse {
   createdAt: string;
 }
 
+/**
+ * `POST /files/:id/move` e `POST /folders/:id/move` (US 2.3, design.md D1).
+ * `destinationFolderId` é sempre **presente**, nunca opcional: `null` SHALL
+ * significar a raiz da unidade, e o servidor precisa distinguir esse caso de
+ * "campo ausente" — um DTO com `?` deixaria `undefined` e `null` indistintos
+ * do lado de quem recebe.
+ */
+export interface MoveItemRequest {
+  destinationFolderId: string | null;
+}
+
+/** `PATCH /folders/:id` (US 2.3) — espelha `RenameFileRequest` (`storage.ts`). */
+export interface RenameFolderRequest {
+  name: string;
+}
+
+/**
+ * Recusa identificável de `POST /folders/:id/move` e `PATCH /folders/:id`
+ * (design.md D4/D5): já existe pasta viva de mesmo nome no destino/pai.
+ */
+export interface FolderNameConflictResponse {
+  error: 'folder_name_conflict';
+}
+
+/**
+ * Recusa identificável de `POST /folders/:id/move` (design.md D3): o destino
+ * é a própria pasta ou pertence à sua subárvore.
+ */
+export interface FolderCycleResponse {
+  error: 'folder_cycle';
+}
+
 /** `GET /folders/root/contents` e `GET /folders/:id/contents` — conteúdo só-por-dono + trilha. */
 export interface FolderContentsResponse {
   /** `null` na raiz da unidade. */

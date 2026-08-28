@@ -4,22 +4,31 @@ import type { TenantContext } from '../ports/database-port.js';
 import { AuditAction, GrantResourceType, Permission } from '@gdoc/shared';
 import type {
   CreateFolderRequest,
+  FolderCycleResponse,
   FolderDownloadManifestEntry,
   FolderDownloadManifestLimitExceededResponse,
   FolderDownloadManifestResponse,
+  FolderNameConflictResponse,
   FolderResponse,
   FolderRestoreResponse,
   FileSummaryResponse,
+  MoveItemRequest,
+  RenameFolderRequest,
 } from '@gdoc/shared';
 import type { PoolClient } from 'pg';
 import { config } from '../config.js';
 import {
+  assertNoCycleAfterMove,
+  collectSubtreeFolderIds,
   findFolderById,
+  FolderCycleError,
+  hasFolderNameConflict,
   traverseFolderSubtree,
+  wouldCreateCycle,
   type FolderRow,
   type SubtreeManifest,
 } from '../lib/folder-tree.js';
-import { hasAccess, isAdminOfUnit, visibleResourceClause } from '../lib/access.js';
+import { canReorganize, hasAccess, isAdminOfUnit, visibleResourceClause } from '../lib/access.js';
 
 interface FileSummaryRow {
   id: string;
@@ -56,19 +65,33 @@ function toFileSummaryResponse(row: FileSummaryRow): FileSummaryResponse {
   };
 }
 
+const MAX_BREADCRUMB_DEPTH = 1000;
+
 /**
  * Sobe a cadeia `parent_id` a partir da pasta corrente até a raiz, montando
  * a trilha (design.md D5). O walk roda na mesma transação tenant já aberta
  * pelo chamador — RLS garante que nenhuma pasta de outra unidade apareça
- * aqui, e a invariante de criação (D4: subpasta só dentro de pasta própria)
- * garante que todo ancestral já pertence ao mesmo dono.
+ * aqui. **Não** é mais verdade que todo ancestral pertence ao mesmo dono
+ * (comentário antigo, já falso desde o Épico 3: `ensureFolderPath` cria
+ * pasta sob âncora de terceiro validada por `upload`, e `mover-e-renomear-itens`
+ * torna isso rotineiro, design.md Risks) — este walk não checa acesso ao
+ * subir, então nomes de pastas ancestrais podem aparecer para quem não tem
+ * `view` sobre elas; vazamento de **nome** conhecido e aceito, não fechado
+ * por esta mudança. Guarda de ciclo (conjunto de visitados + teto de
+ * profundidade, design.md D3): termina com erro tratado em vez de laço
+ * infinito, caso uma linha inconsistente exista por qualquer via.
  */
 async function buildBreadcrumb(client: PoolClient, folder: FolderRow): Promise<FolderRow[]> {
   const breadcrumb: FolderRow[] = [];
+  const visited = new Set<string>([folder.id]);
   let parentId = folder.parent_id;
   while (parentId) {
+    if (visited.has(parentId) || breadcrumb.length >= MAX_BREADCRUMB_DEPTH) {
+      throw new FolderCycleError();
+    }
     const parent = await findFolderById(client, parentId);
     if (!parent) break;
+    visited.add(parent.id);
     breadcrumb.unshift(parent);
     parentId = parent.parent_id;
   }
@@ -113,25 +136,6 @@ async function listContents(
   );
 
   return { folders, files };
-}
-
-/**
- * Ids da pasta e de toda a sua subárvore (design.md D4), via CTE recursiva
- * por `parent_id`. A RLS filtra cada linha do walk pela unidade corrente, o
- * mesmo que qualquer outra query na transação tenant — a cascata nunca
- * cruza unidade.
- */
-async function collectSubtreeFolderIds(client: PoolClient, rootId: string): Promise<string[]> {
-  const { rows } = await client.query<{ id: string }>(
-    `WITH RECURSIVE subtree AS (
-       SELECT id FROM folders WHERE id = $1
-       UNION ALL
-       SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
-     )
-     SELECT id FROM subtree`,
-    [rootId],
-  );
-  return rows.map((r) => r.id);
 }
 
 async function recordFileAudits(
@@ -338,6 +342,141 @@ export function foldersRouter(ports: Ports): Router {
         files: outcome.files.map(toFileSummaryResponse),
       });
     } catch (err) {
+      next(err);
+    }
+  });
+
+  router.patch('/folders/:id', async (req, res, next) => {
+    try {
+      const ctx = req.tenantContext!;
+      const { name } = req.body as RenameFolderRequest;
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        res.status(400).json({ error: 'invalid request body' });
+        return;
+      }
+
+      const outcome = await ports.database.withTenantTransaction(ctx, async (client) => {
+        const folder = await findFolderById(client, req.params.id);
+        // Dono-ou-admin da unidade, sem ramo de grant (design.md D1/D2 de
+        // `mover-e-renomear-itens`) — mesmo 403 fail-closed sem vazar
+        // existência dos demais endpoints.
+        if (!folder) return { ok: false as const, status: 403 as const };
+        const allowed = await canReorganize(client, ctx, GrantResourceType.FOLDER, folder.id);
+        if (!allowed) return { ok: false as const, status: 403 as const };
+
+        if (await hasFolderNameConflict(client, ctx.unitId, folder.parent_id, name, folder.id)) {
+          const body: FolderNameConflictResponse = { error: 'folder_name_conflict' };
+          return { ok: false as const, status: 409 as const, body };
+        }
+
+        const { rows } = await client.query<FolderRow>(
+          'UPDATE folders SET name = $1 WHERE id = $2 RETURNING *',
+          [name, folder.id],
+        );
+        return { ok: true as const, folder: rows[0]! };
+      });
+
+      if (!outcome.ok) {
+        if (outcome.status === 409) {
+          res.status(409).json(outcome.body);
+          return;
+        }
+        res.status(403).json({ error: 'forbidden' });
+        return;
+      }
+
+      // Sem escrita em audit_events (design.md D6): renomear pasta, ao
+      // contrário de renomear arquivo, não gera evento de auditoria — em
+      // coerência com `POST /folders`, que também não audita.
+      res.json(toFolderResponse(outcome.folder));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/folders/:id/move', async (req, res, next) => {
+    try {
+      const ctx = req.tenantContext!;
+      const { destinationFolderId } = req.body as MoveItemRequest;
+      if (destinationFolderId !== null && typeof destinationFolderId !== 'string') {
+        res.status(400).json({ error: 'invalid request body' });
+        return;
+      }
+
+      const outcome = await ports.database.withTenantTransaction(ctx, async (client) => {
+        const folder = await findFolderById(client, req.params.id);
+        if (!folder) return { ok: false as const, status: 403 as const };
+        const allowed = await canReorganize(client, ctx, GrantResourceType.FOLDER, folder.id);
+        if (!allowed) return { ok: false as const, status: 403 as const };
+
+        // Destino nulo = raiz da unidade, sem exigir alcance (design.md D1):
+        // a raiz não tem dono. Destino não-nulo exige o mesmo alcance
+        // dono-ou-admin do item movido (D1: "vale para os dois lados").
+        if (destinationFolderId !== null) {
+          const destination = await findFolderById(client, destinationFolderId);
+          if (!destination) return { ok: false as const, status: 403 as const };
+          const destinationAllowed = await canReorganize(
+            client,
+            ctx,
+            GrantResourceType.FOLDER,
+            destination.id,
+          );
+          if (!destinationAllowed) return { ok: false as const, status: 403 as const };
+        }
+
+        // Ciclo, camada 1 — antes do UPDATE (design.md D3).
+        if (await wouldCreateCycle(client, folder.id, destinationFolderId)) {
+          const body: FolderCycleResponse = { error: 'folder_cycle' };
+          return { ok: false as const, status: 409 as const, body };
+        }
+
+        // Colisão de nome (design.md D4/D5) — mesmo nome já vivo no destino.
+        if (
+          await hasFolderNameConflict(
+            client,
+            ctx.unitId,
+            destinationFolderId,
+            folder.name,
+            folder.id,
+          )
+        ) {
+          const body: FolderNameConflictResponse = { error: 'folder_name_conflict' };
+          return { ok: false as const, status: 409 as const, body };
+        }
+
+        const { rows } = await client.query<FolderRow>(
+          'UPDATE folders SET parent_id = $1 WHERE id = $2 RETURNING *',
+          [destinationFolderId, folder.id],
+        );
+        const moved = rows[0]!;
+
+        // Ciclo, camada 2 — depois do UPDATE e antes do commit, na mesma
+        // transação (design.md D3): fecha a corrida entre dois movimentos
+        // concorrentes que a camada 1, isoladamente, não vê. Lança
+        // `FolderCycleError`, que dispara `ROLLBACK` e é traduzido abaixo.
+        await assertNoCycleAfterMove(client, moved.id);
+
+        return { ok: true as const, folder: moved };
+      });
+
+      if (!outcome.ok) {
+        if (outcome.status === 409) {
+          res.status(409).json(outcome.body);
+          return;
+        }
+        res.status(403).json({ error: 'forbidden' });
+        return;
+      }
+
+      // Sem escrita em audit_events (design.md D6): mover pasta, e a
+      // subárvore que ela arrasta, não gera evento de auditoria.
+      res.json(toFolderResponse(outcome.folder));
+    } catch (err) {
+      if (err instanceof FolderCycleError) {
+        const body: FolderCycleResponse = { error: 'folder_cycle' };
+        res.status(409).json(body);
+        return;
+      }
       next(err);
     }
   });
