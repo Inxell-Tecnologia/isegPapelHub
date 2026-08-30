@@ -71,6 +71,14 @@ seguinte não reverta esse deploy.
 
 ## CI/CD (GitHub Actions)
 
+> ⚠️ Em repositório novo (ex.: transferido/importado para uma organização),
+> o GitHub Actions costuma vir **desabilitado por padrão** — os workflows
+> ficam listados como `active`, mas nenhum evento (`push`/`pull_request`)
+> dispara execução alguma, sem nenhum erro visível. Confira **Settings →
+> Actions → General → "Actions permissions"** no repositório e, se a
+> organização também restringir, nas configurações de Actions da própria
+> organização.
+
 Depois do `apply`, configure as variáveis do repositório GitHub (Settings →
 Secrets and variables → Actions → _Variables_ — não são segredos: acesso é
 controlado pela condição do WIF + IAM, não por elas serem secretas) com os
