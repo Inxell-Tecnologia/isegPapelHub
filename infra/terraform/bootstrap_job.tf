@@ -108,6 +108,7 @@ resource "google_cloud_run_v2_job" "bootstrap" {
   depends_on = [
     google_project_service.required,
     google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_version.bootstrap_admin_password_placeholder,
     google_secret_manager_secret_iam_member.api_bootstrap_admin_password,
   ]
 }

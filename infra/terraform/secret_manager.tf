@@ -68,3 +68,25 @@ resource "google_secret_manager_secret_iam_member" "api_bootstrap_admin_password
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.api.email}"
 }
+
+# O Cloud Run valida o secret_key_ref na CRIAÇÃO do Job de bootstrap (não só
+# na execução) — sem nenhuma versão, `terraform apply` falha com "Secret ...
+# was not found" antes mesmo do operador chegar ao passo 1 do README (criar a
+# versão com a senha real). Esta versão placeholder só existe para satisfazer
+# essa validação; `ignore_changes` garante que o Terraform nunca a
+# sobrescreva depois que o operador rodar `gcloud secrets versions add` com a
+# senha real (vira a versão seguinte, e passa a ser a "latest" lida pelo
+# Job) — a senha real segue nunca tocando o state, como já era a intenção.
+resource "random_password" "bootstrap_admin_password_placeholder" {
+  length  = 32
+  special = false
+}
+
+resource "google_secret_manager_secret_version" "bootstrap_admin_password_placeholder" {
+  secret      = google_secret_manager_secret.bootstrap_admin_password.id
+  secret_data = random_password.bootstrap_admin_password_placeholder.result
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
+}

@@ -124,6 +124,7 @@ resource "google_cloud_run_v2_job" "trash_purge" {
   depends_on = [
     google_project_service.required,
     google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_iam_member.trash_purge_database_url,
   ]
 }
 
@@ -281,6 +282,7 @@ resource "google_cloud_run_v2_job" "notify_expiring_grants" {
   depends_on = [
     google_project_service.required,
     google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_iam_member.notify_expiring_grants_database_url,
   ]
 }
 
