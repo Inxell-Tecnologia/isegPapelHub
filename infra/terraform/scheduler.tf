@@ -39,6 +39,9 @@ resource "google_cloud_run_v2_job" "trash_purge" {
   name     = "${local.name_prefix}-trash-purge"
   location = var.region
   labels   = local.labels
+  # Job stateless recriado a cada deploy (nenhum dado próprio) — diferente do
+  # Cloud SQL, que mantém `deletion_protection = true` de propósito.
+  deletion_protection = false
 
   template {
     template {
@@ -201,6 +204,9 @@ resource "google_cloud_run_v2_job" "notify_expiring_grants" {
   name     = "${local.name_prefix}-notify-grants"
   location = var.region
   labels   = local.labels
+  # Job stateless recriado a cada deploy (nenhum dado próprio) — diferente do
+  # Cloud SQL, que mantém `deletion_protection = true` de propósito.
+  deletion_protection = false
 
   template {
     template {

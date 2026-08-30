@@ -10,6 +10,9 @@ resource "google_cloud_run_v2_job" "bootstrap" {
   name     = "${local.name_prefix}-bootstrap"
   location = var.region
   labels   = local.labels
+  # Job stateless recriado a cada deploy (nenhum dado próprio) — diferente do
+  # Cloud SQL, que mantém `deletion_protection = true` de propósito.
+  deletion_protection = false
 
   template {
     template {

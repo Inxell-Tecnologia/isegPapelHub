@@ -51,6 +51,10 @@ resource "google_cloud_run_v2_service" "api" {
   name     = "${local.name_prefix}-api"
   location = var.region
   labels   = local.labels
+  # Serviço stateless redeployado pelo CI/CD a cada push em main (nenhum dado
+  # próprio) — diferente do Cloud SQL, que mantém `deletion_protection = true`
+  # de propósito.
+  deletion_protection = false
 
   template {
     service_account = google_service_account.api.email
