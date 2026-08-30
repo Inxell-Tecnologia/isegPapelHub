@@ -7,6 +7,8 @@ resource "google_service_account" "api" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-api"
   display_name = "GDoc API runtime (${var.environment})"
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_project_iam_member" "api_cloudsql_client" {
@@ -49,6 +51,10 @@ resource "google_cloud_run_v2_service" "api" {
   name     = "${local.name_prefix}-api"
   location = var.region
   labels   = local.labels
+  # Serviço stateless redeployado pelo CI/CD a cada push em main (nenhum dado
+  # próprio) — diferente do Cloud SQL, que mantém `deletion_protection = true`
+  # de propósito.
+  deletion_protection = false
 
   template {
     service_account = google_service_account.api.email
@@ -189,6 +195,8 @@ resource "google_cloud_run_v2_service" "api" {
     google_project_service.required,
     google_secret_manager_secret_version.database_url,
     google_secret_manager_secret_version.auth_session_secret,
+    google_secret_manager_secret_iam_member.api_database_url,
+    google_secret_manager_secret_iam_member.api_auth_session_secret,
   ]
 }
 

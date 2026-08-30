@@ -8,6 +8,8 @@ resource "google_service_account" "trash_purge_job" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-trash-purge"
   display_name = "Trash purge job runtime (${var.environment})"
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_project_iam_member" "trash_purge_cloudsql_client" {
@@ -37,6 +39,9 @@ resource "google_cloud_run_v2_job" "trash_purge" {
   name     = "${local.name_prefix}-trash-purge"
   location = var.region
   labels   = local.labels
+  # Job stateless recriado a cada deploy (nenhum dado próprio) — diferente do
+  # Cloud SQL, que mantém `deletion_protection = true` de propósito.
+  deletion_protection = false
 
   template {
     template {
@@ -122,6 +127,7 @@ resource "google_cloud_run_v2_job" "trash_purge" {
   depends_on = [
     google_project_service.required,
     google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_iam_member.trash_purge_database_url,
   ]
 }
 
@@ -129,6 +135,8 @@ resource "google_service_account" "scheduler_invoker" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-scheduler"
   display_name = "Cloud Scheduler -> Cloud Run Job invoker (${var.environment})"
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_cloud_run_v2_job_iam_member" "scheduler_invoker" {
@@ -175,6 +183,8 @@ resource "google_service_account" "notify_expiring_grants_job" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-notify-grants"
   display_name = "Grant expiration notice job runtime (${var.environment})"
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_project_iam_member" "notify_expiring_grants_cloudsql_client" {
@@ -194,6 +204,9 @@ resource "google_cloud_run_v2_job" "notify_expiring_grants" {
   name     = "${local.name_prefix}-notify-grants"
   location = var.region
   labels   = local.labels
+  # Job stateless recriado a cada deploy (nenhum dado próprio) — diferente do
+  # Cloud SQL, que mantém `deletion_protection = true` de propósito.
+  deletion_protection = false
 
   template {
     template {
@@ -275,6 +288,7 @@ resource "google_cloud_run_v2_job" "notify_expiring_grants" {
   depends_on = [
     google_project_service.required,
     google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_iam_member.notify_expiring_grants_database_url,
   ]
 }
 

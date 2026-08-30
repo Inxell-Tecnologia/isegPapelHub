@@ -35,6 +35,8 @@ resource "google_service_account" "deployer" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-deployer"
   display_name = "CI/CD deploy (${var.environment}) — GitHub Actions"
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_service_account_iam_member" "deployer_wif_binding" {
