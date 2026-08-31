@@ -48,6 +48,16 @@ output "migrate_job_name" {
   value       = google_cloud_run_v2_job.migrate.name
 }
 
+output "bootstrap_job_name" {
+  description = "Nome do Cloud Run Job de bootstrap do administrador global — valor para a variável de repositório GCP_BOOTSTRAP_JOB do GitHub Actions (ver .github/workflows/deploy.yml)."
+  value       = google_cloud_run_v2_job.bootstrap.name
+}
+
+output "notify_expiring_grants_job_name" {
+  description = "Nome do Cloud Run Job de aviso de permissões a vencer — valor para a variável de repositório GCP_NOTIFY_GRANTS_JOB do GitHub Actions (ver .github/workflows/deploy.yml)."
+  value       = google_cloud_run_v2_job.notify_expiring_grants.name
+}
+
 output "github_actions_workload_identity_provider" {
   description = "Valor para o secret/var GCP_WORKLOAD_IDENTITY_PROVIDER do GitHub Actions (ver .github/workflows/deploy.yml)."
   value       = google_iam_workload_identity_pool_provider.github.name

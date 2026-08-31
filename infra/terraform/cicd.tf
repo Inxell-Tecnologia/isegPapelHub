@@ -91,3 +91,53 @@ resource "google_cloud_run_v2_job_iam_member" "deployer_run_developer_migrate_jo
   role     = "roles/run.developer"
   member   = "serviceAccount:${google_service_account.deployer.email}"
 }
+
+# Mesmo racional do binding acima, para os outros três Jobs que o `deploy.yml`
+# também mantém com a imagem publicada (change corrige-imagem-jobs-cicd):
+# sem `run.developer` por Job, `gcloud run jobs update --image` falha em
+# `run.jobs.get`/`run.jobs.update` com PERMISSION_DENIED e o Job em questão
+# fica preso na imagem placeholder do primeiro `terraform apply` para sempre
+# — é exatamente o que aconteceu com o Job de bootstrap antes desta mudança
+# (ninguém nunca atualizava sua imagem, então `gcloud run jobs execute`
+# tentava rodar `node .../bootstrap.js` dentro da imagem de exemplo do Cloud
+# Run, que nem tem Node, e falhava com "Application failed to start" sem
+# nenhum log da aplicação).
+resource "google_cloud_run_v2_job_iam_member" "deployer_run_developer_bootstrap_job" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.bootstrap.name
+  role     = "roles/run.developer"
+  member   = "serviceAccount:${google_service_account.deployer.email}"
+}
+
+# trash_purge e notify_expiring_grants (diferente do bootstrap/migrate) rodam
+# sob suas PRÓPRIAS service accounts (scheduler.tf), não a da API — por isso,
+# diferente do binding de migração, aqui também precisa de `serviceAccountUser`
+# na SA de runtime de cada Job para o "act-as" da atualização de imagem.
+resource "google_cloud_run_v2_job_iam_member" "deployer_run_developer_trash_purge_job" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.trash_purge.name
+  role     = "roles/run.developer"
+  member   = "serviceAccount:${google_service_account.deployer.email}"
+}
+
+resource "google_service_account_iam_member" "deployer_act_as_trash_purge_job" {
+  service_account_id = google_service_account.trash_purge_job.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.deployer.email}"
+}
+
+resource "google_cloud_run_v2_job_iam_member" "deployer_run_developer_notify_expiring_grants_job" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.notify_expiring_grants.name
+  role     = "roles/run.developer"
+  member   = "serviceAccount:${google_service_account.deployer.email}"
+}
+
+resource "google_service_account_iam_member" "deployer_act_as_notify_expiring_grants_job" {
+  service_account_id = google_service_account.notify_expiring_grants_job.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.deployer.email}"
+}
