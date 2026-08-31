@@ -1,7 +1,7 @@
 # Build a partir da raiz do monorepo:
 #   docker build -f apps/api/Dockerfile .
 # (precisa da raiz como contexto porque é um workspace npm — a API depende
-# de packages/shared).
+# de packages/shared);
 
 FROM node:22-slim AS deps
 WORKDIR /app
