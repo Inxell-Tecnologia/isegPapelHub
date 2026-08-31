@@ -139,6 +139,38 @@ jobs:
             --region "${{ vars.GCP_REGION }}" \
             --wait
 
+      # bootstrap/trash_purge/notify_expiring_grants não são executados pelo
+      # pipeline (o primeiro é manual, sob demanda do operador; os outros dois
+      # rodam pelo próprio Cloud Scheduler) — mas sem manter a imagem deles em
+      # dia aqui, ficam presos para sempre na imagem placeholder do primeiro
+      # `terraform apply` (`us-docker.pkg.dev/cloudrun/container/hello`, que
+      # nem tem Node), e qualquer execução (manual ou agendada) falha com
+      # "Application failed to start" sem log nenhum da aplicação — foi
+      # exatamente o que aconteceu com o Job de bootstrap antes desta mudança.
+      - name: Update bootstrap job image
+        run: |
+          gcloud run jobs update "${{ vars.GCP_BOOTSTRAP_JOB }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --image "${IMAGE}:${{ github.event.workflow_run.head_sha }}" \
+            --quiet
+
+      - name: Update trash purge job image
+        run: |
+          gcloud run jobs update "${{ vars.GCP_TRASH_PURGE_JOB }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --image "${IMAGE}:${{ github.event.workflow_run.head_sha }}" \
+            --quiet
+
+      - name: Update notify expiring grants job image
+        run: |
+          gcloud run jobs update "${{ vars.GCP_NOTIFY_GRANTS_JOB }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --image "${IMAGE}:${{ github.event.workflow_run.head_sha }}" \
+            --quiet
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy "${{ vars.GCP_CLOUD_RUN_SERVICE }}" \
