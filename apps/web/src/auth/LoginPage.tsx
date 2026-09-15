@@ -48,6 +48,12 @@ export function LoginPage() {
       } else if (err instanceof ApiError && err.status === 401) {
         // US 1.2 cenário 2: mensagem genérica — não revela e-mail vs. senha.
         message.error('E-mail ou senha inválidos.');
+      } else if (err instanceof ApiError && (err.status === 429 || err.status === 503)) {
+        // Recusa por falta de capacidade do Cloud Run (`Rate exceeded.`), não
+        // por credencial: o login é POST e não é retentado pelo api-client
+        // (retry gastaria outra verificação argon2 onde já falta capacidade),
+        // então a orientação de tentar de novo precisa vir do texto.
+        message.error('Serviço momentaneamente indisponível. Tente novamente em alguns instantes.');
       } else {
         message.error('Não foi possível entrar. Tente novamente.');
       }

@@ -59,6 +59,29 @@ export const config = {
   databaseUrl: required('DATABASE_URL'),
   databaseSsl: optional('DATABASE_SSL', 'false') === 'true',
 
+  // Envelope de conexões do pool `pg` (fix do 429 "Rate exceeded." em
+  // produção). O `pg` sem configuração usa `max: 10` por processo e espera
+  // **para sempre** por uma conexão livre: com N instâncias do Cloud Run
+  // atrás do mesmo Cloud SQL, N x 10 passa do `max_connections` do tier
+  // (25 no `db-f1-micro`), as conexões excedentes são recusadas e cada
+  // requisição fica pendurada em `pool.connect()` segurando um slot de
+  // concorrência da instância até o timeout de requisição do Cloud Run —
+  // as instâncias saturam, o Google Front End não acha instância livre e
+  // devolve `429 Rate exceeded.` antes de chegar ao container.
+  //
+  // O padrão preserva o comportamento de dev/CI (um processo só, `max: 10`);
+  // em produção o Terraform aperta `DATABASE_POOL_MAX` para que
+  // `api_max_instances x DATABASE_POOL_MAX` caiba no `max_connections` do
+  // Cloud SQL — ver infra/terraform/README.md.
+  databasePoolMax: Number(optional('DATABASE_POOL_MAX', '10')),
+  // Espera limitada por uma conexão livre: falhar em 10s devolve 500 e
+  // libera o slot de concorrência, em vez de segurá-lo por toda a janela de
+  // timeout da requisição. É o que impede o efeito cascata acima.
+  databasePoolConnectionTimeoutMs: Number(optional('DATABASE_POOL_CONNECTION_TIMEOUT_MS', '10000')),
+  // Devolve conexões ociosas ao Cloud SQL para que uma instância parada
+  // (Cloud Run mantém instâncias vivas entre picos) não reserve o teto.
+  databasePoolIdleTimeoutMs: Number(optional('DATABASE_POOL_IDLE_TIMEOUT_MS', '30000')),
+
   storageDriver: optional('STORAGE_DRIVER', 'fake-gcs') as 'gcs' | 'fake-gcs',
   storageBucket: required('STORAGE_BUCKET'),
   storageEmulatorHost: process.env.STORAGE_EMULATOR_HOST,

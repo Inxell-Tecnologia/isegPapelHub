@@ -50,6 +50,13 @@ resource "google_cloud_run_v2_job" "migrate" {
           name  = "DATABASE_SSL"
           value = "false" # socket Unix local ao Cloud Run — mesmo racional de cloud_run.tf
         }
+        # Mesmo envelope de conexões da API (cloud_run.tf): sem teto, o `pg`
+        # assume 10 por processo e um Job concorrendo com o serviço estoura
+        # o `max_connections` do Cloud SQL. Um Job é sequencial — 2 basta.
+        env {
+          name  = "DATABASE_POOL_MAX"
+          value = tostring(var.api_db_pool_max)
+        }
         env {
           name  = "STORAGE_DRIVER"
           value = "gcs"

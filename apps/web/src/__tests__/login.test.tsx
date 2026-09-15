@@ -65,6 +65,24 @@ describe('Login (US 1.2)', () => {
     await screen.findByText('Esta conta está desativada. Procure a administração.');
     expect(screen.queryByText('E-mail ou senha inválidos.')).not.toBeInTheDocument();
   });
+
+  it('recusa por falta de capacidade (429) orienta a tentar de novo, sem acusar a credencial', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 401 },
+      // O 429 do Cloud Run não traz JSON nosso — o corpo é o `Rate
+      // exceeded.` em texto puro do Google Front End.
+      'POST /auth/login': { status: 429 },
+    });
+    renderApp(['/login']);
+
+    await screen.findByRole('heading', { name: 'PapelHub' });
+    await fillAndSubmit('ana@example.com', 'senha-correta');
+
+    await screen.findByText(
+      'Serviço momentaneamente indisponível. Tente novamente em alguns instantes.',
+    );
+    expect(screen.queryByText('E-mail ou senha inválidos.')).not.toBeInTheDocument();
+  });
 });
 
 describe('Identidade visual na tela de login (identidade-visual)', () => {

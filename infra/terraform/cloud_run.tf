@@ -64,6 +64,25 @@ resource "google_cloud_run_v2_service" "api" {
       max_instance_count = var.api_max_instances
     }
 
+    # Conserto do `429 Rate exceeded.` (Google Front End, quando não há
+    # instância livre para atender). Três folgas, nesta ordem de efeito:
+    #
+    # 1. `max_instance_request_concurrency` — o padrão do Cloud Run (80) é
+    #    maior do que esta instância serve de fato (512Mi, argon2id a 19 MiB
+    #    por login, pool de banco de 2 conexões). O excedente enfileira
+    #    DENTRO da instância, que continua "ocupada" para o front end.
+    # 2. `timeout` — o padrão de 300s deixa uma requisição travada segurando
+    #    um slot de concorrência por cinco minutos; é o multiplicador que
+    #    transforma poucas requisições lentas em serviço saturado.
+    # 3. `startup_cpu_boost` (abaixo) — encurta o arranque a frio, e com ele
+    #    a janela em que o Cloud Run pode recusar (ele só enfileira por
+    #    max(10s, 3,5x o arranque médio)). A escala a zero permanece por
+    #    decisão de custo (`api_min_instances`), então esse caso é atenuado,
+    #    não eliminado: quem o absorve do lado do usuário é o retry de GET
+    #    em 429/503 da SPA (`apps/web/src/lib/api-client.ts`).
+    max_instance_request_concurrency = var.api_request_concurrency
+    timeout                          = "${var.api_request_timeout_seconds}s"
+
     volumes {
       name = "cloudsql"
       cloud_sql_instance {
@@ -79,6 +98,15 @@ resource "google_cloud_run_v2_service" "api" {
           cpu    = var.api_cpu
           memory = var.api_memory
         }
+
+        # CPU extra só durante o arranque: encurta o cold start (Node 22 +
+        # argon2 nativo + estáticos da SPA) e com isso a janela em que o
+        # front end pode recusar com 429. Importa mais aqui do que importaria
+        # com instância mínima: com escala a zero (decisão de custo, ver
+        # `api_min_instances`) todo período ocioso termina num arranque a
+        # frio. Não há custo ocioso — a cobrança extra é só durante o
+        # arranque.
+        startup_cpu_boost = true
       }
 
       volume_mounts {
@@ -93,6 +121,15 @@ resource "google_cloud_run_v2_service" "api" {
       env {
         name  = "DATABASE_SSL"
         value = "false" # socket Unix local ao Cloud Run — TLS não se aplica
+      }
+      # Envelope de conexões: `api_max_instances` x este valor precisa caber
+      # no `max_connections` do tier do Cloud SQL, com folga para os Jobs.
+      # Sem ele o `pg` assume 10 por processo e estoura o `db-f1-micro`
+      # (25) — as conexões recusadas penduram a requisição em
+      # `pool.connect()` e saturam a instância. Ver apps/api/src/config.ts.
+      env {
+        name  = "DATABASE_POOL_MAX"
+        value = tostring(var.api_db_pool_max)
       }
       env {
         name  = "STORAGE_DRIVER"

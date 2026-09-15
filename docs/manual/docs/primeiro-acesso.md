@@ -15,6 +15,10 @@ Ao entrar, você é levado ao seu ambiente com o conteúdo que lhe é permitido.
   senha (isso é proposital, por segurança). Confira os dados e tente de novo.
 - **Conta desativada:** se a administração desativou sua conta, o login é negado com
   aviso de conta indisponível. Fale com quem administra o sistema.
+- **Serviço momentaneamente indisponível:** um aviso pedindo para tentar de novo em
+  alguns instantes significa que o sistema recebeu mais acessos simultâneos do que
+  consegue atender naquele momento — não é problema com seu e-mail nem com sua senha.
+  Aguarde alguns segundos e clique em entrar novamente.
 - **Esqueci a senha:** peça à área administrativa da sua unidade que **redefina** sua
   senha. O sistema **gera** uma nova senha e a mostra **uma única vez** a quem fez a
   redefinição, que então lhe repassa. Ninguém consegue consultá-la depois — se ela se
