@@ -273,7 +273,7 @@ describe('Busca transversal de arquivos (routes/search.ts, GET /files/search, US
       .post('/grants')
       .set('Cookie', cookieAdmin)
       .send({
-        subjectUserId: userA2Id,
+        subjectUserIds: [userA2Id],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],

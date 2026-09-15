@@ -159,18 +159,41 @@ O **objetivo principal** do GDoc é entregar um repositório de arquivos corpora
       * **Quando** reorganizo itens de qualquer pessoa
       * **Então** consigo fazê-lo apenas dentro da minha própria unidade, e nunca sobre itens de outra unidade.
 
+* **US 2.4:** Como Colaborador, eu quero selecionar vários arquivos e pastas de uma vez e movê-los juntos para o mesmo destino para que eu reorganize uma pasta cheia sem repetir a ação item a item.
+  * **Critérios de Aceitação:**
+    * *Cenário 1 — Lote movido com sucesso:*
+      * **Dado** que selecionei vários arquivos e pastas sobre os quais tenho alcance
+      * **Quando** escolho um destino e confirmo
+      * **Então** todos passam a residir no destino com o mesmo conteúdo e as mesmas permissões, e recebo um único aviso de sucesso.
+    * *Cenário 2 — Falha parcial com veredito por item:*
+      * **Dado** que a seleção contém um item sobre o qual não tenho alcance, ou uma pasta cujo destino formaria ciclo ou colide de nome
+      * **Quando** confirmo o movimento em lote
+      * **Então** os demais itens são movidos normalmente, e sou informado de quantos foram movidos e de qual item foi recusado, com o motivo.
+    * *Cenário 3 — Destino sem alcance derruba o lote inteiro:*
+      * **Dado** que o destino escolhido está fora do meu alcance, é de outra unidade ou não existe
+      * **Quando** confirmo o movimento em lote
+      * **Então** nenhum item da seleção é movido, e recebo o aviso de permissão insuficiente.
+    * *Cenário 4 — Teto de itens por operação:*
+      * **Dado** que selecionei mais itens do que o teto permitido por operação
+      * **Quando** acionar mover
+      * **Então** a ação é recusada antes de qualquer envio, com aviso distinto da recusa por permissão.
+    * *Cenário 5 — Seleção limpa ao navegar:*
+      * **Dado** que tenho itens selecionados na pasta corrente
+      * **Quando** entro em uma subpasta ou volto pela trilha de navegação
+      * **Então** a seleção anterior é esvaziada, sem misturar itens de pastas diferentes num mesmo lote.
+
 ### Épico 3: Envio e Download em Lote
 
 * **US 3.1:** Como Colaborador, eu quero enviar vários arquivos de uma vez e acompanhar o progresso de cada um para que eu saiba o que já concluiu.
   * **Critérios de Aceitação:**
-    * *Cenário 1 — Progresso individual:*
+    * *Cenário 1 — Progresso do conjunto:*
       * **Dado** que selecionei vários arquivos para envio
       * **Quando** inicio o envio
-      * **Então** cada arquivo exibe seu próprio progresso e um indica sucesso ou falha ao final, de forma independente dos demais.
+      * **Então** acompanho um progresso único do conjunto, medido pelos bytes já transferidos sobre o total, com a quantidade de arquivos concluídos e o arquivo corrente como informação complementar — e um envio com milhares de arquivos não degrada a interface.
     * *Cenário 2 — Falha parcial:*
       * **Dado** que um dos arquivos falha durante o envio
       * **Quando** os demais concluem
-      * **Então** os que concluíram permanecem salvos e o que falhou é sinalizado, permitindo nova tentativa apenas dele.
+      * **Então** os que concluíram permanecem salvos e o que falhou é contabilizado e listável sob demanda, permitindo nova tentativa apenas dele.
 
 * **US 3.2:** Como Colaborador, eu quero enviar uma pasta inteira preservando suas subpastas para que a estrutura original seja mantida.
   * **Critérios de Aceitação:**
@@ -189,6 +212,37 @@ O **objetivo principal** do GDoc é entregar um repositório de arquivos corpora
       * **Dado** que a pasta contém itens sem permissão de download para mim
       * **Quando** solicito o download da pasta
       * **Então** apenas os itens permitidos são incluídos no arquivo compactado.
+
+* **US 3.4:** Como Colaborador, eu quero enviar várias pastas de uma vez e saber antes de começar se o envio cabe no meu espaço, para não esperar dezenas de minutos por uma transferência que seria recusada no meio.
+  * **Critérios de Aceitação:**
+    * *Cenário 1 — Várias pastas numa seleção só:*
+      * **Dado** que arrasto duas ou mais pastas para a área de envio
+      * **Quando** as solto
+      * **Então** todos os arquivos das pastas são reunidos em um único envio e a hierarquia de cada pasta é recriada preservada dentro da pasta atual.
+    * *Cenário 2 — Verificação antes de transferir:*
+      * **Dado** que a minha seleção é maior que o meu espaço disponível
+      * **Quando** a seleção é recebida
+      * **Então** nenhum arquivo é transferido e sou informado do volume da seleção, do espaço disponível e do quanto falta, antes de qualquer espera.
+    * *Cenário 3 — A recusa diz onde o espaço está:*
+      * **Dado** que parte do meu espaço está ocupada por arquivos na lixeira
+      * **Quando** um envio é recusado por falta de espaço
+      * **Então** vejo quanto do meu espaço está em arquivos ativos, na lixeira e em envios pendentes, e sou informado de que excluir arquivos não libera espaço de imediato.
+    * *Cenário 4 — Enviar só o que cabe:*
+      * **Dado** que a seleção não cabe por inteiro
+      * **Quando** escolho enviar apenas o que cabe
+      * **Então** o subconjunto que cabe é enviado e sou informado com clareza de quantos arquivos ficaram de fora.
+    * *Cenário 5 — Confirmação quando cabe:*
+      * **Dado** que a seleção cabe no espaço disponível
+      * **Quando** a verificação termina
+      * **Então** vejo a quantidade de arquivos e o volume a enviar, e a transferência só começa após a minha confirmação.
+    * *Cenário 6 — Espaço esgotado durante o envio:*
+      * **Dado** que o meu espaço se esgota com o envio já em andamento
+      * **Quando** o sistema detecta a falta de espaço
+      * **Então** o envio é pausado sem tentar o restante, os arquivos já transferidos permanecem enviados, e sou informado de que o envio ficou incompleto e de quantos arquivos não foram enviados.
+    * *Cenário 7 — Sem limite próprio de quantidade:*
+      * **Dado** que selecionei uma quantidade muito grande de arquivos
+      * **Quando** a verificação termina
+      * **Então** não sou recusado por quantidade de arquivos: a única recusa por tamanho é a que o espaço disponível justifica.
 
 ### Épico 4: Controle de Acesso e Permissões Granulares
 
@@ -246,6 +300,25 @@ O **objetivo principal** do GDoc é entregar um repositório de arquivos corpora
       * **Dado** que um item está na lixeira há mais de 30 dias
       * **Quando** a rotina diária das 3h é executada
       * **Então** o item é apagado de forma permanente e deixa de poder ser restaurado.
+
+* **US 6.2:** Como Colaborador, eu quero esvaziar a minha lixeira quando quiser para que eu recupere de imediato o espaço que os arquivos excluídos ainda ocupam na minha cota, sem esperar os 30 dias de retenção.
+  * **Critérios de Aceitação:**
+    * *Cenário 1 — Espaço devolvido na hora:*
+      * **Dado** que tenho arquivos meus na lixeira, ainda dentro do prazo de retenção
+      * **Quando** aciono esvaziar a lixeira e confirmo a ação
+      * **Então** esses arquivos são apagados de forma permanente, deixam de poder ser restaurados, e o meu espaço utilizado é reduzido pelo tamanho deles.
+    * *Cenário 2 — Confirmação informa a troca antes de apagar:*
+      * **Dado** que aciono esvaziar a lixeira
+      * **Quando** a confirmação é exibida
+      * **Então** vejo quantos arquivos serão apagados, quanto espaço retorna e o aviso de que a ação não tem volta, e nada é apagado até que eu confirme.
+    * *Cenário 3 — Alcance restrito ao que é meu:*
+      * **Dado** que na lixeira existem também arquivos de outras pessoas e pastas
+      * **Quando** esvazio a minha lixeira
+      * **Então** apenas os arquivos de que sou dono são apagados: os arquivos das outras pessoas seguem restauráveis e as pastas permanecem na lixeira até o expurgo automático.
+    * *Cenário 4 — Falha em um arquivo não derruba os demais:*
+      * **Dado** que a remoção de um dos arquivos falha durante o expurgo
+      * **Quando** a operação termina
+      * **Então** os demais arquivos são apagados normalmente, o arquivo que falhou permanece íntegro na lixeira, e sou informado de quantos foram apagados e quantos falharam.
 
 ### Épico 7: Auditoria
 

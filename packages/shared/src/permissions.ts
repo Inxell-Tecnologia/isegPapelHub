@@ -21,12 +21,24 @@ export const GrantResourceType = {
 export type GrantResourceType = (typeof GrantResourceType)[keyof typeof GrantResourceType];
 
 export interface CreateGrantRequest {
-  subjectUserId: string;
+  /** Um ou mais colaboradores (change `concessao-multipla-e-nomenclatura-colaborador`, design.md D1). */
+  subjectUserIds: string[];
   resourceType: GrantResourceType;
   resourceId: string;
   permissions: Permission[];
   /** Prazo de expiração opcional (change `expiracao-permissoes`, design.md D1) — ausente/nulo = permanente. */
   expiresAt?: string | null;
+}
+
+/**
+ * Recusa por teto de destinatários (design.md D4 do change
+ * `concessao-multipla-e-nomenclatura-colaborador`), no molde exato de
+ * `FolderDownloadManifestLimitExceededResponse` em `src/folders.ts`.
+ */
+export interface GrantSubjectsLimitExceededResponse {
+  error: 'grant_subjects_limit_exceeded';
+  found: number;
+  allowed: number;
 }
 
 export interface GrantResponse {

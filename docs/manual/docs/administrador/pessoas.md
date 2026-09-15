@@ -1,12 +1,12 @@
-# Pessoas
+# Colaboradores
 
 Além de tudo que o colaborador faz, o administrador de unidade gerencia **sua própria
 unidade**. Seu alcance é **restrito à unidade** — você não enxerga nem gerencia
 conteúdo de outras.
 
-## Cadastrar e editar pessoas
+## Cadastrar e editar colaboradores
 
-Abra **Pessoas** no menu e clique em **Nova pessoa**. Informe:
+Abra **Colaboradores** no menu e clique em **Novo colaborador**. Informe:
 
 - **Nome**
 - **E-mail** (único; será o login)
@@ -17,18 +17,18 @@ Abra **Pessoas** no menu e clique em **Nova pessoa**. Informe:
 - **Observação**
 - **Papel** (Colaborador ou Administrador da unidade)
 
-Confirme em **Cadastrar**. A pessoa passa a poder entrar com essas credenciais.
+Confirme em **Cadastrar**. O colaborador passa a poder entrar com essas credenciais.
 
 - Se o **e-mail já estiver em uso**, o cadastro é recusado e o campo é sinalizado —
   ajuste o e-mail sem perder o resto do preenchimento.
-- Para **editar** uma pessoa, clique em **Editar** na linha dela. O **e-mail** não
+- Para **editar** um colaborador, clique em **Editar** na linha dele. O **e-mail** não
   pode ser alterado na edição; os demais dados e o papel, sim.
 
-A lista mostra nome, e-mail, função, papel e **status** (ativa ou desativada).
+A lista mostra nome, e-mail, função, papel e **status** (ativo ou desativado).
 
-## Ativar e desativar pessoas
+## Ativar e desativar colaboradores
 
-Na linha da pessoa, use **Desativar** para cortar o acesso dela ao sistema. Os
+Na linha do colaborador, use **Desativar** para cortar o acesso dele ao sistema. Os
 **arquivos e a auditoria são preservados** — apenas o login deixa de funcionar. Use
 **Ativar** para devolver o acesso.
 
@@ -36,14 +36,14 @@ Na linha da pessoa, use **Desativar** para cortar o acesso dela ao sistema. Os
     Você não encontra a ação de desativar na **sua própria linha** — isso evita que um
     administrador corte o próprio acesso por engano.
 
-## Redefinir a senha de uma pessoa
+## Redefinir a senha de um colaborador
 
-Quando alguém esquece a senha, clique em **Redefinir senha** na linha da pessoa e
+Quando alguém esquece a senha, clique em **Redefinir senha** na linha do colaborador e
 confirme. O sistema:
 
 1. **Gera** uma nova senha (você não a escolhe);
 2. exibe essa senha **uma única vez**, num aviso com botão para **copiar**;
-3. **encerra imediatamente** todos os acessos abertos daquela pessoa, e a senha
+3. **encerra imediatamente** todos os acessos abertos daquele colaborador, e a senha
    anterior deixa de funcionar.
 
 Copie e repasse a senha com segurança antes de fechar o aviso — **ela não pode ser
@@ -57,8 +57,8 @@ consultada depois**. Se a senha se perder, é só redefinir de novo.
 | Administrador global     | Colaboradores e administradores de unidade                                    |
 | Ninguém                  | Administrador global — a senha dele só muda por ele mesmo, em **Minha conta** |
 
-Quando a ação não é permitida para determinada pessoa, o botão **Redefinir senha**
-simplesmente não aparece na linha dela.
+Quando a ação não é permitida para determinado colaborador, o botão **Redefinir senha**
+simplesmente não aparece na linha dele.
 
-Administradores globais cadastram pessoas em qualquer unidade — ver
+Administradores globais cadastram colaboradores em qualquer unidade — ver
 [Unidades](unidades.md).

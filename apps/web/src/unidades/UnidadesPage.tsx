@@ -16,7 +16,7 @@ const STATUS_LABEL: Record<UnitStatus, string> = {
 /** Mensagens de recusa de desativação (change `gestao-de-unidades`, D2/D3), por `error` da API. */
 const DEACTIVATE_ERROR_MESSAGE: Record<string, string> = {
   'unit not empty':
-    'A unidade ainda tem pessoas vinculadas e não pode ser desativada. Remova ou desative as pessoas antes.',
+    'A unidade ainda tem colaboradores vinculados e não pode ser desativada. Remova ou desative os colaboradores antes.',
   'cannot deactivate own or bootstrap unit':
     'Esta unidade não pode ser desativada (é a sua unidade ou a unidade inicial do sistema).',
 };
@@ -89,7 +89,7 @@ export function UnidadesPage() {
             {isActive ? (
               <Popconfirm
                 title="Desativar unidade"
-                description="Só é possível desativar uma unidade sem pessoas vinculadas. A ação é reversível."
+                description="Só é possível desativar uma unidade sem colaboradores vinculados. A ação é reversível."
                 okText="Sim, desativar"
                 cancelText="Cancelar"
                 onConfirm={() => handleToggleStatus(unit)}

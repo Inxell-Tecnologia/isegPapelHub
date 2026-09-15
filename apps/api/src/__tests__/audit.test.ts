@@ -110,7 +110,7 @@ describe('Consulta de auditoria de acesso a arquivo (Épico 7, US 7.1/US 7.2)', 
       .post('/grants')
       .set('Cookie', cookieAdmin)
       .send({
-        subjectUserId: userA2Id,
+        subjectUserIds: [userA2Id],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],

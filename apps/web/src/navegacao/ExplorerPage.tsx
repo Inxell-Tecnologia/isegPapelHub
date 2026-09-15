@@ -1,16 +1,18 @@
-import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import type { Key, ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   App,
   Breadcrumb,
   Button,
   Dropdown,
+  List,
   Popconfirm,
   Result,
   Space,
   Spin,
   Table,
   Tag,
+  Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -28,8 +30,8 @@ import {
   SwapOutlined,
 } from '@ant-design/icons';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { FileSummaryResponse, FolderResponse } from '@gdoc/shared';
-import { GrantResourceType, UserRole } from '@gdoc/shared';
+import type { FileSummaryResponse, FolderResponse, MoveBatchItemResult } from '@gdoc/shared';
+import { GrantResourceType, MOVE_BATCH_MAX_ITEMS_DEFAULT, UserRole } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
 import { useSession } from '../auth/session-context';
 import { useNarrowMode } from '../app/responsive';
@@ -45,7 +47,9 @@ import {
   useDeleteFolder,
   useFolderContents,
   useMoveFile,
+  useMoveFilesBatch,
   useMoveFolder,
+  useMoveFoldersBatch,
   useRenameFile,
   useRenameFolder,
 } from './queries';
@@ -78,6 +82,44 @@ function isFolderNameConflictError(err: unknown): boolean {
  * — texto distinguível da recusa por limite (`DownloadFolderModal`) e da recusa por permissão. */
 const DOWNLOAD_FOLDER_DEVICE_REFUSAL =
   'Baixar pasta não está disponível neste dispositivo. Use um computador.';
+
+/** Motivo legível de uma recusa por item do lote (design.md D2 do change `mover-itens-em-lote`). */
+function describeMoveBatchError(error: string | undefined): string {
+  if (error === 'folder_cycle') return 'destino dentro da própria pasta (ciclo)';
+  if (error === 'folder_name_conflict') return 'já existe uma pasta com esse nome no destino';
+  if (error === 'move_batch_limit_exceeded') return 'teto de itens por operação excedido';
+  return 'permissão insuficiente';
+}
+
+/**
+ * Uma perna do lote (arquivos OU pastas, design.md D4): dispara a requisição
+ * quando há ids, e traduz uma recusa em nível de requisição inteira (destino
+ * sem alcance, teto) num veredito por item — nenhum id deste sub-lote foi
+ * movido, mas o relato ao usuário continua item a item, mesmo quando a causa
+ * é a pré-condição global, não o item em si.
+ */
+async function runMoveBatchLeg(
+  ids: string[],
+  destinationFolderId: string | null,
+  mutateAsync: (body: {
+    ids: string[];
+    destinationFolderId: string | null;
+  }) => Promise<{ results: MoveBatchItemResult[] }>,
+): Promise<MoveBatchItemResult[]> {
+  if (ids.length === 0) return [];
+  try {
+    const response = await mutateAsync({ ids, destinationFolderId });
+    return response.results;
+  } catch (err) {
+    const limitExceeded =
+      err instanceof ApiError &&
+      typeof err.details === 'object' &&
+      err.details !== null &&
+      (err.details as { error?: unknown }).error === 'move_batch_limit_exceeded';
+    const error = limitExceeded ? 'move_batch_limit_exceeded' : 'forbidden';
+    return ids.map((id) => ({ id, ok: false, error }));
+  }
+}
 
 /**
  * Ações agrupadas do item (design.md D4, tasks.md 4.1): abaixo do limiar, as
@@ -149,17 +191,27 @@ export function ExplorerPage() {
   const renameFolder = useRenameFolder();
   const moveFile = useMoveFile();
   const moveFolder = useMoveFolder();
+  const moveFilesBatch = useMoveFilesBatch();
+  const moveFoldersBatch = useMoveFoldersBatch();
   const deleteFile = useDeleteFile();
   const deleteFolder = useDeleteFolder();
 
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [renamingItem, setRenamingItem] = useState<RenamingItem | null>(null);
-  const [movingItem, setMovingItem] = useState<MovingItem | null>(null);
+  const [movingItems, setMovingItems] = useState<MovingItem[] | null>(null);
   const [previewingFile, setPreviewingFile] = useState<FileSummaryResponse | null>(null);
   const [managingResource, setManagingResource] = useState<ManagingResource | null>(null);
   const [auditingFile, setAuditingFile] = useState<FileSummaryResponse | null>(null);
   const [downloadingFolder, setDownloadingFolder] = useState<DownloadingFolder | null>(null);
   const { download, isPending: downloading } = useDownloadFile();
+
+  // Seleção múltipla (US 2.4, design.md D3 do change `mover-itens-em-lote`):
+  // escopada à pasta corrente, esvaziada ao navegar — entrar em subpasta,
+  // voltar pela trilha ou chegar por outra rota, tudo muda `currentFolderId`.
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
+  useEffect(() => {
+    setSelectedRowKeys([]);
+  }, [currentFolderId]);
 
   // US 2.2 cenário 2 / design.md D4: o cliente não infere permissão, oferece
   // a ação e trata o 403 do servidor com um aviso — sem aplicar a mudança.
@@ -211,18 +263,116 @@ export function ExplorerPage() {
     }
   }
 
+  // US 2.4, design.md D2/D4/D7 (`mover-itens-em-lote`): informa quantos
+  // itens foram movidos e lista nominalmente cada recusado com o motivo —
+  // nem "falha total", nem "sucesso total" quando o resultado é parcial.
+  function reportBatchMoveResult(items: MovingItem[], results: MoveBatchItemResult[]) {
+    const nameById = new Map(items.map((item) => [item.id, item.name]));
+    const failures = results.filter(
+      (result): result is Extract<MoveBatchItemResult, { ok: false }> => !result.ok,
+    );
+    const okCount = results.length - failures.length;
+
+    if (failures.length === 0) {
+      message.success(
+        results.length === 1 ? 'Item movido com sucesso.' : `${okCount} itens movidos com sucesso.`,
+      );
+      return;
+    }
+
+    const summary =
+      okCount === 0
+        ? 'Nenhum item foi movido. Verifique a permissão sobre o destino.'
+        : `${okCount} de ${results.length} itens movidos.`;
+
+    message.warning({
+      content: (
+        <div style={{ textAlign: 'left' }}>
+          <div>{summary}</div>
+          <List
+            size="small"
+            dataSource={failures}
+            renderItem={(failure) => (
+              <List.Item style={{ padding: '2px 0', border: 'none' }}>
+                {(nameById.get(failure.id) ?? failure.id) +
+                  ': ' +
+                  describeMoveBatchError(failure.error)}
+              </List.Item>
+            )}
+          />
+        </div>
+      ),
+      duration: 8,
+    });
+  }
+
   async function handleMoveConfirm(destinationFolderId: string | null) {
-    if (!movingItem) return;
+    if (!movingItems || movingItems.length === 0) return;
     try {
-      if (movingItem.kind === 'folder') {
-        await moveFolder.mutateAsync({ folderId: movingItem.id, destinationFolderId });
-      } else {
-        await moveFile.mutateAsync({ fileId: movingItem.id, destinationFolderId });
+      // Um único item reusa a rota por item, existente e inalterada — o
+      // lote (abaixo) só entra em jogo a partir de duas seleções.
+      if (movingItems.length === 1) {
+        const item = movingItems[0]!;
+        if (item.kind === 'folder') {
+          await moveFolder.mutateAsync({ folderId: item.id, destinationFolderId });
+        } else {
+          await moveFile.mutateAsync({ fileId: item.id, destinationFolderId });
+        }
+        setMovingItems(null);
+        setSelectedRowKeys([]);
+        return;
       }
-      setMovingItem(null);
+
+      const folderIds = movingItems.filter((it) => it.kind === 'folder').map((it) => it.id);
+      const fileIds = movingItems.filter((it) => it.kind === 'file').map((it) => it.id);
+
+      // Duas requisições distintas, consolidadas num único aviso (design.md
+      // D4): a pré-condição de destino é avaliada uma vez por perna, sem
+      // atomicidade entre arquivos e pastas.
+      const [folderResults, fileResults] = await Promise.all([
+        runMoveBatchLeg(folderIds, destinationFolderId, moveFoldersBatch.mutateAsync),
+        runMoveBatchLeg(fileIds, destinationFolderId, moveFilesBatch.mutateAsync),
+      ]);
+
+      reportBatchMoveResult(movingItems, [...folderResults, ...fileResults]);
+      setMovingItems(null);
+      setSelectedRowKeys([]);
     } catch (err) {
       handleMoveOrRenameFolderError(err);
     }
+  }
+
+  const rows: Row[] = useMemo(() => {
+    if (!data) return [];
+    return [
+      ...data.folders.map((folder) => ({ key: folder.id, kind: 'folder' as const, folder })),
+      ...data.files.map((file) => ({ key: file.id, kind: 'file' as const, file })),
+    ];
+  }, [data]);
+
+  const selectedItems: MovingItem[] = useMemo(() => {
+    const keySet = new Set(selectedRowKeys);
+    return rows
+      .filter((row) => keySet.has(row.key))
+      .map((row) =>
+        row.kind === 'folder'
+          ? { id: row.folder.id, name: row.folder.name, kind: 'folder' as const }
+          : { id: row.file.id, name: row.file.fileName, kind: 'file' as const },
+      );
+  }, [rows, selectedRowKeys]);
+
+  // Recusa antes do envio (US 2.4, tasks.md 7.4): o teto é avaliado também
+  // no servidor (`move_batch_limit_exceeded`), este é só o atalho de UX que
+  // evita a requisição — ver o comentário de `MOVE_BATCH_MAX_ITEMS_DEFAULT`
+  // em `packages/shared` sobre por que o cliente usa o mesmo padrão.
+  function handleOpenBatchMove() {
+    if (selectedItems.length > MOVE_BATCH_MAX_ITEMS_DEFAULT) {
+      message.error(
+        `Seleção de ${selectedItems.length} itens excede o teto de ${MOVE_BATCH_MAX_ITEMS_DEFAULT} por operação.`,
+      );
+      return;
+    }
+    setMovingItems(selectedItems);
   }
 
   async function handleDeleteFile(fileId: string) {
@@ -278,14 +428,6 @@ export function ExplorerPage() {
         title: <Link to={`/pastas/${crumb.id}`}>{crumb.name}</Link>,
       })),
       { title: data.folder.name },
-    ];
-  }, [data]);
-
-  const rows: Row[] = useMemo(() => {
-    if (!data) return [];
-    return [
-      ...data.folders.map((folder) => ({ key: folder.id, kind: 'folder' as const, folder })),
-      ...data.files.map((file) => ({ key: file.id, kind: 'file' as const, file })),
     ];
   }, [data]);
 
@@ -357,7 +499,7 @@ export function ExplorerPage() {
               size="small"
               icon={<SwapOutlined />}
               onClick={() =>
-                setMovingItem({ id: row.folder.id, name: row.folder.name, kind: 'folder' })
+                setMovingItems([{ id: row.folder.id, name: row.folder.name, kind: 'folder' }])
               }
             >
               Mover para...
@@ -429,7 +571,7 @@ export function ExplorerPage() {
             size="small"
             icon={<SwapOutlined />}
             onClick={() =>
-              setMovingItem({ id: row.file.id, name: row.file.fileName, kind: 'file' })
+              setMovingItems([{ id: row.file.id, name: row.file.fileName, kind: 'file' }])
             }
           >
             Mover para...
@@ -565,12 +707,33 @@ export function ExplorerPage() {
         )}
       </Space>
       <UploadArea destinationFolderId={currentFolderId} />
+      {/* Barra de ação em lote (US 2.4, design.md D3/D8 do change
+          `mover-itens-em-lote`): visível a partir de um item selecionado,
+          alcançável também abaixo do ponto de ruptura — a seleção não é
+          herdeira da recusa por dispositivo aplicada ao download de pasta,
+          porque mover não desloca bytes nem monta arquivo no navegador. */}
+      {selectedItems.length > 0 && (
+        <Space wrap style={{ marginBottom: 16 }}>
+          <Typography.Text>
+            {selectedItems.length === 1
+              ? '1 item selecionado'
+              : `${selectedItems.length} itens selecionados`}
+          </Typography.Text>
+          <Button icon={<SwapOutlined />} onClick={handleOpenBatchMove}>
+            Mover selecionados
+          </Button>
+        </Space>
+      )}
       <Table<Row>
         rowKey="key"
         columns={columns}
         dataSource={rows}
         pagination={false}
         scroll={{ x: 'max-content' }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys),
+        }}
       />
       <NewFolderModal
         open={newFolderOpen}
@@ -585,9 +748,15 @@ export function ExplorerPage() {
         onSubmit={handleRenameItem}
       />
       <MoverItemModal
-        item={movingItem}
-        submitting={movingItem?.kind === 'folder' ? moveFolder.isPending : moveFile.isPending}
-        onCancel={() => setMovingItem(null)}
+        items={movingItems}
+        submitting={
+          movingItems && movingItems.length === 1
+            ? movingItems[0]!.kind === 'folder'
+              ? moveFolder.isPending
+              : moveFile.isPending
+            : moveFoldersBatch.isPending || moveFilesBatch.isPending
+        }
+        onCancel={() => setMovingItems(null)}
         onConfirm={handleMoveConfirm}
       />
       <PreviewModal file={previewingFile} onClose={() => setPreviewingFile(null)} />

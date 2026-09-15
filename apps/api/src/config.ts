@@ -1,6 +1,7 @@
 import { config as loadDotenv } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { isAbsolute, join } from 'node:path';
+import { MOVE_BATCH_MAX_ITEMS_DEFAULT, UPLOAD_BATCH_MAX_ITEMS_DEFAULT } from '@gdoc/shared';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -71,6 +72,20 @@ export const config = {
 
   signedUrlViewTtlSeconds: Number(optional('SIGNED_URL_VIEW_TTL_SECONDS', '300')),
   signedUrlDownloadTtlSeconds: Number(optional('SIGNED_URL_DOWNLOAD_TTL_SECONDS', '1800')),
+
+  // Prazo **próprio** da URL assinada de envio (change
+  // `corrige-defeitos-envio-lote`, design.md D3). Antes o envio pegava
+  // emprestado o TTL de download, por conveniência registrada em comentário
+  // no `gcs-storage-port.ts` — não por decisão. Envio e download não têm
+  // relação: uma pasta inteira leva dezenas de minutos numa conexão comum
+  // (1.000 arquivos de escritório somam ~1,07 GB, que a 5 Mbps levam 31 min),
+  // enquanto o download de um arquivo é pontual. Ampliar só o de envio não
+  // afrouxa leitura alguma: a URL de envio autoriza **exclusivamente** a
+  // escrita de um `object_path` que ainda não existe, com `Content-Type`
+  // fixado na assinatura, sob o prefixo `/{unit_id}/{owner_id}/{uuid}` já
+  // reservado por uma linha `pending` do próprio autor — não lê nada, não
+  // alcança outro objeto, não cruza unidade.
+  signedUrlUploadTtlSeconds: Number(optional('SIGNED_URL_UPLOAD_TTL_SECONDS', '3600')),
   storageQuotaBytesPerUser: Number(
     optional('STORAGE_QUOTA_BYTES_PER_USER', String(10 * 1024 * 1024 * 1024)),
   ),
@@ -92,6 +107,45 @@ export const config = {
     maxBytes: Number(optional('DOWNLOAD_MANIFEST_MAX_BYTES', String(50 * 1024 * 1024))),
     maxFiles: Number(optional('DOWNLOAD_MANIFEST_MAX_FILES', '100')),
   },
+
+  // Teto de destinatários por requisição de concessão (change
+  // `concessao-multipla-e-nomenclatura-colaborador`, design.md D4) — mesmo
+  // molde do teto do manifesto de download, configurável por ambiente.
+  grants: {
+    maxSubjects: Number(optional('GRANTS_MAX_SUBJECTS', '50')),
+  },
+
+  // Teto de itens por operação de mover em lote (change
+  // `mover-itens-em-lote`, design.md D1) — POST /files/move e
+  // POST /folders/move, cada requisição avaliada contra este teto
+  // independentemente. Mesmo molde do teto de grants/manifesto de download,
+  // configurável por ambiente. O padrão é compartilhado com a SPA
+  // (`MOVE_BATCH_MAX_ITEMS_DEFAULT` em `packages/shared`) para a recusa de
+  // envio acontecer antes da requisição, sem endpoint de leitura novo.
+  moveBatch: {
+    maxItems: Number(optional('MOVE_BATCH_MAX_ITEMS', String(MOVE_BATCH_MAX_ITEMS_DEFAULT))),
+  },
+
+  // Teto de itens por requisição de emissão de URLs de envio
+  // (`POST /files/upload-urls`) — change `corrige-defeitos-envio-lote`,
+  // design.md D2. Mesmo molde dos demais tetos por requisição, com o padrão
+  // compartilhado na `packages/shared` para a SPA recusar antes de emitir a
+  // requisição. Deliberadamente **não** derivado de `requestBodyMaxBytes`:
+  // são guardas de coisas diferentes (a transação que faz N
+  // `ensureFolderPath` + N `INSERT` sequenciais, versus a memória do parser),
+  // e amarrar um ao outro reproduz o acoplamento que causou o defeito do
+  // corpo de 100 KB.
+  uploadBatch: {
+    maxItems: Number(optional('UPLOAD_BATCH_MAX_ITEMS', String(UPLOAD_BATCH_MAX_ITEMS_DEFAULT))),
+  },
+
+  // Teto de corpo aceito pelo parser de JSON (change
+  // `corrige-defeitos-envio-lote`, design.md D1). O padrão do `express.json()`
+  // sem `limit` é 100 KB, e um lote de 1.000 itens com nomes reais e
+  // subpastas pesa 153 KB — o teto de rota ficava refém do padrão de uma
+  // biblioteca, e estourá-lo respondia 500. 1 MB acomoda o teto de itens
+  // acima com folga larga no pior caso medido (153 bytes por item).
+  requestBodyMaxBytes: Number(optional('REQUEST_BODY_MAX_BYTES', String(1024 * 1024))),
 
   secretsDriver: optional('SECRETS_DRIVER', 'env') as 'env' | 'secret-manager',
 

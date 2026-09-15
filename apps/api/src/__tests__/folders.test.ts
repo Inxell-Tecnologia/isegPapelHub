@@ -165,7 +165,7 @@ describe('Navegação: pastas aninhadas, trilha e visibilidade só-por-dono', ()
       .post('/grants')
       .set('Cookie', cookieAdmin)
       .send({
-        subjectUserId: userA2Id,
+        subjectUserIds: [userA2Id],
         resourceType: 'folder',
         resourceId: sharedFolderId,
         permissions: ['upload'],

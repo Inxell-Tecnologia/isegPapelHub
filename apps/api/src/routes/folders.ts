@@ -12,6 +12,10 @@ import type {
   FolderResponse,
   FolderRestoreResponse,
   FileSummaryResponse,
+  MoveBatchItemResult,
+  MoveBatchLimitExceededResponse,
+  MoveBatchRequest,
+  MoveBatchResponse,
   MoveItemRequest,
   RenameFolderRequest,
 } from '@gdoc/shared';
@@ -390,6 +394,132 @@ export function foldersRouter(ports: Ports): Router {
       // coerência com `POST /folders`, que também não audita.
       res.json(toFolderResponse(outcome.folder));
     } catch (err) {
+      next(err);
+    }
+  });
+
+  /**
+   * Mover várias pastas para um mesmo destino (US 2.4, design.md D1/D2/D5 do
+   * change `mover-itens-em-lote`) — dois segmentos, sem colisão nem
+   * requisito de ordenação de registro com `POST /folders/:id/move` (três
+   * segmentos, abaixo). Pré-condição global de destino derruba o lote
+   * inteiro; falta de alcance, ciclo (camada 1) e colisão de nome recusam só
+   * o item, sem abortar os demais. A camada 2 do ciclo (pós-`UPDATE`) roda
+   * **uma vez, ao fim**, sobre o conjunto efetivamente movido — se lançar,
+   * derruba o lote de pastas inteiro por `ROLLBACK` (design.md D5), nunca
+   * atribuída a um item específico. Sem escrita em `audit_events` (design.md
+   * D6): mover pasta, como mover pasta por item, não audita.
+   */
+  router.post('/folders/move', async (req, res, next) => {
+    try {
+      const ctx = req.tenantContext!;
+      const { ids, destinationFolderId } = req.body as MoveBatchRequest;
+
+      if (
+        !Array.isArray(ids) ||
+        ids.length === 0 ||
+        !ids.every((id) => typeof id === 'string' && id.length > 0) ||
+        (destinationFolderId !== null && typeof destinationFolderId !== 'string')
+      ) {
+        res.status(400).json({ error: 'invalid request body' });
+        return;
+      }
+
+      const uniqueIds = Array.from(new Set(ids));
+
+      if (uniqueIds.length > config.moveBatch.maxItems) {
+        const limitResponse: MoveBatchLimitExceededResponse = {
+          error: 'move_batch_limit_exceeded',
+          found: uniqueIds.length,
+          allowed: config.moveBatch.maxItems,
+        };
+        res.status(400).json(limitResponse);
+        return;
+      }
+
+      const outcome = await ports.database.withTenantTransaction(ctx, async (client) => {
+        // Pré-condição global de destino (design.md D2), mesmo alcance
+        // dono-ou-admin da rota por item.
+        if (destinationFolderId !== null) {
+          const destination = await findFolderById(client, destinationFolderId);
+          if (!destination) return { ok: false as const };
+          const destinationAllowed = await canReorganize(
+            client,
+            ctx,
+            GrantResourceType.FOLDER,
+            destination.id,
+          );
+          if (!destinationAllowed) return { ok: false as const };
+        }
+
+        const results: MoveBatchItemResult[] = [];
+        const movedFolderIds: string[] = [];
+
+        for (const id of uniqueIds) {
+          const folder = await findFolderById(client, id);
+          if (!folder) {
+            results.push({ id, ok: false, error: 'forbidden' });
+            continue;
+          }
+          const allowed = await canReorganize(client, ctx, GrantResourceType.FOLDER, folder.id);
+          if (!allowed) {
+            results.push({ id, ok: false, error: 'forbidden' });
+            continue;
+          }
+
+          // Ciclo, camada 1 — antes do UPDATE (design.md D3 de
+          // `mover-e-renomear-itens`), recusa só este item.
+          if (await wouldCreateCycle(client, folder.id, destinationFolderId)) {
+            results.push({ id, ok: false, error: 'folder_cycle' });
+            continue;
+          }
+
+          // Colisão de nome — mesmo nome já vivo no destino, recusa só este item.
+          if (
+            await hasFolderNameConflict(
+              client,
+              ctx.unitId,
+              destinationFolderId,
+              folder.name,
+              folder.id,
+            )
+          ) {
+            results.push({ id, ok: false, error: 'folder_name_conflict' });
+            continue;
+          }
+
+          await client.query('UPDATE folders SET parent_id = $1 WHERE id = $2', [
+            destinationFolderId,
+            folder.id,
+          ]);
+          movedFolderIds.push(folder.id);
+          results.push({ id, ok: true });
+        }
+
+        // Ciclo, camada 2 — uma vez, ao fim, sobre o conjunto movido
+        // (design.md D5): fecha a corrida entre movimentos concorrentes. Um
+        // disparo aqui lança `FolderCycleError`, capturado abaixo, e derruba
+        // o lote inteiro por `ROLLBACK` — não é veredito de item.
+        for (const movedId of movedFolderIds) {
+          await assertNoCycleAfterMove(client, movedId);
+        }
+
+        return { ok: true as const, results };
+      });
+
+      if (!outcome.ok) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+      }
+
+      const response: MoveBatchResponse = { results: outcome.results };
+      res.json(response);
+    } catch (err) {
+      if (err instanceof FolderCycleError) {
+        const body: FolderCycleResponse = { error: 'folder_cycle' };
+        res.status(409).json(body);
+        return;
+      }
       next(err);
     }
   });

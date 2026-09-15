@@ -13,6 +13,7 @@
 | Baixar uma subpasta            | Arquivos      | Botão **Baixar pasta** na linha da subpasta (gera um `.zip`) |
 | Renomear um arquivo ou pasta   | Arquivos      | Botão **Renomear** na linha do item (dono ou administrador) |
 | Mover um arquivo ou pasta      | Arquivos      | Botão **Mover para...** na linha do item (dono ou administrador) |
+| Mover vários itens de uma vez  | Arquivos      | Marque as caixas de seleção da listagem → botão **Mover selecionados** |
 | Excluir um arquivo             | Arquivos      | Botão **Excluir** na linha do arquivo (vai para a Lixeira) |
 | Excluir a pasta atual          | Arquivos      | Botão **Excluir esta pasta** (barra superior)              |
 | Excluir uma subpasta           | Arquivos      | Botão **Excluir** na linha da subpasta                     |
@@ -21,8 +22,8 @@
 | Ver quem acessou meu arquivo   | Arquivos      | Botão **Auditoria** (dono/admin)                           |
 | Compartilhar um arquivo enviado | —            | Peça a um administrador para conceder permissão            |
 | Conceder permissão             | Arquivos      | Botão **Permissões** (admin)                               |
-| Cadastrar pessoa               | Pessoas       | **Nova pessoa** (admin)                                    |
-| Ativar/desativar pessoa        | Pessoas       | Botão **Ativar**/**Desativar** (admin)                     |
-| Redefinir a senha de alguém    | Pessoas       | Botão **Redefinir senha** (admin)                          |
+| Cadastrar colaborador          | Colaboradores | **Novo colaborador** (admin)                               |
+| Ativar/desativar colaborador   | Colaboradores | Botão **Ativar**/**Desativar** (admin)                     |
+| Redefinir a senha de alguém    | Colaboradores | Botão **Redefinir senha** (admin)                          |
 | Ver uso e gráficos             | Painel        | Menu **Painel** (admin)                                    |
 | Criar ou desativar unidade     | Unidades      | Menu **Unidades** (admin global)                           |

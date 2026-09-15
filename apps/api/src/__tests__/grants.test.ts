@@ -9,6 +9,7 @@ import { Argon2AuthPort } from '../adapters/argon2-auth-port.js';
 import { InMemoryStoragePort } from './in-memory-storage-port.js';
 import { setupTestDatabase, seedTwoUnits, withSystemBypass, sessionCookieFor } from './test-db.js';
 import type { Ports } from '../ports/index.js';
+import { config } from '../config.js';
 
 describe('Endpoints de gestão de permissão (routes/grants.ts, admin-only)', () => {
   let pool: Pool;
@@ -17,6 +18,7 @@ describe('Endpoints de gestão de permissão (routes/grants.ts, admin-only)', ()
   let unitAdminAId: string;
   let unitAdminBId: string;
   let userA2Id: string;
+  let userA3Id: string;
   let fileAId: string;
   let folderBId: string;
 
@@ -30,12 +32,18 @@ describe('Endpoints de gestão de permissão (routes/grants.ts, admin-only)', ()
         `INSERT INTO users (unit_id, email, password_hash, role) VALUES
            ($1, 'unit-admin-a@test.dev', 'x', 'unit_admin'),
            ($2, 'unit-admin-b@test.dev', 'x', 'unit_admin'),
-           ($1, 'collab-a2@test.dev', 'x', 'collaborator')
+           ($1, 'collab-a2@test.dev', 'x', 'collaborator'),
+           ($1, 'collab-a3@test.dev', 'x', 'collaborator')
          RETURNING id`,
         [ids.unitA, ids.unitB],
       ),
     );
-    [unitAdminAId, unitAdminBId, userA2Id] = users.map((u) => u.id) as [string, string, string];
+    [unitAdminAId, unitAdminBId, userA2Id, userA3Id] = users.map((u) => u.id) as [
+      string,
+      string,
+      string,
+      string,
+    ];
 
     const { rows: files } = await withSystemBypass(pool, (client) =>
       client.query<{ id: string }>(
@@ -78,7 +86,7 @@ describe('Endpoints de gestão de permissão (routes/grants.ts, admin-only)', ()
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: userA2Id,
+        subjectUserIds: [userA2Id],
         resourceType: 'file',
         resourceId: fileAId,
         permissions: ['view'],
@@ -104,7 +112,7 @@ describe('Endpoints de gestão de permissão (routes/grants.ts, admin-only)', ()
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: userA2Id,
+        subjectUserIds: [userA2Id],
         resourceType: 'file',
         resourceId: fileAId,
         permissions: ['view', 'download'],
@@ -116,7 +124,7 @@ describe('Endpoints de gestão de permissão (routes/grants.ts, admin-only)', ()
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: userA2Id,
+        subjectUserIds: [userA2Id],
         resourceType: 'file',
         resourceId: fileAId,
         permissions: ['view'],
@@ -164,7 +172,7 @@ describe('Endpoints de gestão de permissão (routes/grants.ts, admin-only)', ()
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: userA2Id,
+        subjectUserIds: [userA2Id],
         resourceType: 'folder',
         resourceId: folderBId,
         permissions: ['view'],
@@ -185,12 +193,229 @@ describe('Endpoints de gestão de permissão (routes/grants.ts, admin-only)', ()
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: ids.userB,
+        subjectUserIds: [ids.userB],
         resourceType: 'file',
         resourceId: fileAId,
         permissions: ['view'],
       });
     expect(create.status).toBe(404);
+  });
+
+  it('corpo inválido (400): subjectUserIds ausente, vazio ou com elemento não-string', async () => {
+    const app = createApp(ports);
+    const cookie = await sessionCookieFor(ports, unitAdminAId);
+
+    const missing = await request(app)
+      .post('/grants')
+      .set('Cookie', cookie)
+      .send({ resourceType: 'file', resourceId: fileAId, permissions: ['view'] });
+    expect(missing.status).toBe(400);
+
+    const empty = await request(app)
+      .post('/grants')
+      .set('Cookie', cookie)
+      .send({
+        subjectUserIds: [],
+        resourceType: 'file',
+        resourceId: fileAId,
+        permissions: ['view'],
+      });
+    expect(empty.status).toBe(400);
+
+    const notString = await request(app)
+      .post('/grants')
+      .set('Cookie', cookie)
+      .send({
+        subjectUserIds: [userA2Id, 42],
+        resourceType: 'file',
+        resourceId: fileAId,
+        permissions: ['view'],
+      });
+    expect(notString.status).toBe(400);
+  });
+
+  it('destinatário repetido na mesma requisição converge para uma única linha por verbo, sem falhar', async () => {
+    const app = createApp(ports);
+    const cookie = await sessionCookieFor(ports, unitAdminAId);
+    const fileId = await withSystemBypass(pool, (client) =>
+      client
+        .query<{ id: string }>(
+          `INSERT INTO files (unit_id, owner_id, object_path, file_name, status)
+           VALUES ($1, $2, 'unitA/dedup.txt', 'dedup.txt', 'active') RETURNING id`,
+          [ids.unitA, ids.userA],
+        )
+        .then((r) => r.rows[0]!.id),
+    );
+
+    const res = await request(app)
+      .post('/grants')
+      .set('Cookie', cookie)
+      .send({
+        subjectUserIds: [userA2Id, userA2Id],
+        resourceType: 'file',
+        resourceId: fileId,
+        permissions: ['view'],
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.grants).toHaveLength(1);
+
+    const rows = await withSystemBypass(pool, (client) =>
+      client.query('SELECT 1 FROM grants WHERE subject_user_id = $1 AND resource_id = $2', [
+        userA2Id,
+        fileId,
+      ]),
+    );
+    expect(rows.rows).toHaveLength(1);
+  });
+
+  it('concessão simultânea a vários colaboradores: cada um recebe cada verbo, numa única requisição', async () => {
+    const app = createApp(ports);
+    const cookie = await sessionCookieFor(ports, unitAdminAId);
+    const fileId = await withSystemBypass(pool, (client) =>
+      client
+        .query<{ id: string }>(
+          `INSERT INTO files (unit_id, owner_id, object_path, file_name, status)
+           VALUES ($1, $2, 'unitA/multi.txt', 'multi.txt', 'active') RETURNING id`,
+          [ids.unitA, ids.userA],
+        )
+        .then((r) => r.rows[0]!.id),
+    );
+
+    const res = await request(app)
+      .post('/grants')
+      .set('Cookie', cookie)
+      .send({
+        subjectUserIds: [userA2Id, userA3Id],
+        resourceType: 'file',
+        resourceId: fileId,
+        permissions: ['view', 'download'],
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.grants).toHaveLength(4);
+
+    const rows = await withSystemBypass(pool, (client) =>
+      client.query<{ subject_user_id: string; permission: string }>(
+        'SELECT subject_user_id, permission FROM grants WHERE resource_id = $1',
+        [fileId],
+      ),
+    );
+    const bySubject = new Map<string, string[]>();
+    for (const row of rows.rows) {
+      const list = bySubject.get(row.subject_user_id) ?? [];
+      list.push(row.permission);
+      bySubject.set(row.subject_user_id, list);
+    }
+    expect(bySubject.get(userA2Id)?.sort()).toEqual(['download', 'view']);
+    expect(bySubject.get(userA3Id)?.sort()).toEqual(['download', 'view']);
+  });
+
+  it('N sujeitos válidos + 1 inexistente recusa a requisição inteira (404), sem efetivar nenhuma concessão', async () => {
+    const app = createApp(ports);
+    const cookie = await sessionCookieFor(ports, unitAdminAId);
+    const fileId = await withSystemBypass(pool, (client) =>
+      client
+        .query<{ id: string }>(
+          `INSERT INTO files (unit_id, owner_id, object_path, file_name, status)
+           VALUES ($1, $2, 'unitA/parcial.txt', 'parcial.txt', 'active') RETURNING id`,
+          [ids.unitA, ids.userA],
+        )
+        .then((r) => r.rows[0]!.id),
+    );
+    const nonexistent = '00000000-0000-0000-0000-000000000000';
+
+    const create = await request(app)
+      .post('/grants')
+      .set('Cookie', cookie)
+      .send({
+        subjectUserIds: [userA2Id, userA3Id, nonexistent],
+        resourceType: 'file',
+        resourceId: fileId,
+        permissions: ['view'],
+      });
+    expect(create.status).toBe(404);
+
+    const list = await request(app)
+      .get(`/grants?resourceType=file&resourceId=${fileId}`)
+      .set('Cookie', cookie);
+    expect(list.body.grants).toEqual([]);
+  });
+
+  it('id extra de outra unidade produz a mesma recusa 404 indistinguível de id inexistente', async () => {
+    const app = createApp(ports);
+    const cookie = await sessionCookieFor(ports, unitAdminAId);
+    const fileId = await withSystemBypass(pool, (client) =>
+      client
+        .query<{ id: string }>(
+          `INSERT INTO files (unit_id, owner_id, object_path, file_name, status)
+           VALUES ($1, $2, 'unitA/outra-unidade.txt', 'outra-unidade.txt', 'active') RETURNING id`,
+          [ids.unitA, ids.userA],
+        )
+        .then((r) => r.rows[0]!.id),
+    );
+
+    const create = await request(app)
+      .post('/grants')
+      .set('Cookie', cookie)
+      .send({
+        subjectUserIds: [userA2Id, ids.userB],
+        resourceType: 'file',
+        resourceId: fileId,
+        permissions: ['view'],
+      });
+    expect(create.status).toBe(404);
+    expect(create.body).toEqual({ error: 'not found' });
+
+    const list = await request(app)
+      .get(`/grants?resourceType=file&resourceId=${fileId}`)
+      .set('Cookie', cookie);
+    expect(list.body.grants).toEqual([]);
+  });
+
+  it('teto de destinatários (413) usa o valor configurado e não efetiva nenhuma concessão', async () => {
+    const app = createApp(ports);
+    const cookie = await sessionCookieFor(ports, unitAdminAId);
+    const fileId = await withSystemBypass(pool, (client) =>
+      client
+        .query<{ id: string }>(
+          `INSERT INTO files (unit_id, owner_id, object_path, file_name, status)
+           VALUES ($1, $2, 'unitA/teto.txt', 'teto.txt', 'active') RETURNING id`,
+          [ids.unitA, ids.userA],
+        )
+        .then((r) => r.rows[0]!.id),
+    );
+
+    const maxSubjects = config.grants.maxSubjects;
+    const { rows: manyUsers } = await withSystemBypass(pool, (client) =>
+      client.query<{ id: string }>(
+        `INSERT INTO users (unit_id, email, password_hash, role)
+         SELECT $1, 'teto-' || gs || '@test.dev', 'x', 'collaborator'
+           FROM generate_series(1, $2) AS gs
+         RETURNING id`,
+        [ids.unitA, maxSubjects + 1],
+      ),
+    );
+    const subjectUserIds = manyUsers.map((u) => u.id);
+
+    const create = await request(app)
+      .post('/grants')
+      .set('Cookie', cookie)
+      .send({
+        subjectUserIds,
+        resourceType: 'file',
+        resourceId: fileId,
+        permissions: ['view'],
+      });
+    expect(create.status).toBe(413);
+    expect(create.body).toEqual({
+      error: 'grant_subjects_limit_exceeded',
+      found: maxSubjects + 1,
+      allowed: maxSubjects,
+    });
+
+    const list = await request(app)
+      .get(`/grants?resourceType=file&resourceId=${fileId}`)
+      .set('Cookie', cookie);
+    expect(list.body.grants).toEqual([]);
   });
 
   it('RLS: unit_admin de uma unidade não enxerga grant de outra unidade, mesmo pedindo o mesmo recurso', async () => {
@@ -280,7 +505,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],
@@ -293,7 +518,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],
@@ -306,7 +531,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],
@@ -319,7 +544,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],
@@ -379,7 +604,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileWithDeadline,
         permissions: ['view'],
@@ -391,7 +616,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileWithoutDeadline,
         permissions: ['view'],
@@ -413,7 +638,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view', 'download', 'rename'],
@@ -438,7 +663,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],
@@ -449,7 +674,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],
@@ -463,7 +688,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],
@@ -492,7 +717,7 @@ describe('Prazo de expiração e avisos de concessão (routes/grants.ts)', () =>
       .post('/grants')
       .set('Cookie', cookie)
       .send({
-        subjectUserId: recipientId,
+        subjectUserIds: [recipientId],
         resourceType: 'file',
         resourceId: fileId,
         permissions: ['view'],

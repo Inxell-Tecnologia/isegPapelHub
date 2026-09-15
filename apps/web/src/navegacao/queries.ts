@@ -5,6 +5,8 @@ import type {
   FolderContentsResponse,
   FolderDownloadManifestResponse,
   FolderResponse,
+  MoveBatchRequest,
+  MoveBatchResponse,
   MoveItemRequest,
   RenameFileRequest,
   RenameFolderRequest,
@@ -15,6 +17,7 @@ import {
   folderContentsResponseSchema,
   folderDownloadManifestResponseSchema,
   folderResponseSchema,
+  moveBatchResponseSchema,
 } from '../lib/schemas';
 
 export const FOLDER_CONTENTS_KEY = 'folder-contents';
@@ -118,6 +121,30 @@ export function useMoveFolder() {
       const body: MoveItemRequest = { destinationFolderId };
       const raw = await apiClient.post<FolderResponse>(`/folders/${folderId}/move`, body);
       return folderResponseSchema.parse(raw);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** `POST /files/move` (US 2.4, design.md D1 do change `mover-itens-em-lote`). */
+export function useMoveFilesBatch() {
+  const invalidate = useInvalidateFolderContents();
+  return useMutation({
+    mutationFn: async (body: MoveBatchRequest) => {
+      const raw = await apiClient.post<MoveBatchResponse>('/files/move', body);
+      return moveBatchResponseSchema.parse(raw);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** `POST /folders/move` (US 2.4, design.md D1 do change `mover-itens-em-lote`). */
+export function useMoveFoldersBatch() {
+  const invalidate = useInvalidateFolderContents();
+  return useMutation({
+    mutationFn: async (body: MoveBatchRequest) => {
+      const raw = await apiClient.post<MoveBatchResponse>('/folders/move', body);
+      return moveBatchResponseSchema.parse(raw);
     },
     onSuccess: invalidate,
   });

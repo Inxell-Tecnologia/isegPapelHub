@@ -11,4 +11,4 @@ volta a tela ao estado inicial.
 
 !!! note "Filtro por autor (administradores)"
     Administradores contam ainda com o filtro por **autor**, para localizar arquivos
-    enviados por uma pessoa específica da sua unidade.
+    enviados por um colaborador específico da sua unidade.

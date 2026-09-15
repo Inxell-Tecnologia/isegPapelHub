@@ -19,7 +19,7 @@ perfil, terminando sempre pelo **Manual do usuário**:
 | **Arquivos**            | Todos                 | Navegar por pastas, enviar, baixar, visualizar e gerenciar arquivos. |
 | **Buscar**              | Todos                 | Encontrar arquivos por nome e filtros.                               |
 | **Lixeira**             | Todos                 | Recuperar ou acompanhar itens excluídos.                             |
-| **Pessoas**             | Administradores       | Cadastrar, editar, ativar/desativar contas e redefinir senhas.       |
+| **Colaboradores**       | Administradores       | Cadastrar, editar, ativar/desativar contas e redefinir senhas.       |
 | **Painel**              | Administradores       | Ver estatísticas e gráficos de uso.                                  |
 | **Unidades**            | Administrador global  | Criar, renomear e ativar/desativar unidades.                         |
 | **Manual do usuário**   | Todos                 | Abre este material numa nova aba, sem fechar o que você estava fazendo. |

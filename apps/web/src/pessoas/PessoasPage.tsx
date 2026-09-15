@@ -13,8 +13,8 @@ import { SenhaGeradaModal } from './SenhaGeradaModal';
 import { useResetPersonPassword, useUpdatePerson, useUsers } from './queries';
 
 const STATUS_LABEL: Record<PersonStatus, string> = {
-  [PersonStatus.ACTIVE]: 'Ativa',
-  [PersonStatus.DISABLED]: 'Inativa',
+  [PersonStatus.ACTIVE]: 'Ativo',
+  [PersonStatus.DISABLED]: 'Inativo',
 };
 
 /**
@@ -138,11 +138,11 @@ export function PessoasPage() {
             </Button>
             {!(isSelf && isActive) && (
               <Popconfirm
-                title={isActive ? 'Desativar pessoa' : 'Ativar pessoa'}
+                title={isActive ? 'Desativar colaborador' : 'Ativar colaborador'}
                 description={
                   isActive
-                    ? 'A pessoa perde acesso ao login; os arquivos e a auditoria são preservados.'
-                    : 'A pessoa volta a poder fazer login.'
+                    ? 'O colaborador perde acesso ao login; os arquivos e a auditoria são preservados.'
+                    : 'O colaborador volta a poder fazer login.'
                 }
                 okText={isActive ? 'Sim, desativar' : 'Sim, ativar'}
                 cancelText="Cancelar"
@@ -156,7 +156,7 @@ export function PessoasPage() {
             {canReset && (
               <Popconfirm
                 title="Redefinir senha"
-                description="Uma nova senha é gerada e exibida uma única vez; a senha atual da pessoa deixa de funcionar."
+                description="Uma nova senha é gerada e exibida uma única vez; a senha atual do colaborador deixa de funcionar."
                 okText="Sim, redefinir"
                 cancelText="Cancelar"
                 onConfirm={() => handleResetPassword(person)}
@@ -178,7 +178,7 @@ export function PessoasPage() {
     return (
       <Result
         status="error"
-        title="Não foi possível carregar as pessoas"
+        title="Não foi possível carregar os colaboradores"
         subTitle="Verifique sua conexão e tente novamente."
       />
     );
@@ -188,7 +188,7 @@ export function PessoasPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Nova pessoa
+          Novo colaborador
         </Button>
       </div>
       <Table<PersonResponse>

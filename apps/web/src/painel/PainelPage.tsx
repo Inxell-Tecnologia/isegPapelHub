@@ -117,7 +117,7 @@ export function PainelPage() {
         </Col>
         <Col xs={12} sm={12} md={6}>
           <Card>
-            <Statistic title="Total de pessoas" value={data.cards.totalPeople} />
+            <Statistic title="Total de colaboradores" value={data.cards.totalPeople} />
           </Card>
         </Col>
         <Col xs={12} sm={12} md={6}>

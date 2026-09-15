@@ -83,7 +83,9 @@ describe('Painel gerencial da SPA (web-painel)', () => {
 
     await screen.findByText('Total de arquivos');
     expect(screen.getByText('Total de arquivos').closest('.ant-statistic')).toHaveTextContent('10');
-    expect(screen.getByText('Total de pessoas').closest('.ant-statistic')).toHaveTextContent('3');
+    expect(screen.getByText('Total de colaboradores').closest('.ant-statistic')).toHaveTextContent(
+      '3',
+    );
     expect(screen.getByText('Espaço utilizado').closest('.ant-statistic')).toHaveTextContent(
       '50.0 MB',
     );
@@ -92,6 +94,9 @@ describe('Painel gerencial da SPA (web-painel)', () => {
     expect(screen.getByText('Arquivos por tipo')).toBeInTheDocument();
     expect(screen.getByText('Envios por mês')).toBeInTheDocument();
     expect(screen.getByText('Espaço utilizado × disponível')).toBeInTheDocument();
+
+    // nomenclatura-interface: nenhum literal de tela usa "Pessoa"/"Servidor"
+    expect(document.body.textContent).not.toMatch(/pessoa|servidor/i);
   });
 
   it('exibe um indicador de carregamento antes de GET /dashboard responder, sem cartões nem gráficos parciais (spec: estado de carregamento)', async () => {

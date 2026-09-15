@@ -1,9 +1,15 @@
 import { Router } from 'express';
 import { GrantResourceType, NotificationKind, Permission, UserRole } from '@gdoc/shared';
-import type { CreateGrantRequest, GrantListResponse, GrantResponse } from '@gdoc/shared';
+import type {
+  CreateGrantRequest,
+  GrantListResponse,
+  GrantResponse,
+  GrantSubjectsLimitExceededResponse,
+} from '@gdoc/shared';
 import type { Ports } from '../ports/index.js';
 import type { TenantContext } from '../ports/database-port.js';
 import { resourceTable } from '../lib/access.js';
+import { config } from '../config.js';
 
 interface GrantRow {
   id: string;
@@ -79,7 +85,9 @@ export function grantsRouter(ports: Ports): Router {
 
       const body = req.body as CreateGrantRequest;
       if (
-        !body.subjectUserId ||
+        !Array.isArray(body.subjectUserIds) ||
+        body.subjectUserIds.length === 0 ||
+        !body.subjectUserIds.every((id) => typeof id === 'string' && id.length > 0) ||
         !RESOURCE_TYPES.includes(body.resourceType) ||
         !body.resourceId ||
         !Array.isArray(body.permissions) ||
@@ -103,9 +111,24 @@ export function grantsRouter(ports: Ports): Router {
         expiresAt = parsed;
       }
 
+      // Dedup preservando ordem de chegada (design.md D2/D3): o `CROSS JOIN`
+      // sobre `unnest` recusaria a mesma linha duas vezes no mesmo comando, e
+      // o teto de D4 precisa contar destinatários **distintos**.
+      const subjectUserIds = Array.from(new Set(body.subjectUserIds));
+
+      if (subjectUserIds.length > config.grants.maxSubjects) {
+        const limitResponse: GrantSubjectsLimitExceededResponse = {
+          error: 'grant_subjects_limit_exceeded',
+          found: subjectUserIds.length,
+          allowed: config.grants.maxSubjects,
+        };
+        res.status(413).json(limitResponse);
+        return;
+      }
+
       const outcome = await ports.database.withTenantTransaction(ctx, async (client) => {
         // RLS já restringe a leitura à unidade do admin (ou bypass de
-        // global_admin) — recurso ou pessoa de outra unidade simplesmente
+        // global_admin) — recurso ou colaborador de outra unidade simplesmente
         // não aparecem aqui, sem distinguir "não existe" de "é de outra
         // unidade" (design.md D5: "sem vazar existência").
         const { rows: resourceRows } = await client.query<{ unit_id: string }>(
@@ -115,36 +138,38 @@ export function grantsRouter(ports: Ports): Router {
         const resource = resourceRows[0];
         if (!resource) return { status: 404 as const };
 
-        const { rows: subjectRows } = await client.query('SELECT id FROM users WHERE id = $1', [
-          body.subjectUserId,
-        ]);
-        if (!subjectRows[0]) return { status: 404 as const };
+        // Existência de todos os sujeitos numa única consulta (design.md D3):
+        // a cardinalidade do resultado comparada com o conjunto deduplicado
+        // decide tudo-ou-nada, sem apontar qual id falhou — recusa parcial
+        // transformaria a rota num oráculo de existência de contas.
+        const { rows: subjectRows } = await client.query<{ id: string }>(
+          'SELECT id FROM users WHERE id = ANY($1)',
+          [subjectUserIds],
+        );
+        if (subjectRows.length !== subjectUserIds.length) return { status: 404 as const };
 
-        const rows: GrantRow[] = [];
-        for (const permission of body.permissions) {
-          // Reconceder atualiza o prazo (design.md D3): o `ON CONFLICT` deixa
-          // de ser `DO NOTHING` e passa a convergir para o estado pedido —
-          // com prazo, estende ou encurta; sem prazo, torna permanente. Também
-          // atualiza `granted_by`/`created_at` para a trilha refletir quem e
-          // quando estendeu.
-          const { rows: upserted } = await client.query<GrantRow>(
-            `INSERT INTO grants (unit_id, subject_user_id, resource_type, resource_id, permission, granted_by, expires_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             ON CONFLICT (unit_id, subject_user_id, resource_type, resource_id, permission)
-             DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by, created_at = now()
-             RETURNING *, ${EXPIRED_COLUMN}`,
-            [
-              resource.unit_id,
-              body.subjectUserId,
-              body.resourceType,
-              body.resourceId,
-              permission,
-              ctx.userId,
-              expiresAt,
-            ],
-          );
-          rows.push(upserted[0]!);
-        }
+        // Produto colaboradores × verbos num único INSERT ... SELECT sobre
+        // unnest (design.md D2) — uma ida ao banco em vez de N×M, com a
+        // mesma semântica de reconcessão de sempre (prazo informado
+        // prevalece; sem prazo, torna permanente).
+        const { rows } = await client.query<GrantRow>(
+          `INSERT INTO grants (unit_id, subject_user_id, resource_type, resource_id, permission, granted_by, expires_at)
+           SELECT $1, s.subject, $2, $3, p.permission, $4, $5
+             FROM unnest($6::uuid[]) AS s(subject)
+            CROSS JOIN unnest($7::text[]) AS p(permission)
+           ON CONFLICT (unit_id, subject_user_id, resource_type, resource_id, permission)
+           DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by, created_at = now()
+           RETURNING *, ${EXPIRED_COLUMN}`,
+          [
+            resource.unit_id,
+            body.resourceType,
+            body.resourceId,
+            ctx.userId,
+            expiresAt,
+            subjectUserIds,
+            body.permissions,
+          ],
+        );
         return { status: 201 as const, rows };
       });
 
@@ -153,28 +178,32 @@ export function grantsRouter(ports: Ports): Router {
         return;
       }
 
-      // Aviso de concessão (design.md D8): só quando a operação envolve
-      // prazo, emitido **após** o commit acima, fora da transação — falha ao
-      // notificar é registrada e descartada, jamais propagada ao chamador.
-      // Agrupado por (recurso, vencimento): uma requisição com vários verbos
-      // sobre o mesmo recurso e prazo emite um único aviso (design.md D5).
+      // Aviso de concessão (design.md D5): só quando a operação envolve
+      // prazo, emitido **após** o commit acima, fora da transação — um aviso
+      // por destinatário, cada um em seu próprio try/catch, para que a falha
+      // de um não afete os demais nem a concessão já efetivada. A fórmula do
+      // `sourceRef` não muda: a idempotência do NotificationPort já é por
+      // (destinatário, tipo, sourceRef), logo já é por destinatário.
       if (expiresAt) {
         const unitId = outcome.rows[0]!.unit_id;
-        try {
-          await ports.notifications.notify({
-            unitId,
-            recipientUserId: body.subjectUserId,
-            kind: NotificationKind.GRANT_CREATED,
-            payload: {
-              resourceType: body.resourceType,
-              resourceId: body.resourceId,
-              permissions: body.permissions,
-              expiresAt: expiresAt.toISOString(),
-            },
-            sourceRef: grantSourceRef(body.resourceType, body.resourceId, expiresAt),
-          });
-        } catch (err) {
-          console.error('grants: falha ao emitir aviso grant_created', err);
+        const sourceRef = grantSourceRef(body.resourceType, body.resourceId, expiresAt);
+        for (const subjectUserId of subjectUserIds) {
+          try {
+            await ports.notifications.notify({
+              unitId,
+              recipientUserId: subjectUserId,
+              kind: NotificationKind.GRANT_CREATED,
+              payload: {
+                resourceType: body.resourceType,
+                resourceId: body.resourceId,
+                permissions: body.permissions,
+                expiresAt: expiresAt.toISOString(),
+              },
+              sourceRef,
+            });
+          } catch (err) {
+            console.error('grants: falha ao emitir aviso grant_created', err);
+          }
         }
       }
 

@@ -139,7 +139,7 @@ export function PessoaFormModal({ target, open, onClose }: PessoaFormModalProps)
 
   return (
     <Modal
-      title={isEdit ? 'Editar pessoa' : 'Nova pessoa'}
+      title={isEdit ? 'Editar colaborador' : 'Novo colaborador'}
       open={open}
       onCancel={onClose}
       onOk={() => form.submit()}

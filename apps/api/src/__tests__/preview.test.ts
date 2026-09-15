@@ -68,7 +68,7 @@ describe('US 9.2 cenário 2: pré-visualização indisponível + oferta de downl
     const res = await request(createApp(ports))
       .post('/grants')
       .set('Cookie', await sessionCookieFor(ports, ids.globalAdmin))
-      .send({ subjectUserId: userA2Id, resourceType: 'file', resourceId: fileId, permissions });
+      .send({ subjectUserIds: [userA2Id], resourceType: 'file', resourceId: fileId, permissions });
     expect(res.status).toBe(201);
   }
 

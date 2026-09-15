@@ -66,7 +66,7 @@ export function AppShell() {
             {
               key: '/admin/pessoas',
               icon: <TeamOutlined />,
-              label: <Link to="/admin/pessoas">Pessoas</Link>,
+              label: <Link to="/admin/pessoas">Colaboradores</Link>,
             },
             {
               key: '/admin/painel',

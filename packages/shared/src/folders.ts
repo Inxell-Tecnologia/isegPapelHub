@@ -32,6 +32,57 @@ export interface RenameFolderRequest {
 }
 
 /**
+ * `POST /files/move` e `POST /folders/move` (US 2.4, design.md D1/D2 do
+ * change `mover-itens-em-lote`): mesmo destino para vários itens numa única
+ * operação. `destinationFolderId` segue a mesma convenção de
+ * `MoveItemRequest` — `null` explícito é sempre a raiz da unidade.
+ */
+export interface MoveBatchRequest {
+  ids: string[];
+  destinationFolderId: string | null;
+}
+
+export interface MoveBatchItemSuccess {
+  id: string;
+  ok: true;
+}
+
+export interface MoveBatchItemFailure {
+  id: string;
+  ok: false;
+  error: string;
+}
+
+/** Veredito por identificador, no molde de `BatchUploadItemResult` (design.md D2). */
+export type MoveBatchItemResult = MoveBatchItemSuccess | MoveBatchItemFailure;
+
+export interface MoveBatchResponse {
+  results: MoveBatchItemResult[];
+}
+
+/**
+ * Recusa por teto de itens por operação (design.md D1), no molde de
+ * `GrantSubjectsLimitExceededResponse`/`FolderDownloadManifestLimitExceededResponse`.
+ */
+export interface MoveBatchLimitExceededResponse {
+  error: 'move_batch_limit_exceeded';
+  found: number;
+  allowed: number;
+}
+
+/**
+ * Valor padrão do teto de itens por operação de mover em lote
+ * (`MOVE_BATCH_MAX_ITEMS`, `apps/api/src/config.ts`). Compartilhado com a
+ * SPA para a recusa de envio acontecer **antes** da requisição (tasks.md
+ * 7.4), sem abrir endpoint de leitura novo (design.md, Goals: "custar zero em
+ * infraestrutura") — se a implantação sobrescrever a variável de ambiente
+ * para outro valor, o cliente segue orientado por este padrão até a primeira
+ * resposta do servidor, cujo `allowed` de `MoveBatchLimitExceededResponse` é
+ * sempre a fonte da verdade.
+ */
+export const MOVE_BATCH_MAX_ITEMS_DEFAULT = 100;
+
+/**
  * Recusa identificável de `POST /folders/:id/move` e `PATCH /folders/:id`
  * (design.md D4/D5): já existe pasta viva de mesmo nome no destino/pai.
  */

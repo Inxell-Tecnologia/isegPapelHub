@@ -65,13 +65,10 @@ export class GcsStoragePort implements StoragePort {
     // aceita PUT simples normalmente; upload em pedaços/retomável fica como
     // otimização de UX para uma mudança de feature futura, não desta
     // fundação — o contrato do endpoint (uma URL, um PUT) não muda.
-    return this.sign(
-      objectPath,
-      'write',
-      config.signedUrlDownloadTtlSeconds,
-      undefined,
-      contentType,
-    );
+    // Prazo **próprio** do envio (change corrige-defeitos-envio-lote,
+    // design.md D3) — antes reusava `signedUrlDownloadTtlSeconds` por
+    // conveniência, não por decisão.
+    return this.sign(objectPath, 'write', config.signedUrlUploadTtlSeconds, undefined, contentType);
   }
 
   async deleteObject(objectPath: string): Promise<void> {

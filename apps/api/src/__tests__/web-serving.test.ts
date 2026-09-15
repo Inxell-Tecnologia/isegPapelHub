@@ -77,6 +77,17 @@ describe('Serving da SPA (apps/web/dist) pela API — deploy-frontend-gcp', () =
       expect(res.text).not.toContain('SPA');
     });
 
+    it('GET /files/quota sem sessão responde como API (401), não index.html (change envio-multiplas-pastas-com-prechecagem)', async () => {
+      // A rota tem dois segmentos sob o prefixo `/files`, já em
+      // `API_PREFIXES` — nenhuma das três pontas (api-prefixes.ts,
+      // vite.config.ts, locals.tf) muda. O teste é a guarda de que
+      // continua assim.
+      const app = createApp(ports, { webDistDir });
+      const res = await request(app).get('/files/quota');
+      expect(res.status).toBe(401);
+      expect(res.text).not.toContain('SPA');
+    });
+
     it('GET /auth/me sem sessão mantém o contrato atual da API (401)', async () => {
       const app = createApp(ports, { webDistDir });
       const res = await request(app).get('/auth/me');

@@ -1,8 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { FileRestoreResponse, FolderRestoreResponse } from '@gdoc/shared';
+import type { FileRestoreResponse, FolderRestoreResponse, TrashPurgeResponse } from '@gdoc/shared';
 import { apiClient } from '../lib/api-client';
-import { fileRestoreResponseSchema, trashListResponseSchema } from '../lib/schemas';
+import {
+  fileRestoreResponseSchema,
+  trashListResponseSchema,
+  trashPurgeResponseSchema,
+} from '../lib/schemas';
 import { FOLDER_CONTENTS_KEY } from '../navegacao/queries';
+import { QUOTA_KEY } from '../upload/queries';
 
 export const TRASH_KEY = 'trash';
 
@@ -49,5 +54,26 @@ export function useRestoreFolder() {
     mutationFn: (folderId: string) =>
       apiClient.post<FolderRestoreResponse>(`/folders/${folderId}/restore`),
     onSuccess: invalidate,
+  });
+}
+
+/**
+ * `POST /trash/purge` (change `esvaziar-lixeira`) — expurgo imediato dos
+ * arquivos próprios na lixeira. Invalida a listagem da lixeira **e** a
+ * consulta de cota (design.md D4): o espaço recuperado é a razão de a pessoa
+ * estar ali, e precisa aparecer sem recarregar a página. As listagens do
+ * explorador não entram — nada volta a ficar vivo num expurgo.
+ */
+export function usePurgeTrash() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<TrashPurgeResponse> => {
+      const raw = await apiClient.post<unknown>('/trash/purge');
+      return trashPurgeResponseSchema.parse(raw);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TRASH_KEY] });
+      queryClient.invalidateQueries({ queryKey: [QUOTA_KEY] });
+    },
   });
 }

@@ -18,7 +18,7 @@ aparecer na listagem de origem.
 
 Mover preserva o conteúdo, o dono, as permissões já concedidas sobre o item e o
 histórico de auditoria de arquivo — nada disso é afetado pela mudança de local. Mover
-uma pasta leva junto toda a sua subárvore, inclusive arquivos de outras pessoas que
+uma pasta leva junto toda a sua subárvore, inclusive arquivos de outros colaboradores que
 estejam dentro dela.
 
 !!! warning "Mover para uma pasta compartilhada não compartilha o item"
@@ -26,7 +26,7 @@ estejam dentro dela.
     antes. Mas mover um item para dentro de uma pasta que você compartilha com a
     equipe **não estende** esse compartilhamento ao item movido — as permissões são
     sempre por item, nunca herdadas da pasta que o contém. Se quiser que outra
-    pessoa acesse o item movido, peça a um administrador para conceder permissão
+    colaborador acesse o item movido, peça a um administrador para conceder permissão
     sobre ele diretamente (ver [Permissões](../administrador/permissoes.md)).
 
 Mover (arquivo ou pasta) e renomear pasta usam o mesmo alcance: **dono do item OU
@@ -40,6 +40,35 @@ específicas ao mover ou renomear pasta, além da falta de permissão:
 - **Nome já existente no destino** — ao mover ou renomear uma pasta para um nome que
   já é usado por outra pasta viva no mesmo local. O sistema recusa em vez de
   substituir ou combinar o conteúdo das duas.
+
+## Selecionar vários itens e mover em lote
+
+Além de mover um item por vez, você pode marcar **vários arquivos e pastas** ao
+mesmo tempo (uma caixa de seleção aparece em cada linha da listagem) e movê-los
+juntos para o mesmo destino, numa única confirmação — útil para reorganizar uma
+pasta cheia sem repetir a ação item a item. Assim que algo é marcado, uma barra
+aparece acima da listagem mostrando quantos itens estão selecionados e o botão
+**Mover selecionados**, que abre o mesmo seletor de destino usado para mover um
+único item.
+
+A seleção vale só para a pasta em que você está: **entrar em uma subpasta, voltar
+pela trilha de navegação ou trocar de tela esvazia a seleção**. Não é possível
+acumular itens de pastas diferentes num mesmo lote.
+
+Ao confirmar, você recebe um único aviso, mesmo que a seleção misture arquivos e
+pastas:
+
+- **Sucesso total** — todos os itens passam a residir no destino.
+- **Falha parcial** — o aviso informa quantos itens foram movidos e lista, um a
+  um, cada item que não pôde ser movido e o motivo (sem permissão, destino dentro
+  da própria pasta, ou nome já existente no destino). Os demais itens da seleção
+  são movidos normalmente.
+- **Destino sem alcance** — se você não tem permissão sobre o destino escolhido,
+  nenhum item da seleção é movido, e o aviso é o mesmo de falta de permissão.
+
+Se a seleção passar do teto de itens por operação (ver
+[Limites](../referencia/limites.md)), a ação é recusada **antes** de qualquer
+envio, com um aviso próprio, distinto da recusa por permissão.
 
 ## Excluir arquivos
 
@@ -68,3 +97,29 @@ definitivo (não é mais possível recuperar).
 Acesse pelo menu **Lixeira** para restaurar ou acompanhar seus itens excluídos. A
 lista mostra a **data de exclusão** e quantos **dias restantes** faltam até o expurgo,
 com destaque colorido quando o prazo está perto do fim.
+
+### Esvaziar a lixeira para liberar espaço agora
+
+Enquanto um arquivo está na lixeira, ele **continua ocupando a sua cota** (ver
+[Enviar arquivos](enviar.md)). Se você precisa de espaço **hoje**, sem esperar o
+expurgo automático, use **Esvaziar lixeira**, no alto da tela da Lixeira.
+
+A confirmação diz, antes de qualquer coisa, **quantos arquivos** serão apagados e
+**quanto espaço** retorna — é a troca que você está aceitando. Ao confirmar:
+
+- os **seus arquivos** na lixeira são apagados **em definitivo**, e o espaço volta na
+  hora para a sua cota;
+- **não há como desfazer**: eles deixam de ser restauráveis;
+- **pastas não são apagadas** — pasta não ocupa espaço, então continua na lixeira até
+  o expurgo automático (inclusive quando os arquivos que estavam dentro dela foram
+  apagados);
+- **arquivos de outras pessoas não são afetados**, mesmo que apareçam na sua lista da
+  Lixeira porque você tem permissão de exclusão sobre eles. Cada pessoa esvazia a
+  própria lixeira — inclusive administradores, que não esvaziam a lixeira de
+  terceiros.
+
+Se algum arquivo não puder ser apagado no momento, os demais são apagados normalmente
+e a tela informa quantos ficaram — eles permanecem na lixeira e entram no próximo
+expurgo automático.
+
+O botão só aparece quando você tem arquivos próprios na lixeira.

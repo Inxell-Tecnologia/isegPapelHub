@@ -1,7 +1,7 @@
 # Painel gerencial
 
 Abra **Painel** para ver **cartões** com os números principais — total de arquivos,
-total de pessoas, espaço utilizado e percentual da cota — e **gráficos** de:
+total de colaboradores, espaço utilizado e percentual da cota — e **gráficos** de:
 
 - quantidade de **arquivos por tipo**;
 - **envios por mês**;

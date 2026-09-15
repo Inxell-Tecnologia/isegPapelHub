@@ -28,9 +28,39 @@ export interface CreateAppOptions {
   appManualUrl?: string;
 }
 
+/**
+ * Traduz uma exceção na resposta de erro da API (change
+ * `corrige-defeitos-envio-lote`, design.md D1).
+ *
+ * Erro de **leitura do corpo** ganha status próprio, para que o cliente
+ * consiga se corrigir: antes deste conserto um lote grande demais respondia
+ * 500, e a SPA exibia "tente novamente" para uma operação que falharia sempre
+ * de forma idêntica.
+ *
+ * A superfície é deliberadamente fechada. Reconhece **apenas** os dois
+ * `err.type` que o `body-parser` define — nunca um `err.status` arbitrário,
+ * que qualquer biblioteca da árvore de dependências pode ter decorado e que um
+ * dia exporia um erro interno como 4xx. A mensagem do erro original jamais é
+ * repassada: só um código nosso, estável e sem conteúdo interno.
+ *
+ * Função pura, exportada para ser testada diretamente, sem `res` de mentira.
+ */
+export function mapErrorResponse(err: unknown): { status: number; body: { error: string } } {
+  const type = (err as { type?: unknown } | null)?.type;
+
+  if (type === 'entity.too.large') {
+    return { status: 413, body: { error: 'request_body_too_large' } };
+  }
+  if (type === 'entity.parse.failed') {
+    return { status: 400, body: { error: 'invalid_json' } };
+  }
+
+  return { status: 500, body: { error: 'internal_error' } };
+}
+
 export function createApp(ports: Ports, options: CreateAppOptions = {}): Express {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: config.requestBodyMaxBytes }));
   app.use(cookieParser());
 
   // Validação do endereço do manual do usuário (change
@@ -139,7 +169,8 @@ export function createApp(ports: Ports, options: CreateAppOptions = {}): Express
 
   const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     console.error(err);
-    res.status(500).json({ error: 'internal_error' });
+    const { status, body } = mapErrorResponse(err);
+    res.status(status).json(body);
   };
   app.use(errorHandler);
 

@@ -1,4 +1,5 @@
 import type { StoragePort, SignedUrlResult } from '../ports/storage-port.js';
+import { config } from '../config.js';
 
 /** Test double do StoragePort — evita depender do fake-gcs-server nos testes unitários de permissão. */
 export class InMemoryStoragePort implements StoragePort {
@@ -31,7 +32,11 @@ export class InMemoryStoragePort implements StoragePort {
     this.calls.push({ method: 'upload', objectPath });
     return {
       url: `https://storage.test/${objectPath}?upload`,
-      expiresAt: new Date(Date.now() + 1_800_000),
+      // Espelha o prazo próprio de envio do adapter real (change
+      // corrige-defeitos-envio-lote, design.md D3): o dublê não pode
+      // reintroduzir o acoplamento ao TTL de download que o seam acabou de
+      // desfazer, ou a paridade dev↔prod se perde justamente no ponto testado.
+      expiresAt: new Date(Date.now() + config.signedUrlUploadTtlSeconds * 1000),
     };
   }
 

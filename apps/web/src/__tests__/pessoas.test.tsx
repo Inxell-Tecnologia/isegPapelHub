@@ -127,10 +127,13 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     expect(within(row).getByText('beltrano@example.com')).toBeInTheDocument();
     expect(within(row).getByText('Analista')).toBeInTheDocument();
     expect(within(row).getByText('Administrador da unidade')).toBeInTheDocument();
-    expect(within(row).getByText('Ativa')).toBeInTheDocument();
+    expect(within(row).getByText('Ativo')).toBeInTheDocument();
 
     // pessoa sem nome cai no e-mail
     expect(screen.getAllByText('semnome@example.com').length).toBeGreaterThan(0);
+
+    // nomenclatura-interface: nenhum literal de tela usa "Pessoa"/"Servidor"
+    expect(document.body.textContent).not.toMatch(/pessoa|servidor/i);
   });
 
   it('cadastro válido chama POST /users, fecha o modal e a nova pessoa aparece; confirmar sem senha é bloqueado (spec: cadastro válido / senha é exigida)', async () => {
@@ -151,10 +154,10 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     });
 
     renderApp(['/admin/pessoas']);
-    await screen.findByText('Nova pessoa');
-    await userEvent.click(screen.getByRole('button', { name: /nova pessoa/i }));
+    await screen.findByText('Novo colaborador');
+    await userEvent.click(screen.getByRole('button', { name: /novo colaborador/i }));
 
-    const dialog = await findDialogByTitle('Nova pessoa');
+    const dialog = await findDialogByTitle('Novo colaborador');
     await userEvent.type(within(dialog).getByLabelText('Nome'), 'Ciclana Souza');
     await userEvent.type(within(dialog).getByLabelText('E-mail'), 'ciclana@example.com');
     await selectRole(dialog, 'Colaborador');
@@ -190,10 +193,10 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     });
 
     renderApp(['/admin/pessoas']);
-    await screen.findByText('Nova pessoa');
-    await userEvent.click(screen.getByRole('button', { name: /nova pessoa/i }));
+    await screen.findByText('Novo colaborador');
+    await userEvent.click(screen.getByRole('button', { name: /novo colaborador/i }));
 
-    const dialog = await findDialogByTitle('Nova pessoa');
+    const dialog = await findDialogByTitle('Novo colaborador');
     await userEvent.type(within(dialog).getByLabelText('Nome'), 'Fulano Repetido');
     await userEvent.type(within(dialog).getByLabelText('E-mail'), 'ja-existe@example.com');
     await userEvent.type(within(dialog).getByLabelText('Senha inicial'), 'segredo123');
@@ -227,7 +230,7 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     const row = screen.getByText('Beltrano Silva').closest('tr')!;
     await userEvent.click(within(row).getByRole('button', { name: 'Editar' }));
 
-    const dialog = await findDialogByTitle('Editar pessoa');
+    const dialog = await findDialogByTitle('Editar colaborador');
     expect(within(dialog).queryByLabelText('Senha inicial')).not.toBeInTheDocument();
     expect(within(dialog).getByLabelText('E-mail')).toBeDisabled();
 
@@ -277,13 +280,13 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     await userEvent.click(within(row).getByRole('button', { name: 'Desativar' }));
     await userEvent.click(confirmButton('Sim, desativar'));
 
-    await waitFor(() => expect(screen.getByText('Inativa')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Inativo')).toBeInTheDocument());
 
     row = screen.getByText('Beltrano Silva').closest('tr')!;
     await userEvent.click(within(row).getByRole('button', { name: 'Ativar' }));
     await userEvent.click(confirmButton('Sim, ativar'));
 
-    await waitFor(() => expect(screen.getByText('Ativa')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Ativo')).toBeInTheDocument());
 
     const bodies = requestBodies('PATCH', '/users/person-1') as Record<string, unknown>[];
     expect(bodies).toEqual([{ status: 'disabled' }, { status: 'active' }]);
@@ -296,7 +299,7 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
       email: 'admin1@example.com',
       role: UserRole.UNIT_ADMIN,
     });
-    const outraPessoa = person({ id: 'person-2', fullName: 'Outra Pessoa' });
+    const outraPessoa = person({ id: 'person-2', fullName: 'Outro Colaborador' });
 
     mockFetch({
       'GET /auth/me': { status: 200, body: UNIT_ADMIN },
@@ -313,7 +316,7 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
 
     // própria linha, modo editar: seletor de papel não oferece rebaixar (Colaborador) nem global_admin
     await userEvent.click(within(selfRow).getByRole('button', { name: 'Editar' }));
-    const selfDialog = await findDialogByTitle('Editar pessoa');
+    const selfDialog = await findDialogByTitle('Editar colaborador');
     await userEvent.click(within(selfDialog).getByRole('combobox'));
     let dropdown = await waitFor(
       () => document.querySelector('.ant-select-dropdown') as HTMLElement,
@@ -325,8 +328,8 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     await userEvent.click(within(selfDialog).getByRole('button', { name: 'Cancelar' }));
 
     // cadastro: unit_admin não vê global_admin
-    await userEvent.click(screen.getByRole('button', { name: /nova pessoa/i }));
-    const createDialog = await findDialogByTitle('Nova pessoa');
+    await userEvent.click(screen.getByRole('button', { name: /novo colaborador/i }));
+    const createDialog = await findDialogByTitle('Novo colaborador');
     await userEvent.click(within(createDialog).getByRole('combobox'));
     dropdown = await waitFor(() => document.querySelector('.ant-select-dropdown') as HTMLElement);
     expect(within(dropdown).queryByText('Administrador global')).not.toBeInTheDocument();
@@ -335,9 +338,9 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     await userEvent.click(within(createDialog).getByRole('button', { name: 'Cancelar' }));
 
     // 403 ao editar outra pessoa exibe aviso neutro, sem aplicar mudança
-    const otherRow = screen.getByText('Outra Pessoa').closest('tr')!;
+    const otherRow = screen.getByText('Outro Colaborador').closest('tr')!;
     await userEvent.click(within(otherRow).getByRole('button', { name: 'Editar' }));
-    const otherDialog = await findDialogByTitle('Editar pessoa');
+    const otherDialog = await findDialogByTitle('Editar colaborador');
     await userEvent.click(within(otherDialog).getByRole('button', { name: 'Salvar' }));
     await screen.findByText('Permissão insuficiente para executar esta ação.');
   });
@@ -350,10 +353,10 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     });
 
     renderApp(['/admin/pessoas']);
-    await screen.findByText('Nova pessoa');
-    await userEvent.click(screen.getByRole('button', { name: /nova pessoa/i }));
+    await screen.findByText('Novo colaborador');
+    await userEvent.click(screen.getByRole('button', { name: /novo colaborador/i }));
 
-    const dialog = await findDialogByTitle('Nova pessoa');
+    const dialog = await findDialogByTitle('Novo colaborador');
     // O global_admin vê 2 comboboxes (Unidade + Papel); escopar pelo rótulo.
     const roleItem = within(dialog).getByText('Papel').closest('.ant-form-item') as HTMLElement;
     await userEvent.click(within(roleItem).getByRole('combobox'));
@@ -380,10 +383,10 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     });
 
     renderApp(['/admin/pessoas']);
-    await screen.findByText('Nova pessoa');
-    await userEvent.click(screen.getByRole('button', { name: /nova pessoa/i }));
+    await screen.findByText('Novo colaborador');
+    await userEvent.click(screen.getByRole('button', { name: /novo colaborador/i }));
 
-    const dialog = await findDialogByTitle('Nova pessoa');
+    const dialog = await findDialogByTitle('Novo colaborador');
     await userEvent.type(within(dialog).getByLabelText('Nome'), 'Novo GA');
     await userEvent.type(within(dialog).getByLabelText('E-mail'), 'novo-ga@example.com');
     await userEvent.type(within(dialog).getByLabelText('Senha inicial'), 'segredo123');
@@ -407,10 +410,10 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     });
 
     renderApp(['/admin/pessoas']);
-    await screen.findByText('Nova pessoa');
-    await userEvent.click(screen.getByRole('button', { name: /nova pessoa/i }));
+    await screen.findByText('Novo colaborador');
+    await userEvent.click(screen.getByRole('button', { name: /novo colaborador/i }));
 
-    const dialog = await findDialogByTitle('Nova pessoa');
+    const dialog = await findDialogByTitle('Novo colaborador');
     await userEvent.type(within(dialog).getByLabelText('Nome'), 'Fulano');
     await userEvent.type(within(dialog).getByLabelText('E-mail'), 'fulano@example.com');
     await userEvent.type(within(dialog).getByLabelText('Senha inicial'), 'segredo123');
@@ -423,8 +426,8 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
   });
 
   it('global_admin: a listagem exibe o NOME da unidade (não o UUID), resolvido via GET /units (spec: unidade exibida pelo nome)', async () => {
-    const pessoaA = person({ id: 'p-a', fullName: 'Pessoa A', unitId: 'unit-a' });
-    const pessoaB = person({ id: 'p-b', fullName: 'Pessoa B', unitId: 'unit-b' });
+    const pessoaA = person({ id: 'p-a', fullName: 'Colaborador A', unitId: 'unit-a' });
+    const pessoaB = person({ id: 'p-b', fullName: 'Colaborador B', unitId: 'unit-b' });
 
     mockFetch({
       'GET /auth/me': { status: 200, body: GLOBAL_ADMIN },
@@ -433,13 +436,13 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     });
 
     renderApp(['/admin/pessoas']);
-    await screen.findByText('Pessoa A');
+    await screen.findByText('Colaborador A');
 
-    const rowA = screen.getByText('Pessoa A').closest('tr')!;
+    const rowA = screen.getByText('Colaborador A').closest('tr')!;
     expect(within(rowA).getByText('Unidade A')).toBeInTheDocument();
     expect(within(rowA).queryByText('unit-a')).not.toBeInTheDocument();
 
-    const rowB = screen.getByText('Pessoa B').closest('tr')!;
+    const rowB = screen.getByText('Colaborador B').closest('tr')!;
     expect(within(rowB).getByText('Unidade B')).toBeInTheDocument();
   });
 
@@ -457,8 +460,8 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     // sem coluna "Unidade" no cabeçalho da tabela
     expect(screen.queryByRole('columnheader', { name: 'Unidade' })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /nova pessoa/i }));
-    const dialog = await findDialogByTitle('Nova pessoa');
+    await userEvent.click(screen.getByRole('button', { name: /novo colaborador/i }));
+    const dialog = await findDialogByTitle('Novo colaborador');
     // sem campo "Unidade" no formulário
     expect(within(dialog).queryByText('Unidade')).not.toBeInTheDocument();
   });

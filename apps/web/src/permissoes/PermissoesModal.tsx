@@ -16,7 +16,7 @@ import {
   Typography,
 } from 'antd';
 import type { Dayjs } from 'dayjs';
-import type { GrantResponse } from '@gdoc/shared';
+import type { GrantResponse, GrantSubjectsLimitExceededResponse } from '@gdoc/shared';
 import { GrantResourceType, Permission } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
 import { useSession } from '../auth/session-context';
@@ -33,9 +33,19 @@ interface PermissoesModalProps {
 }
 
 interface GrantFormValues {
-  subjectUserId: string;
+  subjectUserIds: string[];
   permissions: Permission[];
   expiresAt?: Dayjs | null;
+}
+
+function isGrantSubjectsLimitExceeded(
+  details: unknown,
+): details is GrantSubjectsLimitExceededResponse {
+  return (
+    typeof details === 'object' &&
+    details !== null &&
+    (details as { error?: unknown }).error === 'grant_subjects_limit_exceeded'
+  );
 }
 
 /**
@@ -80,7 +90,7 @@ export function PermissoesModal({
   const { message } = App.useApp();
   const { identity } = useSession();
   const [form] = Form.useForm<GrantFormValues>();
-  const selectedSubjectId = Form.useWatch('subjectUserId', form);
+  const selectedSubjectIds = Form.useWatch('subjectUserIds', form) ?? [];
 
   const { data: grantsData } = useGrants(resourceType, resourceId, open);
   const authorOptions = useAuthorOptions(identity?.role);
@@ -107,17 +117,22 @@ export function PermissoesModal({
     return map;
   }, [grantsData]);
 
-  // design.md D3: reconceder faz o prazo informado prevalecer — sem
-  // oferecer o campo em branco como se fosse neutro, a pessoa que concede
-  // precisa ver o que a pessoa já tem antes de decidir deixar em branco.
-  const selectedPersonGrants = selectedSubjectId
-    ? (grantsByPerson.get(selectedSubjectId) ?? [])
-    : [];
+  // design.md D6: reconceder faz o prazo informado prevalecer — sem
+  // oferecer o campo em branco como se fosse neutro, quem concede precisa
+  // ver o que cada colaborador selecionado já tem antes de decidir deixar em
+  // branco. Colaborador selecionado sem concessão prévia não gera bloco.
+  const selectedSubjectsWithGrants = selectedSubjectIds
+    .map((subjectId) => ({ subjectId, grants: grantsByPerson.get(subjectId) ?? [] }))
+    .filter(({ grants }) => grants.length > 0);
 
-  // design.md Risks: 404 (recurso/pessoa inexistente ou de outra unidade) e
-  // 403 não são distinguidos — mensagem neutra, preservando o fail-closed do servidor.
+  // design.md D6: teto excedido tem aviso próprio; demais recusas mantêm a
+  // mensagem neutra que não distingue 403 de 404 (fail-closed do servidor).
   function handleMutationError(err: unknown) {
     if (err instanceof ApiError) {
+      if (isGrantSubjectsLimitExceeded(err.details)) {
+        message.error('Muitos colaboradores selecionados. Reduza a seleção e tente novamente.');
+        return;
+      }
       message.error('Não foi possível concluir a operação de permissões.');
       return;
     }
@@ -127,7 +142,7 @@ export function PermissoesModal({
   async function handleGrant(values: GrantFormValues) {
     try {
       await createGrant.mutateAsync({
-        subjectUserId: values.subjectUserId,
+        subjectUserIds: values.subjectUserIds,
         resourceType,
         resourceId,
         permissions: values.permissions,
@@ -168,17 +183,21 @@ export function PermissoesModal({
 
       <Form<GrantFormValues> form={form} layout="vertical" onFinish={handleGrant}>
         <Form.Item
-          name="subjectUserId"
-          label="Pessoa"
-          rules={[{ required: true, message: 'Selecione uma pessoa' }]}
+          name="subjectUserIds"
+          label="Colaborador(es)"
+          rules={[
+            { required: true, type: 'array', min: 1, message: 'Selecione ao menos um colaborador' },
+          ]}
         >
           <Select
+            mode="multiple"
             showSearch
-            placeholder="Selecione uma pessoa"
+            placeholder="Selecione um ou mais colaboradores"
             loading={authorOptions.isLoading}
             disabled={authorOptions.isError}
             options={authorOptions.data ?? []}
             optionFilterProp="label"
+            maxTagCount="responsive"
           />
         </Form.Item>
         {authorOptions.isError && (
@@ -186,7 +205,7 @@ export function PermissoesModal({
             type="error"
             showIcon
             style={{ marginBottom: 16 }}
-            message="Não foi possível carregar a lista de pessoas. Concessão indisponível no momento."
+            message="Não foi possível carregar a lista de colaboradores. Concessão indisponível no momento."
           />
         )}
         <Form.Item
@@ -198,15 +217,19 @@ export function PermissoesModal({
         >
           <Checkbox.Group options={VERB_OPTIONS} />
         </Form.Item>
-        {selectedPersonGrants.length > 0 && (
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -8 }}>
-            Prazo atual desta pessoa neste recurso:{' '}
-            {selectedPersonGrants
+        {selectedSubjectsWithGrants.map(({ subjectId, grants }) => (
+          <Typography.Paragraph
+            key={subjectId}
+            type="secondary"
+            style={{ fontSize: 12, marginTop: -8 }}
+          >
+            Prazo atual de {personNameById.get(subjectId) ?? subjectId} neste recurso:{' '}
+            {grants
               .map((grant) => `${VERB_LABEL[grant.permission]} (${expiryLabel(grant)})`)
               .join(', ')}
             .
           </Typography.Paragraph>
-        )}
+        ))}
         <Form.Item
           name="expiresAt"
           label="Prazo de expiração (opcional)"
@@ -244,7 +267,7 @@ export function PermissoesModal({
                     </Tag>
                     <Popconfirm
                       title="Revogar permissão"
-                      description={`Remover "${VERB_LABEL[grant.permission]}" desta pessoa sobre este recurso?`}
+                      description={`Remover "${VERB_LABEL[grant.permission]}" deste colaborador sobre este recurso?`}
                       okText="Sim, revogar"
                       cancelText="Cancelar"
                       onConfirm={() => handleRevoke(grant.id)}

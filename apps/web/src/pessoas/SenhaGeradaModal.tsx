@@ -34,7 +34,7 @@ export function SenhaGeradaModal({ generatedPassword, onClose }: SenhaGeradaModa
       destroyOnClose
     >
       <Typography.Paragraph type="warning">
-        Esta senha não será exibida novamente. Copie-a e repasse à pessoa por um canal seguro.
+        Esta senha não será exibida novamente. Copie-a e repasse ao colaborador por um canal seguro.
       </Typography.Paragraph>
       <Typography.Text code style={{ fontSize: 16 }}>
         {generatedPassword}

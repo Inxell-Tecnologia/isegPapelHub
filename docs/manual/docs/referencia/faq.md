@@ -9,13 +9,18 @@ Vá à **Lixeira** e **restaure** — desde que dentro do prazo de retenção (v
 [Limites](limites.md)). Após esse prazo, o item é apagado permanentemente.
 
 **Meus envios pararam de funcionar.**
-Você pode ter atingido sua cota de armazenamento (ver [Limites](limites.md)). Exclua
-arquivos para liberar espaço.
+Você pode ter atingido sua cota de armazenamento (ver [Limites](limites.md)). Ao
+receber uma seleção, o sistema informa quanto espaço você tem e onde ele está — em
+arquivos ativos, na lixeira e em envios pendentes. **Excluir arquivos não libera
+espaço de imediato**: o arquivo vai para a lixeira e continua ocupando a sua cota até
+o expurgo automático, ao fim do prazo de retenção. A saída imediata é **enviar só o
+que cabe**, oferecida na própria recusa (ver
+[Enviar arquivos](../colaborador/enviar.md)).
 
 **Como compartilho um arquivo que enviei?**
 Você não concede permissão sobre o próprio arquivo — essa ação é exclusiva da
-administração da sua unidade. Peça a um administrador que conceda a permissão à
-pessoa que precisa acessá-lo.
+administração da sua unidade. Peça a um administrador que conceda a permissão ao
+colaborador que precisa acessá-lo.
 
 **Cliquei em visualizar um Word (ou Excel) e não abriu na tela.**
 Documentos do Office não têm pré-visualização nesta versão. O sistema avisa e oferece
@@ -37,7 +42,7 @@ sistema, e pode trocá-la depois em **Minha conta**.
 É esperado: trocar a senha encerra as demais sessões, mantendo apenas aquela em que
 você fez a troca.
 
-**Por que não vejo os menus "Pessoas", "Painel" ou "Unidades"?**
-"Pessoas" e "Painel" são exclusivos de administradores, e "Unidades" é exclusivo do
+**Por que não vejo os menus "Colaboradores", "Painel" ou "Unidades"?**
+"Colaboradores" e "Painel" são exclusivos de administradores, e "Unidades" é exclusivo do
 administrador global. Se você precisa deles, converse com a área administrativa sobre
 o seu perfil.

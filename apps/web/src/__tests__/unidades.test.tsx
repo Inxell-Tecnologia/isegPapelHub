@@ -200,11 +200,14 @@ describe('Gestão de unidades da SPA (web-unidades)', () => {
     await userEvent.click(within(row).getByRole('button', { name: 'Desativar' }));
     await userEvent.click(confirmButton('Sim, desativar'));
 
-    await screen.findByText(/ainda tem pessoas vinculadas/i);
+    await screen.findByText(/ainda tem colaboradores vinculados/i);
     // status permanece "Ativa" na listagem
     expect(
       within(screen.getByText('Unidade Cheia').closest('tr')!).getByText('Ativa'),
     ).toBeInTheDocument();
+
+    // nomenclatura-interface: nenhum literal de tela usa "Pessoa"/"Servidor"
+    expect(document.body.textContent).not.toMatch(/pessoa|servidor/i);
   });
 
   it('reativar unidade desativada chama PATCH com status active (spec: reativar unidade)', async () => {

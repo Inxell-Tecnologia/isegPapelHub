@@ -17,7 +17,7 @@ nada.
 ## O que é o PapelHub
 
 O PapelHub é um repositório de arquivos na nuvem com **controle rigoroso de acesso**. A
-ideia central é simples: cada pessoa vê, baixa, envia, altera ou exclui **apenas
+ideia central é simples: cada colaborador vê, baixa, envia, altera ou exclui **apenas
 aquilo que criou ou que lhe foi liberado** — nada além disso. Tudo que acontece com
 os arquivos importantes (visualizações e downloads) fica registrado, e cada unidade
 da organização enxerga somente o seu próprio conteúdo.
@@ -33,7 +33,7 @@ Principais recursos:
 - **Lixeira** com retenção temporária para recuperar o que foi excluído.
 - **Auditoria** de quem acessou cada arquivo.
 - **Painel** gerencial de uso (para administradores).
-- **Cota de armazenamento** por pessoa.
+- **Cota de armazenamento** por colaborador.
 
 Valores de cota, retenção e demais tetos operacionais são padrões desta implantação
 — ver [Limites](referencia/limites.md).
@@ -46,7 +46,7 @@ quando sua conta é criada. Existem três:
 | Perfil                       | O que enxerga                                                                                 | O que pode fazer                                                                                                                                                                            |
 | ----------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Colaborador**              | Apenas os arquivos e pastas que criou ou que lhe foram liberados.                             | Enviar, visualizar, baixar, renomear e excluir conforme sua permissão; ver a auditoria dos arquivos que enviou; trocar a própria senha.                                                     |
-| **Administrador da unidade** | Tudo da **sua unidade** (pessoas, pastas, arquivos, permissões). Não enxerga outras unidades. | Tudo o que o colaborador faz, mais: cadastrar, editar, ativar/desativar pessoas da unidade e redefinir a senha delas; conceder e revogar permissões; ver o painel e a auditoria da unidade. |
+| **Administrador da unidade** | Tudo da **sua unidade** (colaboradores, pastas, arquivos, permissões). Não enxerga outras unidades. | Tudo o que o colaborador faz, mais: cadastrar, editar, ativar/desativar colaboradores da unidade e redefinir a senha deles; conceder e revogar permissões; ver o painel e a auditoria da unidade. |
 | **Administrador global**     | **Todas as unidades**.                                                                        | Tudo o que o administrador de unidade faz, em escala global; além disso, cria e administra as **unidades** e define administradores de unidade.                                             |
 
 !!! note "Alcance, não exceção"
@@ -59,7 +59,7 @@ quando sua conta é criada. Existem três:
 - Primeiro acesso à aplicação: [Primeiro acesso](primeiro-acesso.md)
 - Conhecendo a tela (menu, notificações, perfil): [A tela](a-tela.md)
 - Guia do colaborador: comece por [Navegar e criar pastas](colaborador/navegar-e-criar.md)
-- Guia da administração: comece por [Pessoas](administrador/pessoas.md)
+- Guia da administração: comece por [Colaboradores](administrador/pessoas.md)
 - Resumo de tarefas e perguntas frequentes: [Tarefas rápidas](referencia/tarefas-rapidas.md), [FAQ](referencia/faq.md)
 
 ---

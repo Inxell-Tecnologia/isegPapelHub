@@ -106,20 +106,25 @@ function vigentesSection(dialog: HTMLElement): HTMLElement {
 }
 
 /**
- * Seleciona uma pessoa no `Select` do formulário. `aria-controls` do
- * combobox aponta para um espelho de acessibilidade oculto (mostra o value
- * cru, não o rótulo) — a lista clicável de verdade é o dropdown do AntD
- * (`.ant-select-dropdown`), então escopamos nele em vez de `getByText`
- * global, que ambiguaria com o mesmo nome já exibido nos vigentes.
+ * Seleciona um ou mais colaboradores no `Select` `mode="multiple"` do
+ * formulário. `aria-controls` do combobox aponta para um espelho de
+ * acessibilidade oculto (mostra o value cru, não o rótulo) — a lista
+ * clicável de verdade é o dropdown do AntD (`.ant-select-dropdown`), então
+ * escopamos nele em vez de `getByText` global, que ambiguaria com o mesmo
+ * nome já exibido nos vigentes. O dropdown de seleção múltipla permanece
+ * aberto entre cliques — fechamos com `Escape` ao final.
  */
-async function selectPerson(dialog: HTMLElement, name: string): Promise<void> {
+async function selectPeople(dialog: HTMLElement, names: string[]): Promise<void> {
   await userEvent.click(within(dialog).getByRole('combobox'));
   const dropdown = await waitFor(() => {
     const el = document.querySelector('.ant-select-dropdown');
     if (!el) throw new Error('dropdown do Select ainda não está no DOM');
     return el as HTMLElement;
   });
-  await userEvent.click(await within(dropdown).findByText(name));
+  for (const name of names) {
+    await userEvent.click(await within(dropdown).findByText(name));
+  }
+  await userEvent.keyboard('{Escape}');
 }
 
 describe('Gestão de permissões da SPA (web-permissoes)', () => {
@@ -178,7 +183,7 @@ describe('Gestão de permissões da SPA (web-permissoes)', () => {
     const dialog = await findDialogByTitle('Permissões — relatorio.pdf');
     await screen.findByText('Nenhuma concessão');
 
-    await selectPerson(dialog, 'Fulano');
+    await selectPeople(dialog, ['Fulano']);
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visualizar' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Conceder' }));
 
@@ -218,7 +223,7 @@ describe('Gestão de permissões da SPA (web-permissoes)', () => {
     await userEvent.click(screen.getByRole('button', { name: /permissões/i }));
 
     const dialog = await findDialogByTitle('Permissões — relatorio.pdf');
-    await selectPerson(dialog, 'Fulano');
+    await selectPeople(dialog, ['Fulano']);
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visualizar' }));
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Baixar' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Conceder' }));
@@ -231,7 +236,7 @@ describe('Gestão de permissões da SPA (web-permissoes)', () => {
     expect(bodies[0]!.permissions.sort()).toEqual(['download', 'view']);
 
     // reconceder (idempotente no servidor): a lista não duplica as linhas.
-    await selectPerson(dialog, 'Fulano');
+    await selectPeople(dialog, ['Fulano']);
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visualizar' }));
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Baixar' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Conceder' }));
@@ -329,7 +334,7 @@ describe('Gestão de permissões da SPA (web-permissoes)', () => {
     await userEvent.click(screen.getByRole('button', { name: /permissões/i }));
 
     const dialog = await findDialogByTitle('Permissões — relatorio.pdf');
-    await selectPerson(dialog, 'Fulano');
+    await selectPeople(dialog, ['Fulano']);
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visualizar' }));
 
     const dateInput = within(dialog).getByLabelText('Prazo de expiração (opcional)');
@@ -409,5 +414,146 @@ describe('Gestão de permissões da SPA (web-permissoes)', () => {
     await userEvent.click(within(fileRow).getByRole('button', { name: /permissões/i }));
     const fileDialog = await findDialogByTitle('Permissões — relatorio.pdf');
     expect(within(fileDialog).queryByText(/libera apenas a própria pasta/)).not.toBeInTheDocument();
+  });
+
+  it('conceder a vários colaboradores envia uma única POST /grants com todos os ids, e os vigentes exibem cada um (design.md D1/D2, change concessao-multipla-e-nomenclatura-colaborador)', async () => {
+    const fileX = file({ id: 'file-1', fileName: 'relatorio.pdf' });
+    const fulano = person({ id: 'person-1', fullName: 'Fulano' });
+    const ciclana = person({ id: 'person-2', fullName: 'Ciclana' });
+    const grants = [
+      grant({ id: 'grant-1', subjectUserId: 'person-1', permission: Permission.VIEW }),
+      grant({ id: 'grant-2', subjectUserId: 'person-2', permission: Permission.VIEW }),
+    ];
+
+    mockFetch({
+      'GET /auth/me': { status: 200, body: ADMIN },
+      'GET /folders/root/contents': { status: 200, body: contents({ files: [fileX] }) },
+      'GET /users': { status: 200, body: [fulano, ciclana] },
+      'GET /grants': [
+        { status: 200, body: { grants: [] } },
+        { status: 200, body: { grants: grants } },
+      ],
+      'POST /grants': { status: 201, body: { grants: grants } },
+    });
+
+    renderApp(['/pastas']);
+    await screen.findByText('relatorio.pdf');
+    await userEvent.click(screen.getByRole('button', { name: /permissões/i }));
+
+    const dialog = await findDialogByTitle('Permissões — relatorio.pdf');
+    await selectPeople(dialog, ['Fulano', 'Ciclana']);
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visualizar' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Conceder' }));
+
+    await waitFor(() => {
+      const bodies = postBodies('/grants') as { subjectUserIds: string[] }[];
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0]!.subjectUserIds.sort()).toEqual(['person-1', 'person-2']);
+    });
+
+    await waitFor(() => {
+      const section = vigentesSection(dialog);
+      expect(within(section).getByText('Fulano')).toBeInTheDocument();
+      expect(within(section).getByText('Ciclana')).toBeInTheDocument();
+    });
+  }, 10000);
+
+  it('submissão exige ao menos um colaborador — bloqueia sem chamar POST /grants (spec: submissão exige ao menos um colaborador)', async () => {
+    const fileX = file({ id: 'file-1', fileName: 'relatorio.pdf' });
+
+    mockFetch({
+      'GET /auth/me': { status: 200, body: ADMIN },
+      'GET /folders/root/contents': { status: 200, body: contents({ files: [fileX] }) },
+      'GET /users': { status: 200, body: [] },
+      'GET /grants': { status: 200, body: { grants: [] } },
+    });
+
+    renderApp(['/pastas']);
+    await screen.findByText('relatorio.pdf');
+    await userEvent.click(screen.getByRole('button', { name: /permissões/i }));
+
+    const dialog = await findDialogByTitle('Permissões — relatorio.pdf');
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visualizar' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Conceder' }));
+
+    await within(dialog).findByText('Selecione ao menos um colaborador');
+    expect(postBodies('/grants')).toHaveLength(0);
+  });
+
+  it('teto de destinatários excedido (413) exibe aviso próprio orientando a reduzir a seleção, sem alterar os vigentes (spec: teto de destinatários excedido)', async () => {
+    const fileX = file({ id: 'file-1', fileName: 'relatorio.pdf' });
+    const fulano = person({ id: 'person-1', fullName: 'Fulano' });
+    const ciclana = person({ id: 'person-2', fullName: 'Ciclana' });
+
+    mockFetch({
+      'GET /auth/me': { status: 200, body: ADMIN },
+      'GET /folders/root/contents': { status: 200, body: contents({ files: [fileX] }) },
+      'GET /users': { status: 200, body: [fulano, ciclana] },
+      'GET /grants': { status: 200, body: { grants: [] } },
+      'POST /grants': {
+        status: 413,
+        body: { error: 'grant_subjects_limit_exceeded', found: 2, allowed: 1 },
+      },
+    });
+
+    renderApp(['/pastas']);
+    await screen.findByText('relatorio.pdf');
+    await userEvent.click(screen.getByRole('button', { name: /permissões/i }));
+
+    const dialog = await findDialogByTitle('Permissões — relatorio.pdf');
+    await selectPeople(dialog, ['Fulano', 'Ciclana']);
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visualizar' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Conceder' }));
+
+    await screen.findByText(/reduza a seleção/i);
+    expect(within(dialog).getByText('Nenhuma concessão')).toBeInTheDocument();
+  });
+
+  it('prévia de prazo vigente é exibida por colaborador selecionado que já tenha concessão, omitindo os sem concessão prévia (design.md D6)', async () => {
+    const fileX = file({ id: 'file-1', fileName: 'relatorio.pdf' });
+    const fulano = person({ id: 'person-1', fullName: 'Fulano' });
+    const ciclana = person({ id: 'person-2', fullName: 'Ciclana' });
+    const existingGrant = grant({
+      id: 'grant-1',
+      subjectUserId: 'person-1',
+      permission: Permission.VIEW,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+
+    mockFetch({
+      'GET /auth/me': { status: 200, body: ADMIN },
+      'GET /folders/root/contents': { status: 200, body: contents({ files: [fileX] }) },
+      'GET /users': { status: 200, body: [fulano, ciclana] },
+      'GET /grants': { status: 200, body: { grants: [existingGrant] } },
+    });
+
+    renderApp(['/pastas']);
+    await screen.findByText('relatorio.pdf');
+    await userEvent.click(screen.getByRole('button', { name: /permissões/i }));
+
+    const dialog = await findDialogByTitle('Permissões — relatorio.pdf');
+    await selectPeople(dialog, ['Fulano', 'Ciclana']);
+
+    await within(dialog).findByText(/Prazo atual de Fulano/);
+    expect(within(dialog).queryByText(/Prazo atual de Ciclana/)).not.toBeInTheDocument();
+  });
+
+  it('nomenclatura-interface: o diálogo de permissões não usa "Pessoa"/"Servidor"', async () => {
+    const fileX = file({ id: 'file-1', fileName: 'relatorio.pdf' });
+
+    mockFetch({
+      'GET /auth/me': { status: 200, body: ADMIN },
+      'GET /folders/root/contents': { status: 200, body: contents({ files: [fileX] }) },
+      'GET /users': { status: 200, body: [] },
+      'GET /grants': { status: 200, body: { grants: [] } },
+    });
+
+    renderApp(['/pastas']);
+    await screen.findByText('relatorio.pdf');
+    await userEvent.click(screen.getByRole('button', { name: /permissões/i }));
+
+    const dialog = await findDialogByTitle('Permissões — relatorio.pdf');
+    await within(dialog).findByText('Nenhuma concessão');
+    expect(dialog.textContent).not.toMatch(/pessoa|servidor/i);
   });
 });

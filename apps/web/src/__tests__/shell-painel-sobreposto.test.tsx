@@ -55,7 +55,7 @@ describe('Painel sobreposto de navegação (responsividade-mobile-tablet)', () =
       'Arquivos',
       'Buscar',
       'Lixeira',
-      'Pessoas',
+      'Colaboradores',
       'Painel',
       'Unidades',
       'Manual do usuário',

@@ -16,8 +16,8 @@ describe('Guarda de rota por papel e shell condicionado ao papel', () => {
 
     // guarda por papel: navegado de volta para a home, a tela de admin nunca renderiza
     await screen.findByText('Bem-vindo ao PapelHub');
-    expect(screen.queryByText('Nova pessoa')).not.toBeInTheDocument();
-    expect(screen.queryByText('Pessoas')).not.toBeInTheDocument();
+    expect(screen.queryByText('Novo colaborador')).not.toBeInTheDocument();
+    expect(screen.queryByText('Colaboradores')).not.toBeInTheDocument();
     expect(screen.queryByText('Painel')).not.toBeInTheDocument();
     expect(screen.getByText('Colaborador')).toBeInTheDocument();
   });
@@ -32,9 +32,12 @@ describe('Guarda de rota por papel e shell condicionado ao papel', () => {
     });
     renderApp(['/admin/pessoas']);
 
-    await screen.findByText('Nova pessoa');
-    expect(screen.getByText('Pessoas')).toBeInTheDocument();
+    await screen.findByText('Novo colaborador');
+    expect(screen.getByText('Colaboradores')).toBeInTheDocument();
     expect(screen.getByText('Painel')).toBeInTheDocument();
     expect(screen.getByText('Administrador da unidade')).toBeInTheDocument();
+
+    // nomenclatura-interface: nenhum literal de tela usa "Pessoa"/"Servidor"
+    expect(document.body.textContent).not.toMatch(/pessoa|servidor/i);
   });
 });

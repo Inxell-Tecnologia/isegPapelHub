@@ -39,7 +39,7 @@ nav:
       - Auditoria: colaborador/auditoria.md
       - Minha conta: colaborador/minha-conta.md
   - Administrador:
-      - Pessoas: administrador/pessoas.md
+      - Colaboradores: administrador/pessoas.md
       - Permissões: administrador/permissoes.md
       - Auditoria da unidade: administrador/auditoria.md
       - Painel gerencial: administrador/painel.md

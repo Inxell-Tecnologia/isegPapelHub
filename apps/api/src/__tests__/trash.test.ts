@@ -110,7 +110,7 @@ describe('Lixeira e retenção (Épico 6, US 6.1)', () => {
         .post('/grants')
         .set('Cookie', cookieAdmin)
         .send({
-          subjectUserId: ids.userA,
+          subjectUserIds: [ids.userA],
           resourceType: 'file',
           resourceId: fileId,
           permissions: ['delete'],
@@ -275,7 +275,7 @@ describe('Lixeira e retenção (Épico 6, US 6.1)', () => {
         .post('/grants')
         .set('Cookie', cookieAdmin)
         .send({
-          subjectUserId: userA2Id,
+          subjectUserIds: [userA2Id],
           resourceType: 'file',
           resourceId: fileId,
           permissions: ['view'],
@@ -400,7 +400,7 @@ describe('Lixeira e retenção (Épico 6, US 6.1)', () => {
         .post('/grants')
         .set('Cookie', cookieAdmin)
         .send({
-          subjectUserId: ids.userA,
+          subjectUserIds: [ids.userA],
           resourceType: 'file',
           resourceId: grantedFile,
           permissions: ['delete'],
@@ -524,7 +524,7 @@ describe('Lixeira e retenção (Épico 6, US 6.1)', () => {
         .post('/grants')
         .set('Cookie', cookieAdmin)
         .send({
-          subjectUserId: userA2Id,
+          subjectUserIds: [userA2Id],
           resourceType: 'file',
           resourceId: fileId,
           permissions: ['view'],
@@ -623,6 +623,255 @@ describe('Lixeira e retenção (Épico 6, US 6.1)', () => {
         client.query('SELECT 1 FROM folders WHERE id = $1', [folderId]),
       );
       expect(folderRow.rows).toHaveLength(0);
+    });
+  });
+  /**
+   * Expurgo sob demanda — change `esvaziar-lixeira`. Usa pessoas próprias em
+   * cada caso: a rota apaga **tudo** o que o solicitante tem na lixeira, e
+   * reaproveitar `ids.userA` misturaria os restos dos blocos anteriores na
+   * contagem.
+   */
+  describe('Expurgo sob demanda (POST /trash/purge)', () => {
+    async function createUser(email: string, unitId: string, role = 'collaborator') {
+      const { rows } = await withSystemBypass(pool, (client) =>
+        client.query<{ id: string }>(
+          `INSERT INTO users (unit_id, email, password_hash, role)
+           VALUES ($1, $2, 'x', $3) RETURNING id`,
+          [unitId, email, role],
+        ),
+      );
+      return rows[0]!.id;
+    }
+
+    async function activate(fileIds: string[], sizeBytes: number) {
+      await withSystemBypass(pool, (client) =>
+        client.query('UPDATE files SET status = $1, size_bytes = $2 WHERE id = ANY($3::uuid[])', [
+          'active',
+          sizeBytes,
+          fileIds,
+        ]),
+      );
+    }
+
+    async function setUsage(userId: string, bytes: number) {
+      await withSystemBypass(pool, (client) =>
+        client.query('UPDATE users SET storage_used_bytes = $1 WHERE id = $2', [bytes, userId]),
+      );
+    }
+
+    async function usage(userId: string): Promise<number> {
+      const { rows } = await withSystemBypass(pool, (client) =>
+        client.query<{ storage_used_bytes: string }>(
+          'SELECT storage_used_bytes FROM users WHERE id = $1',
+          [userId],
+        ),
+      );
+      return Number(rows[0]!.storage_used_bytes);
+    }
+
+    async function objectPathOf(fileId: string): Promise<string> {
+      const { rows } = await withSystemBypass(pool, (client) =>
+        client.query<{ object_path: string }>('SELECT object_path FROM files WHERE id = $1', [
+          fileId,
+        ]),
+      );
+      return rows[0]!.object_path;
+    }
+
+    it('devolve exatamente os bytes dos próprios arquivos, sem tocar nos de outra pessoa nem nas pastas (tasks 3.3/3.4/3.6)', async () => {
+      const app = createApp(ports);
+      const purgerId = await createUser('purger@trash.test', ids.unitA);
+      const otherId = await createUser('vizinho@trash.test', ids.unitA);
+      const cookiePurger = await sessionCookieFor(ports, purgerId);
+      const cookieOther = await sessionCookieFor(ports, otherId);
+
+      const soltoId = await uploadFile(cookiePurger, 'solto.txt');
+      const folderId = await createFolder(cookiePurger, 'Pasta Esvaziar');
+      const dentroId = await uploadFile(cookiePurger, 'dentro.txt', folderId);
+      const alheioId = await uploadFile(cookieOther, 'alheio.txt');
+
+      await activate([soltoId, dentroId, alheioId], 1000);
+      await setUsage(purgerId, 2000);
+      await setUsage(otherId, 1000);
+
+      await request(app).delete(`/files/${soltoId}`).set('Cookie', cookiePurger).expect(204);
+      // Pasta excluída em cascata: o arquivo de dentro vai para a lixeira com
+      // a pasta como raiz — e ocupa bytes do mesmo jeito.
+      await request(app).delete(`/folders/${folderId}`).set('Cookie', cookiePurger).expect(204);
+      await request(app).delete(`/files/${alheioId}`).set('Cookie', cookieOther).expect(204);
+
+      const soltoPath = await objectPathOf(soltoId);
+
+      const res = await request(app).post('/trash/purge').set('Cookie', cookiePurger);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ purgedFiles: 2, reclaimedBytes: 2000, failedFiles: 0 });
+
+      // Cota devolvida exatamente pela soma dos apagados (task 3.3).
+      expect(await usage(purgerId)).toBe(0);
+      expect((ports.storage as InMemoryStoragePort).wasDeleted(soltoPath)).toBe(true);
+
+      const purged = await withSystemBypass(pool, (client) =>
+        client.query('SELECT 1 FROM files WHERE id = ANY($1::uuid[])', [[soltoId, dentroId]]),
+      );
+      expect(purged.rows).toHaveLength(0);
+
+      // Arquivo de outra pessoa da mesma unidade: intacto e restaurável (task 3.4).
+      const alheio = await withSystemBypass(pool, (client) =>
+        client.query<{ deleted_at: string | null }>('SELECT deleted_at FROM files WHERE id = $1', [
+          alheioId,
+        ]),
+      );
+      expect(alheio.rows).toHaveLength(1);
+      expect(alheio.rows[0]!.deleted_at).not.toBeNull();
+      expect(await usage(otherId)).toBe(1000);
+      await request(app).post(`/files/${alheioId}/restore`).set('Cookie', cookieOther).expect(200);
+
+      // Pasta na lixeira permanece, sujeita só ao expurgo automático (task 3.6).
+      const folder = await withSystemBypass(pool, (client) =>
+        client.query<{ deleted_at: string | null }>(
+          'SELECT deleted_at FROM folders WHERE id = $1',
+          [folderId],
+        ),
+      );
+      expect(folder.rows).toHaveLength(1);
+      expect(folder.rows[0]!.deleted_at).not.toBeNull();
+    });
+
+    it('arquivo de outra unidade é inalcançável, e o admin global esvazia só a própria lixeira (task 3.5)', async () => {
+      const app = createApp(ports);
+      const adminId = await createUser('admin-purge@trash.test', ids.unitA, 'global_admin');
+      const cookieAdmin = await sessionCookieFor(ports, adminId);
+      const cookieB = await sessionCookieFor(ports, ids.userB);
+
+      const ownId = await uploadFile(cookieAdmin, 'admin-proprio.txt');
+      const otherUnitId = await uploadFile(cookieB, 'outra-unidade.txt');
+
+      await activate([ownId, otherUnitId], 1000);
+      await setUsage(adminId, 1000);
+      const usageBBefore = await usage(ids.userB);
+
+      await request(app).delete(`/files/${ownId}`).set('Cookie', cookieAdmin).expect(204);
+      await request(app).delete(`/files/${otherUnitId}`).set('Cookie', cookieB).expect(204);
+
+      const res = await request(app).post('/trash/purge').set('Cookie', cookieAdmin);
+      expect(res.status).toBe(200);
+      // O bypass de RLS do global_admin faria a seleção ver a outra unidade; o
+      // filtro por dono é que fecha (design.md D2) — 1 arquivo, não 2.
+      expect(res.body).toEqual({ purgedFiles: 1, reclaimedBytes: 1000, failedFiles: 0 });
+
+      const own = await withSystemBypass(pool, (client) =>
+        client.query('SELECT 1 FROM files WHERE id = $1', [ownId]),
+      );
+      expect(own.rows).toHaveLength(0);
+
+      const foreign = await withSystemBypass(pool, (client) =>
+        client.query<{ deleted_at: string | null }>('SELECT deleted_at FROM files WHERE id = $1', [
+          otherUnitId,
+        ]),
+      );
+      expect(foreign.rows).toHaveLength(1);
+      expect(foreign.rows[0]!.deleted_at).not.toBeNull();
+      expect(await usage(ids.userB)).toBe(usageBBefore);
+    });
+
+    it('falha ao apagar bytes de um arquivo não impede os demais, e o falho continua na lixeira (task 3.7)', async () => {
+      const purgerId = await createUser('purger-falha@trash.test', ids.unitA);
+      const cookie = await sessionCookieFor(ports, purgerId);
+      const app = createApp(ports);
+
+      const okId = await uploadFile(cookie, 'ok-sob-demanda.txt');
+      const failId = await uploadFile(cookie, 'falha-sob-demanda.txt');
+      await activate([okId, failId], 1000);
+      await setUsage(purgerId, 2000);
+
+      await request(app).delete(`/files/${okId}`).set('Cookie', cookie).expect(204);
+      await request(app).delete(`/files/${failId}`).set('Cookie', cookie).expect(204);
+
+      const failPath = await objectPathOf(failId);
+      const flakyApp = createApp({
+        ...ports,
+        storage: new FlakyStoragePort(new Set([failPath])),
+      });
+
+      const res = await request(flakyApp).post('/trash/purge').set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ purgedFiles: 1, reclaimedBytes: 1000, failedFiles: 1 });
+
+      // Só o que foi apagado devolveu cota — o falho segue contando.
+      expect(await usage(purgerId)).toBe(1000);
+
+      const okRow = await withSystemBypass(pool, (client) =>
+        client.query('SELECT 1 FROM files WHERE id = $1', [okId]),
+      );
+      expect(okRow.rows).toHaveLength(0);
+
+      const failRow = await withSystemBypass(pool, (client) =>
+        client.query<{ deleted_at: string | null }>('SELECT deleted_at FROM files WHERE id = $1', [
+          failId,
+        ]),
+      );
+      expect(failRow.rows).toHaveLength(1);
+      expect(failRow.rows[0]!.deleted_at).not.toBeNull();
+    });
+
+    it('grants e auditoria dos arquivos expurgados sob demanda são apagados junto (task 3.8)', async () => {
+      const app = createApp(ports);
+      const purgerId = await createUser('purger-grants@trash.test', ids.unitA);
+      const cookie = await sessionCookieFor(ports, purgerId);
+      const cookieAdmin = await sessionCookieFor(ports, ids.globalAdmin);
+
+      const fileId = await uploadFile(cookie, 'com-grant.txt');
+      await activate([fileId], 1000);
+      await setUsage(purgerId, 1000);
+
+      await request(app)
+        .post('/grants')
+        .set('Cookie', cookieAdmin)
+        .send({
+          subjectUserIds: [userA2Id],
+          resourceType: 'file',
+          resourceId: fileId,
+          permissions: ['view'],
+        })
+        .expect(201);
+
+      await request(app)
+        .post(`/files/${fileId}/view-url`)
+        .set('Cookie', await sessionCookieFor(ports, userA2Id))
+        .expect(200);
+
+      await request(app).delete(`/files/${fileId}`).set('Cookie', cookie).expect(204);
+
+      const res = await request(app).post('/trash/purge').set('Cookie', cookie);
+      expect(res.body.purgedFiles).toBe(1);
+
+      const grants = await withSystemBypass(pool, (client) =>
+        client.query('SELECT 1 FROM grants WHERE resource_id = $1', [fileId]),
+      );
+      expect(grants.rows).toHaveLength(0);
+
+      const audits = await withSystemBypass(pool, (client) =>
+        client.query('SELECT 1 FROM audit_events WHERE file_id = $1', [fileId]),
+      );
+      expect(audits.rows).toHaveLength(0);
+    });
+
+    it('lixeira sem arquivo próprio responde zerado, sem tocar em nada (design.md D1/D2)', async () => {
+      const app = createApp(ports);
+      const vazioId = await createUser('purger-vazio@trash.test', ids.unitA);
+      const cookie = await sessionCookieFor(ports, vazioId);
+
+      const folderId = await createFolder(cookie, 'Só Pasta');
+      await request(app).delete(`/folders/${folderId}`).set('Cookie', cookie).expect(204);
+
+      const res = await request(app).post('/trash/purge').set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ purgedFiles: 0, reclaimedBytes: 0, failedFiles: 0 });
+
+      const folder = await withSystemBypass(pool, (client) =>
+        client.query('SELECT 1 FROM folders WHERE id = $1', [folderId]),
+      );
+      expect(folder.rows).toHaveLength(1);
     });
   });
 });

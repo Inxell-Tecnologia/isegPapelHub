@@ -145,6 +145,10 @@ describe('Auditoria de acesso na SPA (web-auditoria)', () => {
     const dialog = await findDialogByTitle('Auditoria — relatorio.pdf');
     await within(dialog).findByText('Fulano');
 
+    // nomenclatura-interface: cabeçalho de coluna usa "Colaborador"
+    expect(within(dialog).getByRole('columnheader', { name: 'Colaborador' })).toBeInTheDocument();
+    expect(dialog.textContent).not.toMatch(/pessoa|servidor/i);
+
     // cabeçalho + as 2 linhas retornadas pelo servidor, na ordem em que vieram.
     const rows = within(dialog).getAllByRole('row').slice(1);
     expect(rows).toHaveLength(2);

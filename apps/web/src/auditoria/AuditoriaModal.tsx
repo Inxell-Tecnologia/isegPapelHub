@@ -31,7 +31,7 @@ export function AuditoriaModal({ file, onClose }: AuditoriaModalProps) {
 
   const columns: ColumnsType<AuditRow> = [
     {
-      title: 'Pessoa',
+      title: 'Colaborador',
       key: 'person',
       render: (_, row) => row.actor.name ?? row.actor.email,
     },

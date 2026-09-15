@@ -3,6 +3,7 @@ import { config } from '../config.js';
 import { createPorts, type Ports } from '../ports/index.js';
 import type { DatabasePort, TenantContext } from '../ports/database-port.js';
 import type { StoragePort } from '../ports/storage-port.js';
+import { purgeFile, type PurgeableFile } from '../lib/purge-file.js';
 
 // Papel de sistema (manutenção, não requisição de usuário) — mesmo bypass
 // de `global_admin` usado por `attachTenantContext`/`storage-events.ts`; a
@@ -13,14 +14,6 @@ const SYSTEM_CTX: TenantContext = {
   userId: '00000000-0000-0000-0000-000000000000',
   role: UserRole.GLOBAL_ADMIN,
 };
-
-interface ExpiredFileRow {
-  id: string;
-  owner_id: string;
-  object_path: string;
-  pending_object_path: string | null;
-  size_bytes: string | null;
-}
 
 interface LeafFolderRow {
   id: string;
@@ -69,7 +62,7 @@ async function purgeExpiredFiles(
   summary: PurgeSummary,
 ): Promise<void> {
   const expired = await database.withTenantTransaction(SYSTEM_CTX, async (client) => {
-    const { rows } = await client.query<ExpiredFileRow>(
+    const { rows } = await client.query<PurgeableFile>(
       `SELECT id, owner_id, object_path, pending_object_path, size_bytes FROM files
        WHERE deleted_at IS NOT NULL AND deleted_at < now() - ($1 * interval '1 day')`,
       [config.trashRetentionDays],
@@ -79,33 +72,11 @@ async function purgeExpiredFiles(
 
   for (const file of expired) {
     try {
-      // 1. Bytes primeiro (idempotente — design.md D8): também o objeto
-      // órfão de uma substituição abandonada (`pending_object_path`), se
-      // houver.
-      await storage.deleteObject(file.object_path);
-      if (file.pending_object_path) {
-        await storage.deleteObject(file.pending_object_path);
-      }
-
-      await database.withTenantTransaction(SYSTEM_CTX, async (client) => {
-        // 2. Cota devolvida ao dono (design.md D6).
-        await client.query(
-          'UPDATE users SET storage_used_bytes = storage_used_bytes - $1 WHERE id = $2',
-          [Number(file.size_bytes ?? '0'), file.owner_id],
-        );
-        // 3. Auditoria do arquivo expurgado (design.md D10) — o FK também
-        // tem ON DELETE CASCADE (migração 0008) como rede de segurança,
-        // mas o passo explícito segue a ordem do design.
-        await client.query('DELETE FROM audit_events WHERE file_id = $1', [file.id]);
-        // 4. Grants órfãos.
-        await client.query('DELETE FROM grants WHERE resource_type = $1 AND resource_id = $2', [
-          GrantResourceType.FILE,
-          file.id,
-        ]);
-        // 5. A linha por último.
-        await client.query('DELETE FROM files WHERE id = $1', [file.id]);
-      });
-
+      // A sequência (bytes → cota → auditoria → grants → linha) vive em
+      // `lib/purge-file.ts`, compartilhada com `POST /trash/purge` (change
+      // `esvaziar-lixeira`, design.md D3). Aqui fica só o que é do job: a
+      // seleção por prazo vencido, o contexto de sistema e a contagem.
+      await purgeFile(database, storage, SYSTEM_CTX, file);
       summary.purgedFiles += 1;
     } catch (err) {
       summary.failedFiles += 1;

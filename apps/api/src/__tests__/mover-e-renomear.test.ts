@@ -306,7 +306,7 @@ describe('Mover e renomear itens (US 2.3)', () => {
         .post('/grants')
         .set('Cookie', cookieAdmin)
         .send({
-          subjectUserId: userA2Id,
+          subjectUserIds: [userA2Id],
           resourceType: 'file',
           resourceId: fileId,
           permissions: ['rename'],
@@ -316,7 +316,7 @@ describe('Mover e renomear itens (US 2.3)', () => {
         .post('/grants')
         .set('Cookie', cookieAdmin)
         .send({
-          subjectUserId: userA2Id,
+          subjectUserIds: [userA2Id],
           resourceType: 'folder',
           resourceId: destination.id,
           permissions: ['upload'],
@@ -333,7 +333,7 @@ describe('Mover e renomear itens (US 2.3)', () => {
         .post('/grants')
         .set('Cookie', cookieAdmin)
         .send({
-          subjectUserId: userA2Id,
+          subjectUserIds: [userA2Id],
           resourceType: 'folder',
           resourceId: origin.id,
           permissions: ['rename'],
@@ -497,7 +497,7 @@ describe('Mover e renomear itens (US 2.3)', () => {
         .post('/grants')
         .set('Cookie', cookieAdmin)
         .send({
-          subjectUserId: userA2Id,
+          subjectUserIds: [userA2Id],
           resourceType: 'file',
           resourceId: fileId,
           permissions: ['view'],

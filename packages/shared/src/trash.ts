@@ -27,3 +27,18 @@ export interface FileRestoreResponse extends FileSummaryResponse {
 
 /** Resposta de `POST /folders/:id/restore` — pasta nunca muda de local ao restaurar. */
 export type FolderRestoreResponse = FolderResponse;
+
+/**
+ * Resposta de `POST /trash/purge` (change `esvaziar-lixeira`) — expurgo
+ * imediato dos **arquivos do próprio solicitante** que estão na lixeira.
+ * `failedFiles` existe porque a operação é tolerante a falha por item: o que
+ * falhou permanece íntegro na lixeira e reentra no ciclo do job.
+ */
+export interface TrashPurgeResponse {
+  /** Arquivos apagados permanentemente. */
+  purgedFiles: number;
+  /** Soma dos `size_bytes` dos arquivos apagados — cota devolvida ao dono. */
+  reclaimedBytes: number;
+  /** Arquivos que falharam e continuam na lixeira. */
+  failedFiles: number;
+}

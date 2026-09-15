@@ -13,9 +13,14 @@ import type {
   BatchUploadUrlRequest,
   FileRestoreResponse,
   FileSummaryResponse,
+  MoveBatchItemResult,
+  MoveBatchLimitExceededResponse,
+  MoveBatchRequest,
+  MoveBatchResponse,
   MoveItemRequest,
   RenameFileRequest,
   ReplaceFileRequest,
+  StorageQuotaResponse,
   UploadUrlRequest,
   ViewUrlResponse,
 } from '@gdoc/shared';
@@ -84,8 +89,103 @@ async function recordAudit(
   });
 }
 
+/**
+ * Um evento por arquivo, numa única transação (design.md D6 do change
+ * `mover-itens-em-lote`) — mesmo molde de `recordFileAudits` em
+ * `routes/folders.ts`, usado aqui só pelo lote de `POST /files/move` (a
+ * versão singular acima segue chamada pelas demais rotas, uma transação por
+ * evento).
+ */
+async function recordAudits(
+  ports: Ports,
+  ctx: NonNullable<import('express').Request['tenantContext']>,
+  files: { id: string; unit_id: string }[],
+  action: AuditAction,
+) {
+  if (files.length === 0) return;
+  await ports.database.withTenantTransaction(ctx, async (client) => {
+    for (const file of files) {
+      await client.query(
+        'INSERT INTO audit_events (unit_id, user_id, file_id, action) VALUES ($1, $2, $3, $4)',
+        [file.unit_id, ctx.userId, file.id, action],
+      );
+    }
+  });
+}
+
 export function filesRouter(ports: Ports): Router {
   const router = Router();
+
+  /**
+   * `GET /files/quota` (change `envio-multiplas-pastas-com-prechecagem`,
+   * design.md D2) — espaço de armazenamento **do próprio solicitante**.
+   *
+   * A identidade vem exclusivamente de `ctx.userId` (sessão relida do banco
+   * por `attachTenantContext`): a rota **não aceita identificador de pessoa**,
+   * nem em caminho, nem em query — não existindo superfície para consultar a
+   * cota de terceiro, ainda que da mesma unidade, ainda que por admin.
+   * Deliberadamente **sem** o bypass de `global_admin`: o CLAUDE.md restringe
+   * esse bypass a agregados de painel, e cota é dado de pessoa.
+   *
+   * `trashedBytes` (e seu par de contagem `trashedFiles`, que a confirmação
+   * de `POST /trash/purge` usa) é decomposição explicativa de `usedBytes` e
+   * **não** é descontado do disponível — um arquivo na lixeira segue contando em
+   * `storage_used_bytes` até o `purge-trash` (retenção de
+   * `config.trashRetentionDays`). Descontá-lo aqui inflaria o disponível e
+   * produziria uma promessa que a emissão de URLs desmentiria em seguida.
+   *
+   * `pendingBytes` usa a **mesma** soma de `pending`/`replacing` da reserva
+   * consciente do lote em `POST /files/upload-urls`, para que o retrato e a
+   * guarda falem do mesmo número.
+   */
+  router.get('/files/quota', async (req, res, next) => {
+    try {
+      const ctx = req.tenantContext!;
+      const snapshot = await ports.database.withTenantTransaction(ctx, async (client) => {
+        const { rows: usageRows } = await client.query<{ storage_used_bytes: string }>(
+          'SELECT storage_used_bytes FROM users WHERE id = $1',
+          [ctx.userId],
+        );
+        const usedBytes = Number(usageRows[0]?.storage_used_bytes ?? '0');
+
+        const { rows: trashedRows } = await client.query<{
+          total: string | null;
+          files: string;
+        }>(
+          `SELECT SUM(size_bytes) AS total, COUNT(*) AS files FROM files
+           WHERE owner_id = $1 AND deleted_at IS NOT NULL`,
+          [ctx.userId],
+        );
+        const trashedBytes = Number(trashedRows[0]?.total ?? '0');
+        const trashedFiles = Number(trashedRows[0]?.files ?? '0');
+
+        const { rows: pendingRows } = await client.query<{ total: string | null }>(
+          `SELECT SUM(size_bytes) AS total FROM files
+           WHERE owner_id = $1 AND status IN ('pending', 'replacing')`,
+          [ctx.userId],
+        );
+        const pendingBytes = Number(pendingRows[0]?.total ?? '0');
+
+        return { usedBytes, trashedBytes, trashedFiles, pendingBytes };
+      });
+
+      const quotaBytes = config.storageQuotaBytesPerUser;
+      const response: StorageQuotaResponse = {
+        quotaBytes,
+        usedBytes: snapshot.usedBytes,
+        trashedBytes: snapshot.trashedBytes,
+        trashedFiles: snapshot.trashedFiles,
+        pendingBytes: snapshot.pendingBytes,
+        // Piso em zero: uma reconciliação de finalize que ultrapasse a cota
+        // (o `size_bytes` real difere do declarado) não deve devolver um
+        // disponível negativo, que o cliente exibiria como número absurdo.
+        availableBytes: Math.max(0, quotaBytes - snapshot.usedBytes - snapshot.pendingBytes),
+      };
+      res.json(response);
+    } catch (err) {
+      next(err);
+    }
+  });
 
   router.post('/files/:id/view-url', async (req, res, next) => {
     try {
@@ -232,6 +332,22 @@ export function filesRouter(ports: Ports): Router {
 
       if (!Array.isArray(items) || items.length === 0) {
         res.status(400).json({ error: 'invalid request body' });
+        return;
+      }
+
+      // Teto por requisição (change corrige-defeitos-envio-lote, design.md
+      // D2), avaliado **antes** de abrir a transação: a recusa não deixa
+      // linha `pending`, pasta de caminho relativo nem URL assinada para
+      // trás. Molde de `move_batch_limit_exceeded` /
+      // `download_manifest_limit_exceeded`; `allowed` é a fonte da verdade
+      // para o cliente, que orienta a recusa antecipada pelo padrão
+      // compartilhado em `packages/shared`.
+      if (items.length > config.uploadBatch.maxItems) {
+        res.status(400).json({
+          error: 'upload_batch_limit_exceeded',
+          found: items.length,
+          allowed: config.uploadBatch.maxItems,
+        });
         return;
       }
 
@@ -394,6 +510,105 @@ export function filesRouter(ports: Ports): Router {
 
       await recordAudit(ports, ctx, updated, AuditAction.RENAME);
       res.json(toFileSummaryResponse(updated));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /**
+   * Mover vários arquivos para um mesmo destino (US 2.4, design.md D1/D2/D6
+   * do change `mover-itens-em-lote`) — dois segmentos, sem colisão nem
+   * requisito de ordenação de registro com `POST /files/:id/move` (três
+   * segmentos, abaixo). Pré-condição global de destino derruba o lote
+   * inteiro (mesmo alcance dono-ou-admin da rota por item); falta de alcance
+   * sobre um item recusa só aquele item, sem abortar os demais (design.md
+   * D2). Auditoria só para os itens efetivamente movidos, depois da
+   * transação (design.md D6).
+   */
+  router.post('/files/move', async (req, res, next) => {
+    try {
+      const ctx = req.tenantContext!;
+      const { ids, destinationFolderId } = req.body as MoveBatchRequest;
+
+      if (
+        !Array.isArray(ids) ||
+        ids.length === 0 ||
+        !ids.every((id) => typeof id === 'string' && id.length > 0) ||
+        (destinationFolderId !== null && typeof destinationFolderId !== 'string')
+      ) {
+        res.status(400).json({ error: 'invalid request body' });
+        return;
+      }
+
+      // Dedup preservando ordem de chegada (mesmo padrão de POST /grants):
+      // o teto e o veredito por item se aplicam a identificadores distintos.
+      const uniqueIds = Array.from(new Set(ids));
+
+      if (uniqueIds.length > config.moveBatch.maxItems) {
+        const limitResponse: MoveBatchLimitExceededResponse = {
+          error: 'move_batch_limit_exceeded',
+          found: uniqueIds.length,
+          allowed: config.moveBatch.maxItems,
+        };
+        res.status(400).json(limitResponse);
+        return;
+      }
+
+      const outcome = await ports.database.withTenantTransaction(ctx, async (client) => {
+        // Pré-condição global de destino (design.md D2): mesmo alcance
+        // dono-ou-admin exigido pela rota por item, indistinguível entre
+        // inexistente/de outra unidade/na lixeira/sem alcance.
+        if (destinationFolderId !== null) {
+          const destination = await findFolderById(client, destinationFolderId);
+          if (!destination) return { ok: false as const };
+          const destinationAllowed = await canReorganize(
+            client,
+            ctx,
+            GrantResourceType.FOLDER,
+            destination.id,
+          );
+          if (!destinationAllowed) return { ok: false as const };
+        }
+
+        const results: MoveBatchItemResult[] = [];
+        const movedFiles: FileRow[] = [];
+
+        for (const id of uniqueIds) {
+          const { rows } = await client.query<FileRow>(
+            'SELECT * FROM files WHERE id = $1 AND deleted_at IS NULL',
+            [id],
+          );
+          const file = rows[0];
+          if (!file) {
+            results.push({ id, ok: false, error: 'forbidden' });
+            continue;
+          }
+          const allowed = await canReorganize(client, ctx, GrantResourceType.FILE, file.id);
+          if (!allowed) {
+            results.push({ id, ok: false, error: 'forbidden' });
+            continue;
+          }
+
+          const { rows: updated } = await client.query<FileRow>(
+            'UPDATE files SET folder_id = $1 WHERE id = $2 RETURNING *',
+            [destinationFolderId, file.id],
+          );
+          movedFiles.push(updated[0]!);
+          results.push({ id, ok: true });
+        }
+
+        return { ok: true as const, results, movedFiles };
+      });
+
+      if (!outcome.ok) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+      }
+
+      await recordAudits(ports, ctx, outcome.movedFiles, AuditAction.MOVE);
+
+      const response: MoveBatchResponse = { results: outcome.results };
+      res.json(response);
     } catch (err) {
       next(err);
     }

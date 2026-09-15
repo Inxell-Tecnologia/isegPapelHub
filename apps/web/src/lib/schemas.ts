@@ -14,6 +14,8 @@ import type {
   GrantListResponse,
   GrantNotificationPayload,
   GrantResponse,
+  MoveBatchItemResult,
+  MoveBatchResponse,
   MyProfileResponse,
   NotificationListResponse,
   NotificationResponse,
@@ -22,7 +24,9 @@ import type {
   ResetPasswordResponse,
   SearchFilesResponse,
   SignedUrlResponse,
+  StorageQuotaResponse,
   TrashListResponse,
+  TrashPurgeResponse,
   UnitResponse,
   UnreadNotificationCountResponse,
   ViewUrlResponse,
@@ -129,6 +133,19 @@ export const batchUploadUrlResponseSchema: z.ZodType<BatchUploadUrlResponse> = z
   results: z.array(batchUploadItemResultSchema),
 });
 
+/**
+ * Espelha `StorageQuotaResponse` (change `envio-multiplas-pastas-com-prechecagem`,
+ * design.md D2) — a decomposição do espaço do próprio solicitante.
+ */
+export const storageQuotaResponseSchema: z.ZodType<StorageQuotaResponse> = z.object({
+  quotaBytes: z.number(),
+  usedBytes: z.number(),
+  trashedBytes: z.number(),
+  trashedFiles: z.number(),
+  pendingBytes: z.number(),
+  availableBytes: z.number(),
+});
+
 /** Espelha `SearchFilesResponse` (design.md D6, `web-busca`), reusando `fileSummaryResponseSchema`. */
 export const searchFilesResponseSchema: z.ZodType<SearchFilesResponse> = z.object({
   files: z.array(fileSummaryResponseSchema),
@@ -170,6 +187,30 @@ export const grantResponseSchema: z.ZodType<GrantResponse> = z.object({
 /** Espelha `GrantListResponse` (design.md D6, `web-permissoes`). */
 export const grantListResponseSchema: z.ZodType<GrantListResponse> = z.object({
   grants: z.array(grantResponseSchema),
+});
+
+/**
+ * Espelha `MoveBatchItemResult` (união discriminada em `ok`, design.md D2 do
+ * change `mover-itens-em-lote`) — mesmo molde de `batchUploadItemResultSchema`.
+ */
+export const moveBatchItemResultSchema: z.ZodType<MoveBatchItemResult> = z.discriminatedUnion(
+  'ok',
+  [
+    z.object({ id: z.string(), ok: z.literal(true) }),
+    z.object({ id: z.string(), ok: z.literal(false), error: z.string() }),
+  ],
+);
+
+/** Espelha `MoveBatchResponse` (design.md D2 do change `mover-itens-em-lote`). */
+export const moveBatchResponseSchema: z.ZodType<MoveBatchResponse> = z.object({
+  results: z.array(moveBatchItemResultSchema),
+});
+
+/** Espelha `TrashPurgeResponse` (change `esvaziar-lixeira`) — fronteira de `POST /trash/purge`. */
+export const trashPurgeResponseSchema: z.ZodType<TrashPurgeResponse> = z.object({
+  purgedFiles: z.number(),
+  reclaimedBytes: z.number(),
+  failedFiles: z.number(),
 });
 
 /** Espelha `TrashListResponse` (design.md D7, `web-lixeira`): item de raiz de exclusão. */
