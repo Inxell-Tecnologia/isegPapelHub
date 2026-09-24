@@ -43,17 +43,21 @@ Referência: PRD US 3.1.
 
 ### Requirement: Reserva de cota consciente do lote
 
-Ao pré-checar a cota individual de 10 GB para um lote, o sistema SHALL considerar a
-soma dos tamanhos declarados dos itens do próprio lote **e** dos envios ainda
-pendentes do mesmo usuário, não apenas o volume já finalizado (`storage_used_bytes`).
-Os itens que couberem dentro do limite SHALL receber URL; os que ultrapassarem o
-limite SHALL ser sinalizados com erro de cota, sem impedir os itens que couberem.
-Nenhuma linha de arquivo SHALL ser inserida para um item recusado por cota.
-Referência: PRD US 3.1, US 8.1.
+Ao pré-checar a **cota efetiva** do usuário (capability `cota-individual`) para um
+lote, o sistema SHALL considerar a soma dos tamanhos declarados dos itens do próprio
+lote **e** dos envios ainda pendentes do mesmo usuário, não apenas o volume já
+finalizado (`storage_used_bytes`). Os itens que couberem dentro do limite SHALL
+receber URL; os que ultrapassarem o limite SHALL ser sinalizados com erro de cota,
+sem impedir os itens que couberem. Nenhuma linha de arquivo SHALL ser inserida para
+um item recusado por cota.
+
+O limite aplicado SHALL ser o da pessoa que envia — sua exceção nominal quando
+houver, o padrão da plataforma quando não houver —, e NÃO SHALL ser um valor fixo
+do produto. Referência: PRD US 3.1, US 8.1.
 
 #### Scenario: Lote que excede a cota no conjunto
 - **WHEN** os arquivos do lote cabem individualmente, mas a soma deles (com os envios
-  pendentes) ultrapassa o limite de 10 GB do usuário
+  pendentes) ultrapassa a cota efetiva do usuário
 - **THEN** os primeiros itens que couberem recebem URL e os que excederem o limite são
   recusados com erro de cota, sem que nenhuma linha seja inserida para os recusados
 
@@ -62,8 +66,12 @@ Referência: PRD US 3.1, US 8.1.
 - **THEN** nenhuma linha `pending` é criada para ele e o volume reservado do usuário
   não é acrescido por esse item
 
-### Requirement: Teto de itens por requisição de envio em lote
+#### Scenario: Lote de quem tem exceção nominal usa o limite da exceção
+- **WHEN** um usuário com exceção nominal acima do padrão da plataforma envia um lote
+  cuja soma ultrapassa o padrão, mas cabe na sua exceção
+- **THEN** todos os itens do lote recebem URL, sem recusa por cota
 
+### Requirement: Teto de itens por requisição de envio em lote
 
 O sistema SHALL recusar, em `POST /files/upload-urls`, qualquer requisição cuja
 lista de itens exceda o teto configurado, respondendo com um código de erro
@@ -90,7 +98,6 @@ dispense a validação no servidor. Referência: PRD US 3.1; design.md D2 do cha
   resultado próprio
 
 ### Requirement: Recusa por requisição malformada distinguível de falha interna
-
 
 O sistema SHALL responder a uma requisição cujo corpo exceda o tamanho máximo
 aceito com um status próprio de corpo grande demais, e a uma requisição cujo

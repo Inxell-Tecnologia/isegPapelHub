@@ -27,6 +27,7 @@ import type {
 import { config } from '../config.js';
 import { ensureFolderPath, findFolderById, validateAnchor } from '../lib/folder-tree.js';
 import { canReorganize, hasAccess } from '../lib/access.js';
+import { QUOTA_COLUMNS, resolveQuotaBytes, type QuotaRow } from '../lib/quota.js';
 
 interface FileRow {
   id: string;
@@ -142,11 +143,14 @@ export function filesRouter(ports: Ports): Router {
     try {
       const ctx = req.tenantContext!;
       const snapshot = await ports.database.withTenantTransaction(ctx, async (client) => {
-        const { rows: usageRows } = await client.query<{ storage_used_bytes: string }>(
-          'SELECT storage_used_bytes FROM users WHERE id = $1',
+        const { rows: usageRows } = await client.query<{ storage_used_bytes: string } & QuotaRow>(
+          `SELECT ${QUOTA_COLUMNS} FROM users WHERE id = $1`,
           [ctx.userId],
         );
         const usedBytes = Number(usageRows[0]?.storage_used_bytes ?? '0');
+        // Cota efetiva desta pessoa (`lib/quota.ts`), não o padrão da
+        // plataforma: quem tem exceção nominal vê a própria cota aqui.
+        const quotaBytes = resolveQuotaBytes(usageRows[0]);
 
         const { rows: trashedRows } = await client.query<{
           total: string | null;
@@ -166,10 +170,10 @@ export function filesRouter(ports: Ports): Router {
         );
         const pendingBytes = Number(pendingRows[0]?.total ?? '0');
 
-        return { usedBytes, trashedBytes, trashedFiles, pendingBytes };
+        return { usedBytes, quotaBytes, trashedBytes, trashedFiles, pendingBytes };
       });
 
-      const quotaBytes = config.storageQuotaBytesPerUser;
+      const { quotaBytes } = snapshot;
       const response: StorageQuotaResponse = {
         quotaBytes,
         usedBytes: snapshot.usedBytes,
@@ -281,12 +285,12 @@ export function filesRouter(ports: Ports): Router {
           if (!anchor.ok) return { ok: false as const, status: anchor.status };
         }
 
-        const { rows } = await client.query<{ storage_used_bytes: string }>(
-          'SELECT storage_used_bytes FROM users WHERE id = $1',
+        const { rows } = await client.query<{ storage_used_bytes: string } & QuotaRow>(
+          `SELECT ${QUOTA_COLUMNS} FROM users WHERE id = $1`,
           [ctx.userId],
         );
         const currentUsage = Number(rows[0]?.storage_used_bytes ?? '0');
-        if (currentUsage + declaredSizeBytes! > config.storageQuotaBytesPerUser) {
+        if (currentUsage + declaredSizeBytes! > resolveQuotaBytes(rows[0])) {
           return { ok: false as const, status: 400 as const };
         }
 
@@ -368,11 +372,12 @@ export function filesRouter(ports: Ports): Router {
         const anchor = await validateAnchor(client, ctx, destinationFolderId);
         if (!anchor.ok) return { ok: false as const, status: anchor.status };
 
-        const { rows: usageRows } = await client.query<{ storage_used_bytes: string }>(
-          'SELECT storage_used_bytes FROM users WHERE id = $1',
+        const { rows: usageRows } = await client.query<{ storage_used_bytes: string } & QuotaRow>(
+          `SELECT ${QUOTA_COLUMNS} FROM users WHERE id = $1`,
           [ctx.userId],
         );
         const baseUsage = Number(usageRows[0]?.storage_used_bytes ?? '0');
+        const quotaBytes = resolveQuotaBytes(usageRows[0]);
 
         // Reserva consciente do lote (design.md D2): soma o que já está
         // pendente/em substituição, e cresce a cada item aceito no próprio
@@ -411,7 +416,7 @@ export function filesRouter(ports: Ports): Router {
             continue;
           }
 
-          const available = config.storageQuotaBytesPerUser - baseUsage - reserved;
+          const available = quotaBytes - baseUsage - reserved;
           if (declaredSizeBytes! > available) {
             prepared.push({ fileName, ok: false, error: 'quota exceeded' });
             continue;
@@ -695,8 +700,8 @@ export function filesRouter(ports: Ports): Router {
       );
 
       const outcome = await ports.database.withTenantTransaction(ctx, async (client) => {
-        const { rows } = await client.query<{ storage_used_bytes: string }>(
-          'SELECT storage_used_bytes FROM users WHERE id = $1',
+        const { rows } = await client.query<{ storage_used_bytes: string } & QuotaRow>(
+          `SELECT ${QUOTA_COLUMNS} FROM users WHERE id = $1`,
           [ctx.userId],
         );
         const currentUsage = Number(rows[0]?.storage_used_bytes ?? '0');
@@ -704,7 +709,7 @@ export function filesRouter(ports: Ports): Router {
         // Cota pelo delta (design.md D6): a versão antiga já está contada
         // em `storage_used_bytes`, então só a diferença importa.
         const projectedUsage = currentUsage - oldSize + declaredSizeBytes!;
-        if (projectedUsage > config.storageQuotaBytesPerUser) {
+        if (projectedUsage > resolveQuotaBytes(rows[0])) {
           return { ok: false as const };
         }
 

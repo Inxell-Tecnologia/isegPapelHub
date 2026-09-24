@@ -6,7 +6,7 @@ Os valores abaixo são os vigentes **nesta implantação** do PapelHub. Todos s�
 
 | Limite                                    | Valor vigente | Ajustável por                          |
 | ------------------------------------------ | -------------- | ---------------------------------------- |
-| Cota de armazenamento por colaborador      | 10 GB          | `STORAGE_QUOTA_BYTES_PER_USER`          |
+| Cota de armazenamento por colaborador (padrão) | 10 GB      | `STORAGE_QUOTA_BYTES_PER_USER`          |
 | Retenção da lixeira antes do expurgo       | 30 dias        | `TRASH_RETENTION_DAYS`                   |
 | Antecedência do aviso de expiração de acesso | 7 dias       | `GRANT_EXPIRING_NOTICE_WINDOW_DAYS`      |
 | Tamanho máximo do download compactado de pasta | 50 MB      | `DOWNLOAD_MANIFEST_MAX_BYTES`            |
@@ -20,6 +20,11 @@ A **quantidade máxima de arquivos por requisição de envio** é um detalhe int
 automaticamente em partes menores que esse valor, de modo que o uso normal nunca o
 alcança. O único limite de tamanho que o envio apresenta a você é a **cota de
 armazenamento** — ver [Enviar arquivos](../colaborador/enviar.md).
+
+A cota de armazenamento é o **padrão aplicado a quem não tem cota individual**. O
+administrador global pode conceder a uma pessoa uma cota diferente, só para ela —
+ver [Colaboradores](../administrador/pessoas.md). Se você não sabe qual é a sua,
+a tela de envio mostra sempre a cota que vale para você.
 
 O **espaço ocupado por arquivos na lixeira continua contando na sua cota** até o
 expurgo automático, ao fim do prazo de retenção da tabela acima. Excluir arquivos,

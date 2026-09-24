@@ -247,6 +247,8 @@ export const personResponseSchema: z.ZodType<PersonResponse> = z.object({
   role: z.enum([UserRole.COLLABORATOR, UserRole.UNIT_ADMIN, UserRole.GLOBAL_ADMIN]),
   status: z.enum([PersonStatus.ACTIVE, PersonStatus.DISABLED]),
   createdAt: z.string(),
+  storageUsedBytes: z.number(),
+  storageQuotaBytes: z.number().nullable(),
 });
 
 /** Espelha a listagem de `GET /users` (design.md D7, `web-pessoas`). */

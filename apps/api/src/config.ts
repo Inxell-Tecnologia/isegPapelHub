@@ -109,6 +109,16 @@ export const config = {
   // reservado por uma linha `pending` do próprio autor — não lê nada, não
   // alcança outro objeto, não cruza unidade.
   signedUrlUploadTtlSeconds: Number(optional('SIGNED_URL_UPLOAD_TTL_SECONDS', '3600')),
+  // **Padrão** de cota por pessoa — o limite de quem não tem exceção nominal
+  // (change `cota-por-usuario`: `users.storage_quota_bytes IS NULL`). Quem tem
+  // exceção não é alcançado por este valor; a resolução vive em `lib/quota.ts`.
+  //
+  // Ajustável por implantação pela variável de ambiente, nunca fixo no código:
+  // em produção o valor vem do Terraform (`storage_quota_bytes_per_user`,
+  // injetado em `cloud_run.tf`), e alterá-lo é uma nova revisão do Cloud Run,
+  // sem migration e sem tocar `users.storage_used_bytes`. Elevar a cota de UMA
+  // pessoa não passa mais por aqui — é concessão nominal, não configuração de
+  // ambiente.
   storageQuotaBytesPerUser: Number(
     optional('STORAGE_QUOTA_BYTES_PER_USER', String(10 * 1024 * 1024 * 1024)),
   ),

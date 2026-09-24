@@ -56,6 +56,8 @@ function person(
     role: UserRole.COLLABORATOR,
     status: 'active',
     createdAt: '2026-01-01T00:00:00.000Z',
+    storageUsedBytes: 0,
+    storageQuotaBytes: null,
     ...overrides,
   };
 }

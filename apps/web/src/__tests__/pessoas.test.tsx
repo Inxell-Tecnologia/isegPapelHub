@@ -36,6 +36,8 @@ function person(overrides: Partial<PersonResponse> & { id: string }): PersonResp
     role: UserRole.COLLABORATOR,
     status: PersonStatus.ACTIVE,
     createdAt: '2026-01-01T00:00:00.000Z',
+    storageUsedBytes: 0,
+    storageQuotaBytes: null,
     ...overrides,
   };
 }
@@ -464,6 +466,113 @@ describe('Gestão de pessoas da SPA (web-pessoas)', () => {
     const dialog = await findDialogByTitle('Novo colaborador');
     // sem campo "Unidade" no formulário
     expect(within(dialog).queryByText('Unidade')).not.toBeInTheDocument();
+  });
+
+  describe('Cota individual (change `cota-por-usuario`, design.md D3/D5/D7)', () => {
+    const ALVO: Partial<PersonResponse> & { id: string } = {
+      id: 'person-cota',
+      fullName: 'Fulano Com Cota',
+      storageUsedBytes: 5 * 1024 * 1024 * 1024,
+      storageQuotaBytes: null,
+    };
+
+    async function abrirEdicao(identity: typeof UNIT_ADMIN | typeof GLOBAL_ADMIN, alvo = ALVO) {
+      mockFetch({
+        'GET /auth/me': { status: 200, body: identity },
+        'GET /users': { status: 200, body: [person(alvo)] },
+        'GET /units': { status: 200, body: [UNIT_A, UNIT_B] },
+        'PATCH /users/person-cota': { status: 200, body: person(alvo) },
+      });
+      renderApp(['/admin/pessoas']);
+      await screen.findByText('Fulano Com Cota');
+      const row = screen.getByText('Fulano Com Cota').closest('tr')!;
+      await userEvent.click(within(row).getByRole('button', { name: 'Editar' }));
+      return findDialogByTitle('Editar colaborador');
+    }
+
+    it('unit_admin não vê o campo — nem desabilitado, que sugeriria permissão inexistente', async () => {
+      const dialog = await abrirEdicao(UNIT_ADMIN);
+      expect(within(dialog).queryByText('Cota de armazenamento')).not.toBeInTheDocument();
+      // os demais campos seguem editáveis
+      expect(within(dialog).getByLabelText('Nome')).toBeEnabled();
+    });
+
+    it('global_admin vê o campo, o consumo atual e o estado de padrão da plataforma', async () => {
+      const dialog = await abrirEdicao(GLOBAL_ADMIN);
+      expect(within(dialog).getByText('Cota de armazenamento')).toBeInTheDocument();
+      expect(within(dialog).getByText(/Em uso hoje: 5\.0 GB/)).toBeInTheDocument();
+      // `storageQuotaBytes: null` ⇒ segue o padrão, e o campo em GB nem aparece
+      expect(within(dialog).queryByLabelText('Cota individual (GB)')).not.toBeInTheDocument();
+    });
+
+    it('conceder exceção envia a cota em bytes', async () => {
+      const dialog = await abrirEdicao(GLOBAL_ADMIN);
+      await userEvent.click(within(dialog).getByRole('switch'));
+      const campo = await within(dialog).findByLabelText('Cota individual (GB)');
+      await userEvent.type(campo, '300');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+      await waitFor(() => {
+        expect(requestBodies('PATCH', '/users/person-cota')).toHaveLength(1);
+      });
+      expect(requestBodies('PATCH', '/users/person-cota')[0]).toMatchObject({
+        storageQuotaBytes: 300 * 1024 * 1024 * 1024,
+      });
+    });
+
+    it('devolver ao padrão da plataforma envia null, sem exigir digitar o valor do padrão', async () => {
+      const dialog = await abrirEdicao(GLOBAL_ADMIN, {
+        ...ALVO,
+        storageQuotaBytes: 300 * 1024 * 1024 * 1024,
+      });
+      // chega como exceção: o campo em GB está visível e preenchido
+      expect(within(dialog).getByLabelText('Cota individual (GB)')).toHaveValue('300');
+
+      await userEvent.click(within(dialog).getByRole('switch'));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+      await waitFor(() => {
+        expect(requestBodies('PATCH', '/users/person-cota')).toHaveLength(1);
+      });
+      expect(requestBodies('PATCH', '/users/person-cota')[0]).toMatchObject({
+        storageQuotaBytes: null,
+      });
+    });
+
+    it('avisa quando a cota fica abaixo do consumo, sem impedir a confirmação (design.md D5)', async () => {
+      const dialog = await abrirEdicao(GLOBAL_ADMIN);
+      await userEvent.click(within(dialog).getByRole('switch'));
+      await userEvent.type(await within(dialog).findByLabelText('Cota individual (GB)'), '1');
+
+      await within(dialog).findByText('Cota menor que o espaço já utilizado');
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+      await waitFor(() => {
+        expect(requestBodies('PATCH', '/users/person-cota')).toHaveLength(1);
+      });
+    });
+
+    it('403 do servidor é recusa legítima e preserva o preenchimento', async () => {
+      mockFetch({
+        'GET /auth/me': { status: 200, body: GLOBAL_ADMIN },
+        'GET /users': { status: 200, body: [person(ALVO)] },
+        'GET /units': { status: 200, body: [UNIT_A, UNIT_B] },
+        'PATCH /users/person-cota': { status: 403, body: { error: 'forbidden' } },
+      });
+      renderApp(['/admin/pessoas']);
+      await screen.findByText('Fulano Com Cota');
+      const row = screen.getByText('Fulano Com Cota').closest('tr')!;
+      await userEvent.click(within(row).getByRole('button', { name: 'Editar' }));
+      const dialog = await findDialogByTitle('Editar colaborador');
+
+      await userEvent.click(within(dialog).getByRole('switch'));
+      await userEvent.type(await within(dialog).findByLabelText('Cota individual (GB)'), '300');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+      await screen.findByText('Permissão insuficiente para executar esta ação.');
+      // modal segue aberto com o que foi digitado
+      expect(within(dialog).getByLabelText('Cota individual (GB)')).toHaveValue('300');
+    });
   });
 
   describe('Redefinição de senha (US 1.4, design.md (troca-de-senha) D5) — visibilidade é UX, não defesa', () => {

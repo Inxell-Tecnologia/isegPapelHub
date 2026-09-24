@@ -49,6 +49,24 @@ confirme. O sistema:
 Copie e repasse a senha com segurança antes de fechar o aviso — **ela não pode ser
 consultada depois**. Se a senha se perder, é só redefinir de novo.
 
+**Quem pode editar quem:**
+
+| Quem edita               | Pode editar                                                      |
+| ------------------------- | ------------------------------------------------------------------ |
+| Administrador da unidade | Colaboradores da própria unidade                                 |
+| Administrador global     | Todos, inclusive outros administradores globais e ele mesmo      |
+
+Duas coisas ninguém faz, nem o administrador global: **mudar o próprio papel** e
+**desativar a própria conta**. São as travas que impedem alguém de cortar o
+próprio acesso — por isso a ação **Desativar** não aparece na sua própria linha.
+
+!!! warning "Editar não é o mesmo que redefinir a senha"
+
+    Um administrador global edita outro administrador global — inclusive o papel,
+    o status e a cota —, mas **não redefine a senha dele**. A senha de um
+    administrador global só muda por ele mesmo, em **Minha conta**. É por isso
+    que as duas tabelas desta página são diferentes.
+
 **Quem pode redefinir a senha de quem:**
 
 | Quem redefine            | Pode redefinir de                                                             |
@@ -62,3 +80,38 @@ simplesmente não aparece na linha dele.
 
 Administradores globais cadastram colaboradores em qualquer unidade — ver
 [Unidades](unidades.md).
+
+## Cota de armazenamento de um colaborador
+
+Todo colaborador começa com a **cota padrão** da plataforma — o valor da tabela de
+[Limites](../referencia/limites.md). Quando alguém precisa de mais espaço, o
+**administrador global** concede uma **cota individual** só para aquela pessoa, sem
+alterar o limite de mais ninguém.
+
+!!! info "Só o administrador global"
+
+    A cota é a única coisa na tela de colaboradores que o administrador de unidade
+    não edita. Para ele, o campo nem aparece.
+
+No formulário de **Editar** de um colaborador, o campo **Cota de armazenamento**
+funciona como uma chave de duas posições:
+
+| Posição                | O que significa                                                        |
+| ------------------------ | ------------------------------------------------------------------------ |
+| **Padrão da plataforma** | A pessoa segue o limite geral. Se o limite geral mudar, ela acompanha. |
+| **Cota individual**      | A pessoa tem um limite próprio, em GB, que você digita.               |
+
+Logo abaixo do campo aparece **quanto a pessoa já usa hoje** — é a informação que
+evita decidir no escuro. Para devolver alguém ao limite geral, basta voltar a chave
+para **Padrão da plataforma**: você não precisa saber quanto é o padrão.
+
+### Reduzir a cota de alguém
+
+Você **pode** definir uma cota menor do que o espaço que a pessoa já ocupa, e a tela
+avisa quando isso acontece. Nada é apagado: ela continua vendo e baixando tudo o que
+tem. O que muda é que ela fica **impedida de enviar arquivos novos**, e só consegue
+substituir uma versão quando a própria troca couber na cota.
+
+Para voltar a caber, não basta excluir: o que está na lixeira **continua ocupando
+cota** até o expurgo — ver [Mover, renomear e excluir](../colaborador/renomear-e-excluir.md).
+Esvaziar a lixeira libera o espaço na hora.

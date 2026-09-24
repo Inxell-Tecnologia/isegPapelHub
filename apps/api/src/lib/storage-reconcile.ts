@@ -1,5 +1,5 @@
 import type { Ports } from '../ports/index.js';
-import { config } from '../config.js';
+import { QUOTA_COLUMNS, resolveQuotaBytes, type QuotaRow } from './quota.js';
 import type {
   StorageFinalizeNotification,
   PubSubPushEnvelope,
@@ -93,12 +93,15 @@ export async function reconcileFinalize(
       const oldSize = Number(file.size_bytes ?? '0');
       const delta = isReplace ? sizeBytes - oldSize : sizeBytes;
 
-      const { rows: userRows } = await client.query<{ storage_used_bytes: string }>(
-        'SELECT storage_used_bytes FROM users WHERE id = $1',
+      const { rows: userRows } = await client.query<{ storage_used_bytes: string } & QuotaRow>(
+        `SELECT ${QUOTA_COLUMNS} FROM users WHERE id = $1`,
         [file.owner_id],
       );
       const newUsage = Number(userRows[0]?.storage_used_bytes ?? '0') + delta;
-      const overQuota = newUsage > config.storageQuotaBytesPerUser;
+      // Cota efetiva do **dono do arquivo**, não de quem disparou a
+      // reconciliação: o finalize chega do Pub/Sub, sem sessão de usuário
+      // (change `cota-por-usuario`, spec `cota-individual`).
+      const overQuota = newUsage > resolveQuotaBytes(userRows[0]);
 
       await client.query('UPDATE users SET storage_used_bytes = $1 WHERE id = $2', [
         newUsage,

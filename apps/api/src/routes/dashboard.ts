@@ -3,7 +3,7 @@ import { UserRole, fileCategory } from '@gdoc/shared';
 import type { DashboardResponse, DashboardUploadsByMonthEntry, FileCategory } from '@gdoc/shared';
 import type { Ports } from '../ports/index.js';
 import type { TenantContext } from '../ports/database-port.js';
-import { config } from '../config.js';
+import { platformDefaultQuotaBytes } from '../lib/quota.js';
 
 function isAdmin(ctx: TenantContext): boolean {
   return ctx.role === UserRole.GLOBAL_ADMIN || ctx.role === UserRole.UNIT_ADMIN;
@@ -89,14 +89,27 @@ export function dashboardRouter(ports: Ports): Router {
           }),
         );
 
-        const { rows: storageRows } = await client.query<{ user_count: string; used: string }>(
-          `SELECT count(*) AS user_count, coalesce(sum(storage_used_bytes), 0) AS used FROM users`,
+        // Capacidade = **soma das cotas efetivas** do alcance, não `cota ×
+        // pessoas` (change `cota-por-usuario`, design.md D2): com exceções
+        // nominais, o produto deixaria de refletir a capacidade real. O padrão
+        // da plataforma entra como parâmetro vindo do `config` — nunca como
+        // `DEFAULT` da coluna, que seria uma segunda fonte da verdade.
+        const quotaBytesPerUser = platformDefaultQuotaBytes();
+        const { rows: storageRows } = await client.query<{
+          user_count: string;
+          used: string;
+          capacity: string;
+        }>(
+          `SELECT count(*) AS user_count,
+                  coalesce(sum(storage_used_bytes), 0) AS used,
+                  coalesce(sum(coalesce(storage_quota_bytes, $1)), 0) AS capacity
+             FROM users`,
+          [quotaBytesPerUser],
         );
         const storageRow = storageRows[0]!;
         const userCount = Number(storageRow.user_count);
         const usedBytes = Number(storageRow.used);
-        const quotaBytesPerUser = config.storageQuotaBytesPerUser;
-        const capacityBytes = quotaBytesPerUser * userCount;
+        const capacityBytes = Number(storageRow.capacity);
         const availableBytes = Math.max(0, capacityBytes - usedBytes);
 
         const dashboard: DashboardResponse = {

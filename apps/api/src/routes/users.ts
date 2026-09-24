@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { PoolClient } from 'pg';
-import { UserRole, UnitStatus } from '@gdoc/shared';
+import { UserRole, UnitStatus, PersonStatus } from '@gdoc/shared';
 import type {
   CreatePersonRequest,
   UpdatePersonRequest,
@@ -10,6 +10,7 @@ import type {
 import type { Ports } from '../ports/index.js';
 import type { TenantContext } from '../ports/database-port.js';
 import { isPasswordValid, generatePassword } from '../lib/password-policy.js';
+import { isValidQuotaInput } from '../lib/quota.js';
 
 interface PersonRow {
   id: string;
@@ -23,10 +24,18 @@ interface PersonRow {
   role: string;
   status: string;
   created_at: string;
+  storage_used_bytes: string;
+  storage_quota_bytes: string | null;
 }
 
 const PERSON_COLUMNS =
-  'id, unit_id, full_name, email, phone, job_title, work_area, notes, role, status, created_at';
+  'id, unit_id, full_name, email, phone, job_title, work_area, notes, role, status, created_at, ' +
+  // Consumo e exceção de cota (change `cota-por-usuario`): o consumo existe
+  // para que a administração decida a cota vendo o uso atual em vez de às
+  // cegas (design.md D5); a exceção é `null` quando a pessoa segue o padrão da
+  // plataforma. Ambos herdam o alcance que a gestão de pessoas já impõe — RLS
+  // por unidade mais `canEditTarget` —, sem rota nova.
+  'storage_used_bytes, storage_quota_bytes';
 
 function toPersonResponse(row: PersonRow): PersonResponse {
   return {
@@ -41,6 +50,11 @@ function toPersonResponse(row: PersonRow): PersonResponse {
     role: row.role as PersonResponse['role'],
     status: row.status as PersonResponse['status'],
     createdAt: new Date(row.created_at).toISOString(),
+    storageUsedBytes: Number(row.storage_used_bytes ?? '0'),
+    storageQuotaBytes:
+      row.storage_quota_bytes === null || row.storage_quota_bytes === undefined
+        ? null
+        : Number(row.storage_quota_bytes),
   };
 }
 
@@ -53,25 +67,68 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 /**
- * Alcance por papel do alvo (change `troca-de-senha`, design.md D5) — função
- * única usada tanto por `POST /users/:id/password` quanto por `PATCH
- * /users/:id`, lendo o papel do alvo do banco **na mesma transação** da
- * operação, nunca do corpo da requisição. `unit_admin` alcança só
- * `collaborator` (a RLS já restringe a busca à própria unidade);
- * `global_admin` alcança `collaborator` e `unit_admin`; ninguém alcança
- * `global_admin`, nem outro `global_admin`. Fail-closed: alvo inexistente ou
- * escondido pela RLS (outra unidade) cai no mesmo `false` de alvo fora do
- * alcance por papel — sem distinguir os dois casos.
+ * Papel da **pessoa alvo**, lido do banco na mesma transação da operação —
+ * nunca do corpo da requisição. `null` quando o alvo não existe ou está
+ * escondido pela RLS (outra unidade): os dois casos são indistinguíveis de
+ * propósito, e ambos levam à mesma recusa fail-closed.
  */
-async function canActOnTarget(
+async function targetRoleOf(client: PoolClient, targetId: string): Promise<string | null> {
+  const { rows } = await client.query<{ role: string }>('SELECT role FROM users WHERE id = $1', [
+    targetId,
+  ]);
+  return rows[0]?.role ?? null;
+}
+
+/**
+ * Alcance da **edição de pessoa** (`PATCH /users/:id`) — change
+ * `edicao-entre-admins-globais`, design.md D1.
+ *
+ * | Ator \ Alvo   | collaborator | unit_admin | global_admin       |
+ * | -------------- | ------------ | ---------- | ------------------ |
+ * | `unit_admin`   | ✔            | ✘          | ✘                  |
+ * | `global_admin` | ✔            | ✔          | ✔ (inclusive si)   |
+ *
+ * **Deliberadamente distinto de `canResetPasswordOf`**, e não uma variação
+ * dela: editar os dados de outro administrador é administração; redefinir a
+ * senha dele é tomar a conta dele. Até este change as duas regras eram a mesma
+ * função, e a edição herdava por acidente a restrição que só a senha precisa —
+ * contrariando a própria spec `gestao-pessoas`, que sempre permitiu
+ * `global_admin` sobre `global_admin`. Se alterar uma, confira se a outra
+ * realmente deve acompanhar.
+ */
+async function canEditTarget(
   client: PoolClient,
   ctx: TenantContext,
   targetId: string,
 ): Promise<boolean> {
-  const { rows } = await client.query<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-    targetId,
-  ]);
-  const targetRole = rows[0]?.role;
+  const targetRole = await targetRoleOf(client, targetId);
+  if (!targetRole) return false;
+  if (ctx.role === UserRole.GLOBAL_ADMIN) return true;
+  return ctx.role === UserRole.UNIT_ADMIN && targetRole === UserRole.COLLABORATOR;
+}
+
+/**
+ * Alcance da **redefinição administrativa de senha** (`POST
+ * /users/:id/password`) — change `troca-de-senha`, design.md D5; PRD US 1.4
+ * cenário 2. **Inalterado** por `edicao-entre-admins-globais`.
+ *
+ * | Ator \ Alvo   | collaborator | unit_admin | global_admin |
+ * | -------------- | ------------ | ---------- | ------------ |
+ * | `unit_admin`   | ✔            | ✘          | ✘            |
+ * | `global_admin` | ✔            | ✔          | ✘            |
+ *
+ * A senha de um `global_admin` não é redefinida por ninguém — nem por outro
+ * `global_admin`, nem por ele mesmo por aqui —, restando só a troca pela
+ * própria pessoa em "Minha conta". A senha gerada é exibida uma única vez a
+ * quem redefiniu, então redefinir a de outro administrador entregaria a conta
+ * dele, com todo o rastro seguinte apontando para o dono.
+ */
+async function canResetPasswordOf(
+  client: PoolClient,
+  ctx: TenantContext,
+  targetId: string,
+): Promise<boolean> {
+  const targetRole = await targetRoleOf(client, targetId);
   if (!targetRole || targetRole === UserRole.GLOBAL_ADMIN) return false;
   if (ctx.role === UserRole.GLOBAL_ADMIN) return true;
   return ctx.role === UserRole.UNIT_ADMIN && targetRole === UserRole.COLLABORATOR;
@@ -217,6 +274,50 @@ export function usersRouter(ports: Ports): Router {
         return;
       }
 
+      // Concessão de cota é exclusiva do `global_admin` (change
+      // `cota-por-usuario`, design.md D3) — mais estreita que o `isAdmin()`
+      // que governa os demais campos, porque cota é alavanca de custo de
+      // infraestrutura. A recusa é **total**: a requisição inteira cai sem
+      // aplicar os outros campos. Ignorar o campo em silêncio e salvar o resto
+      // devolveria sucesso por uma concessão que não ocorreu.
+      const quotaRequested = 'storageQuotaBytes' in body && body.storageQuotaBytes !== undefined;
+      if (quotaRequested && ctx.role !== UserRole.GLOBAL_ADMIN) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+      }
+      if (quotaRequested && !isValidQuotaInput(body.storageQuotaBytes)) {
+        res.status(400).json({ error: 'invalid storage quota' });
+        return;
+      }
+
+      // Travas de auto-edição (change `edicao-entre-admins-globais`, design.md
+      // D2), válidas para **qualquer** papel. Até este change elas eram
+      // desnecessárias no servidor: ninguém alcançava um `global_admin`, então
+      // não havia como rebaixar-se nem desativar-se. Ao abrir a edição entre
+      // administradores globais, os dois caminhos passariam a existir — e um
+      // deles é irreversível pela aplicação: o bootstrap só recria um
+      // administrador global quando NENHUM existe **por papel**, sem olhar
+      // status, então um último administrador desativado não seria recuperado.
+      //
+      // As duas travas bastam, sem contar "último administrador": quem executa
+      // precisa ser administrador global ativo (o middleware relê papel e
+      // status do banco a cada requisição) e não alcança a si mesmo por
+      // nenhuma delas — logo sempre resta ao menos um ativo, o próprio autor.
+      //
+      // A recusa é total, no mesmo espírito da guarda de cota: aplicar os
+      // demais campos e ignorar o proibido devolveria sucesso por uma operação
+      // que não ocorreu. Reenviar o MESMO papel não é alteração — o formulário
+      // sempre manda o papel vigente, e recusá-lo travaria a edição de si.
+      const isSelf = req.params.id === ctx.userId;
+      if (isSelf && body.role !== undefined && body.role !== ctx.role) {
+        res.status(403).json({ error: 'cannot change own role' });
+        return;
+      }
+      if (isSelf && body.status === PersonStatus.DISABLED) {
+        res.status(403).json({ error: 'cannot disable own account' });
+        return;
+      }
+
       const setClauses: string[] = [];
       const values: unknown[] = [];
       const setField = (column: string, value: unknown) => {
@@ -230,6 +331,9 @@ export function usersRouter(ports: Ports): Router {
       if (body.notes !== undefined) setField('notes', body.notes);
       if (body.status !== undefined) setField('status', body.status);
       if (body.role !== undefined) setField('role', body.role);
+      // `null` remove a exceção e devolve a pessoa ao padrão da plataforma,
+      // sem exigir que quem chama conheça o valor do padrão (design.md D8).
+      if (quotaRequested) setField('storage_quota_bytes', body.storageQuotaBytes);
 
       if (setClauses.length === 0) {
         res.status(400).json({ error: 'no fields to update' });
@@ -241,15 +345,16 @@ export function usersRouter(ports: Ports): Router {
       // RLS filtra as linhas visíveis para UPDATE antes do WHERE por id
       // rodar: se a pessoa pertence a outra unidade, 0 linhas voltam — sem
       // erro, sem dado alterado (US 5.1, cenário "edição respeita o
-      // alcance"). A checagem de `canActOnTarget` (design.md (troca-de-senha)
-      // D5) fecha a brecha adjacente: sem ela, a RLS ainda deixaria um
+      // alcance"). A checagem de `canEditTarget` (design.md
+      // (edicao-entre-admins-globais) D1) fecha a brecha adjacente: sem ela, a
+      // RLS ainda deixaria um
       // `unit_admin` enxergar (e editar/desativar) um `unit_admin` ou
       // `global_admin` lotado na própria unidade. Os dois casos — RLS
       // escondendo a linha, ou a linha visível mas fora do alcance por papel
       // — caem no mesmo 403, sem distinção (mesmo tratamento usado por
       // routes/files.ts para "linha escondida pela RLS").
       const row = await ports.database.withTenantTransaction(ctx, async (client) => {
-        const allowed = await canActOnTarget(client, ctx, req.params.id!);
+        const allowed = await canEditTarget(client, ctx, req.params.id!);
         if (!allowed) return null;
 
         const { rows } = await client.query<PersonRow>(
@@ -287,7 +392,7 @@ export function usersRouter(ports: Ports): Router {
       const outcome = await ports.database.withTenantTransaction<ResetOutcome>(
         ctx,
         async (client) => {
-          const allowed = await canActOnTarget(client, ctx, req.params.id!);
+          const allowed = await canResetPasswordOf(client, ctx, req.params.id!);
           if (!allowed) return { kind: 'forbidden' };
 
           const generatedPassword = generatePassword();

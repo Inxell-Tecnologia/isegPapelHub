@@ -26,7 +26,7 @@ O **objetivo principal** do GDoc é entregar um repositório de arquivos corpora
   * Avisos relacionados à expiração de permissão: alerta à pessoa antes do vencimento e aviso à área administrativa no momento do corte de acesso.
   * Registro de auditoria de visualização e download (quem, qual arquivo, data e hora), consultável pela área administrativa e pelo dono do arquivo sobre seus próprios arquivos.
   * Lixeira: itens excluídos são retidos por até 30 dias, podem ser restaurados nesse período e são apagados de forma permanente e automática após o vencimento, por uma rotina diária executada às 3h.
-  * Cota de armazenamento de 10 GB por pessoa, com bloqueio de novos envios ao atingir o limite.
+  * Cota de armazenamento de 10 GB por pessoa como **padrão**, com bloqueio de novos envios ao atingir o limite; o Administrador Global pode conceder cota individual distinta a uma pessoa (ver adendo da US 8.1).
   * Painel (dashboard) com cartões de estatísticas principais e gráficos de quantidade de arquivos por tipo, envios por mês e espaço utilizado versus disponível, acessível pelo menu lateral.
   * Busca por nome e filtros por data, tipo de arquivo (imagens, vídeos, áudios, PDFs, entre outros) e autor na página de arquivos, com botão para limpar filtros.
   * Visualização, sem necessidade de baixar, de PDFs, imagens, vídeos, áudios, arquivos de texto e documentos de escritório (Word, Excel, PowerPoint).
@@ -344,6 +344,15 @@ O **objetivo principal** do GDoc é entregar um repositório de arquivos corpora
       * **Dado** que meu espaço utilizado atingiu 10 GB
       * **Quando** tento enviar um novo arquivo
       * **Então** o envio é bloqueado e recebo aviso de que a cota foi atingida, indicando a necessidade de liberar espaço.
+  * **Adendo — cota individual por exceção nominal** (change `cota-por-usuario`): os 10 GB permanecem como o **padrão da plataforma**, aplicado a toda pessoa que não tenha exceção. O **Administrador Global** — e somente ele, nunca o Administrador de Unidade — pode conceder a uma pessoa uma cota individual diferente, diretamente no cadastro dela, sem alterar o limite de mais ninguém. O bloqueio do Cenário 1 passa a ser avaliado contra a **cota efetiva** da pessoa (a exceção quando houver, o padrão quando não houver).
+    * *Cenário 2 — Exceção nominal prevalece:*
+      * **Dado** que o Administrador Global concedeu a mim uma cota individual acima do padrão
+      * **Quando** envio um arquivo que ultrapassa o padrão mas cabe na minha cota
+      * **Então** o envio é aceito, e a cota das demais pessoas permanece inalterada.
+    * *Cenário 3 — Cota abaixo do já utilizado:*
+      * **Dado** que minha cota foi reduzida abaixo do espaço que já ocupo
+      * **Quando** tento enviar um novo arquivo
+      * **Então** o envio é bloqueado, **nenhum arquivo meu é apagado**, e continuo podendo visualizar e baixar o que já tenho.
 
 * **US 8.2:** Como Administrador, eu quero um painel com cartões e gráficos de uso para que eu acompanhe a saúde do repositório.
   * **Critérios de Aceitação:**
@@ -392,7 +401,7 @@ O **objetivo principal** do GDoc é entregar um repositório de arquivos corpora
 12. Controle de acesso ativo em toda a aplicação, incluindo bloqueio de acesso a arquivo por link direto sem permissão, sem expor pré-visualização.
 13. Registro de auditoria de visualização e download, contendo pessoa, ação, data e hora; consultável por administradores (dentro do seu alcance) e pelo dono do arquivo sobre seus próprios arquivos.
 14. Lixeira com retenção de 30 dias, restauração ao local de origem com permissões preservadas e expurgo permanente automático por rotina diária às 3h.
-15. Cota de 10 GB por pessoa, com bloqueio de novos envios ao atingir o limite e aviso correspondente.
+15. Cota de 10 GB por pessoa como padrão, com bloqueio de novos envios ao atingir o limite e aviso correspondente; cota individual por exceção nominal, concedida apenas pelo Administrador Global (adendo da US 8.1).
 16. Painel gerencial com cartões de estatísticas e gráficos de arquivos por tipo, envios por mês e espaço utilizado versus disponível, respeitando o alcance do administrador.
 17. Busca por nome e filtros combináveis por data, tipo de arquivo e autor, com botão para limpar filtros, sempre limitados aos itens permitidos.
 18. Visualização sem download de PDFs, imagens, vídeos, áudios, arquivos de texto e documentos de escritório (Word, Excel, PowerPoint); mensagem clara quando não houver pré-visualização.
@@ -412,5 +421,5 @@ O **objetivo principal** do GDoc é entregar um repositório de arquivos corpora
 * **Adoção:** percentual de colaboradores ativos por semana e volume de arquivos sob gestão crescendo mês a mês nos primeiros 90 dias.
 * **Eficiência operacional:** redução do tempo médio para localizar um arquivo (com busca e filtros) e para liberar um acesso, comparado ao processo atual do cliente.
 * **Confiabilidade da retenção:** 100% dos itens vencidos na lixeira expurgados pela rotina diária e zero perdas indevidas de itens dentro do prazo de 30 dias.
-* **Controle de espaço:** cota de 10 GB por pessoa respeitada em 100% dos casos, sem envios além do limite.
+* **Controle de espaço:** cota efetiva de cada pessoa (padrão de 10 GB ou exceção nominal) respeitada em 100% dos casos, sem envios além do limite.
 * **Satisfação:** avaliação positiva das personas administrativas quanto à clareza do painel gerencial e ao controle de permissões após o primeiro mês de uso.
