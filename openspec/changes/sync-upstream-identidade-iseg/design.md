@@ -98,8 +98,9 @@ moved {
 
 As chaves de `deployer_act_as_job_runtime` são `account_id`
 (`${name_prefix}-…`), literais em `moved` — por isso dependem de
-`name_prefix = "gdoc-prod"` e devem ser confirmadas contra o state
-(`terraform state list`) antes do apply. Arquivo separado = zero conflito com
+`name_prefix = "gdoc-prod"`. **Confirmadas contra o state de produção em
+2026-11-24** (tasks.md 2.2): `gdoc-prod-trash-purge` e
+`gdoc-prod-notify-grants`, e os 5 endereços de origem existem. Arquivo separado = zero conflito com
 o upstream; pode ser apagado depois do primeiro apply bem-sucedido.
 
 _Alternativa descartada:_ aceitar o destroy/create. Funciona, mas o plan

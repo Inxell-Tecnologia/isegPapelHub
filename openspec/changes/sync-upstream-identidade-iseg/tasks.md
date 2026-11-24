@@ -45,10 +45,21 @@
       `deployer_act_as_job_runtime["gdoc-prod-trash-purge"|"gdoc-prod-notify-grants"]`,
       com comentário explicando que é só do fork e removível após o primeiro
       apply. Verificar: `terraform validate` passa.
-- [ ] 2.2 (Operador, com acesso ao state) Confirmar as chaves com
-      `terraform state list | grep deployer_` e rodar `terraform plan`: 0 destroy,
-      os 5 recursos aparecem como "has moved to". Registrar o resultado nesta
-      tarefa.
+- [x] 2.2 (Operador, com acesso ao state) Confirmar as chaves com
+      `terraform state list | grep deployer_`. **Conferido em 2026-11-24** no
+      state `gs://isegpapelhub-terraform-state/bootstrap-infrastructure`
+      (checkout em `c58882b`): os 5 endereços de origem existem
+      (`deployer_run_developer_{bootstrap,trash_purge,notify_expiring_grants}_job`,
+      `deployer_act_as_{trash_purge,notify_expiring_grants}_job`); `account_id`
+      = `gdoc-prod-trash-purge` e `gdoc-prod-notify-grants`, confirmados também
+      por `gcloud iam service-accounts list`. Os demais recursos `deployer_*` do
+      state (`deployer_run_developer`, `deployer_run_developer_migrate_job`,
+      `deployer_act_as_api`) têm o mesmo nome no upstream e não precisam de
+      `moved`.
+- [ ] 2.3 (Operador, depois do merge) `terraform plan` com o código mesclado:
+      0 destroy, os 5 recursos aparecem como "has moved to"; só adições para o
+      que vem do upstream (Job/scheduler `notify-readings` e suas concessões).
+      Registrar o resultado nesta tarefa.
 
 ## 3. CI/CD e GitHub — infraestrutura
 
@@ -138,7 +149,7 @@
 
 - Abrir PR da branch para `main` e integrar com **merge commit** (nunca squash);
   só depois das tarefas 3.1 e 3.3.
-- Após o deploy: `terraform apply` (tarefa 2.2), remover as variáveis
+- Após o deploy: `terraform apply` (tarefa 2.3), remover as variáveis
   `GCP_BOOTSTRAP_JOB`, `GCP_TRASH_PURGE_JOB`, `GCP_NOTIFY_GRANTS_JOB`.
 - Ao arquivar: atualizar o _Purpose_ de `identidade-visual`, que cita o
   Instituto SETES/SETES como logomarca e exemplo de identificação.
