@@ -112,11 +112,16 @@ O D1 da Forte Saúde assume **três tintas chapadas**. A marca ISEG é um
 **degradê** contínuo turquesa → oliva → laranja, então não há conjunto finito
 de tintas. Generalização:
 
-1. Amplia a arte 4× (bicúbico) — mantém o procedimento da Forte Saúde.
-2. **Núcleo opaco:** pixels cuja distância ao branco passa de um limiar são
-   considerados tinta pura; a cor deles é a tinta local.
-3. **Campo de tinta:** cada pixel não opaco herda a tinta do pixel do núcleo
-   mais próximo (transformada de distância / vizinho mais próximo).
+1. Trabalha na **resolução original**: diferente das artes de 500 px da Forte
+   Saúde, as do ISEG são grandes (símbolo com 985 px de diâmetro) e só
+   precisam ser **reduzidas** — no fim, por LANCZOS sobre cor
+   pré-multiplicada, para a borda não ganhar halo.
+2. **Núcleo de tinta pura:** pixels pintados que formam um **platô** (nenhum
+   vizinho 3×3 é bem mais pintado que eles, ou seja, não estão na rampa
+   antisserrilhada). Uma erosão, tentada primeiro, apagava as letras finas do
+   texto institucional (~4 px de traço).
+3. **Campo de tinta:** cada pixel de borda herda, por dilatação iterativa, a
+   média das tintas do núcleo vizinho.
 4. **Opacidade:** `a = Σ(255 − c) / Σ(255 − tinta_local)`, recortada em
    [0, 1]; saída = tinta local pura com opacidade `a`.
 
@@ -140,7 +145,10 @@ Artes e script em `docs/images/iseg/`; regerar é
 Sobre os fundos escuros, a sigla "ISEG", o filete e a frase institucional
 (tinta cinza `#4F4F4F`, baixa saturação) passam a branco; o anel e a cruz
 mantêm o degradê. A classificação por pixel é pela **saturação da tinta
-local**: tinta acinzentada (S < limiar) → branco; tinta saturada → preservada.
+local** (max − min dos canais ≤ 14 → branco). Medido nas artes: sigla, filete
+e texto têm saturação 0 — o texto da logo horizontal é **preto**, não cinza —,
+e o degradê, mesmo nas sombras quase pretas da borda do anel na arte
+horizontal, tem saturação ≥ 68.
 
 Ativos:
 
@@ -198,17 +206,20 @@ as specs usam o nome da função.
 
 `COR_MAIS_CLARA_DO_SIMBOLO` (navegação) e `COR_MAIS_ESCURA_DO_SIMBOLO` (área
 principal) passam a ser **medidas nos ativos gerados** (o mais luminoso do
-símbolo negativo — esperado `#FFFFFF`; o pixel opaco mais escuro do símbolo
-colorido — esperado o cinza `#4F4F4F` da sigla). Opacidades mantidas (8% e
+símbolo negativo — medido `#FFFFFF`; o pixel opaco mais escuro do símbolo
+colorido — medido `#444444`, o cinza da sigla). Opacidades mantidas (8% e
 6%); o teto demonstrativo do teste de contraste da navegação é reapurado para
 o novo degradê.
 
-### D8 — Logo no shell expandido mantém 150 px
+### D8 — Logo no shell expandido a 142 px, mesma altura da logo ISETES
 
-A arte horizontal recortada tem proporção 2,24:1, próxima dos 2,34:1 da logo
-ISETES. A 150 px de largura a altura fica ~67 px (ISETES: 64 px). O ajuste do
-orçamento de altura da navegação em 768 px é verificado na captura; se
-estourar, reduz-se a largura até caber, nunca a altura de outro elemento.
+A arte horizontal recortada tem proporção 2,22:1 (319×144 servidos), contra
+2,34:1 da logo ISETES. A 150 px de largura (medida da demanda nº 2) ela teria
+68 px de altura, 4 px a mais que os 64 px que o orçamento de altura da
+navegação em 768 px reservava. Em vez de depender de inspeção visual para
+caber, a largura passa a **142 px**, que dá exatamente os mesmos 64 px — o
+orçamento fica intacto por construção. No login, 72 px de altura (56 px
+estreito) dão 160 px (124 px) de largura, dentro do campo de apresentação.
 
 ### D9 — Ordem dos commits
 
