@@ -93,9 +93,13 @@
       (e a menção no `infra/terraform/README.md`). Sem efeito se o
       `terraform.tfvars` de produção já define o valor; confirmar no plan da 2.3
       que a condição do WIF não muda ou passa a apontar para este repositório.
-- [ ] 3.3 (Operador) Confirmar GitHub Pages do fork com Source: GitHub Actions.
-      Verificar: `https://inxell-tecnologia.github.io/isegPapelHub/` responde
-      200 depois do workflow `docs.yml`.
+- [x] 3.3 (Operador) Confirmar GitHub Pages do fork com Source: GitHub Actions.
+      **Confirmado ativo em 2026-11-24.** O manual com a identidade ISEG é
+      publicado pelo `docs.yml` no push em `main` que tocar `docs/manual/**`
+      (o merge do PR). Conferido junto: `cors_allowed_origins` de produção já
+      tem as duas formas da URL do Cloud Run
+      (`gdoc-prod-api-pbr7vkzcga-uc.a.run.app` e
+      `gdoc-prod-api-1033018645624.us-central1.run.app`).
 
 ## 4. Identificação do cliente
 
