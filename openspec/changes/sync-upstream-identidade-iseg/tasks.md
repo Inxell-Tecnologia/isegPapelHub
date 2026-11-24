@@ -67,11 +67,25 @@
       state (`deployer_run_developer`, `deployer_run_developer_migrate_job`,
       `deployer_act_as_api`) têm o mesmo nome no upstream e não precisam de
       `moved`.
-- [ ] 2.3 (Operador, depois do merge em `main` e do deploy) No Cloud Shell,
+- [x] 2.3 (Operador, depois do merge em `main` e do deploy) No Cloud Shell,
       com o código mesclado: `terraform validate` e `terraform plan` — 0
       destroy, os 5 recursos aparecem como "has moved to"; só adições para o
       que vem do upstream (Job/scheduler `notify-readings`, sua conta e
-      concessões). Então `terraform apply`. Registrar o resultado nesta tarefa.
+      concessões). Então `terraform apply`. **Feito em 2026-11-24** (PR #6,
+      `78bd99f`): plan e apply com 9 adições, 6 alterações, **0 destruições**;
+      os 5 `moved` aplicados. O plan revelou dois defeitos antigos da produção,
+      corrigidos pelo apply:
+      - a assinatura `gdoc-prod-storage-finalize-push` tinha expirado (runbook,
+        Armadilha 9) e foi recriada sem expiração; os uploads do intervalo
+        foram reconciliados com o backfill pelo Job de migração (execução
+        `gdoc-prod-migrate-rp7md`, concluída);
+      - `trash-purge` e `notify-grants` rodavam com `args` `dist/jobs/...`,
+        inexistente na imagem (Armadilha 10): todas as execuções recentes do
+        expurgo terminaram `0 / 1`. Os `args` passam a `apps/api/dist/jobs/...`.
+      Também entraram os ajustes de capacidade do upstream no serviço
+      (concorrência 20, timeout 120s, até 8 instâncias, pool de 2 conexões) e
+      `deletion_protection = true` no serviço da API (o fork o desligava só
+      para destravar o primeiro provisionamento; mantido ligado).
 
 ## 3. CI/CD e GitHub — infraestrutura
 
