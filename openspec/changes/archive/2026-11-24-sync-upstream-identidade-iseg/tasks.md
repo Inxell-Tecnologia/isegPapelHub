@@ -89,7 +89,7 @@
 
 ## 3. CI/CD e GitHub — infraestrutura
 
-- [ ] 3.1 (Operador) Variável de repositório `GCP_DEPLOY_UPDATED_JOBS`, em duas
+- [x] 3.1 (Operador) Variável de repositório `GCP_DEPLOY_UPDATED_JOBS`, em duas
       etapas — o output `deploy_updated_job_names` só existe no state depois do
       apply com o código mesclado, e inclui o Job `notify-readings`, que também
       só passa a existir ali:
@@ -103,6 +103,10 @@
       variáveis antigas.
       Verificar: o passo "Update scheduled and bootstrap job images" do primeiro
       deploy fica verde.
+      **Concluído em 2026-11-24:** (a) criada antes do merge; o deploy do PR #6
+      passou verde; (b) atualizada após o apply para
+      `gdoc-prod-bootstrap gdoc-prod-notify-grants gdoc-prod-notify-readings gdoc-prod-trash-purge`,
+      e as três variáveis antigas removidas.
 - [x] 3.2 `var.github_repository` default → `Inxell-Tecnologia/isegPapelHub`
       (e a menção no `infra/terraform/README.md`). Sem efeito se o
       `terraform.tfvars` de produção já define o valor; confirmar no plan da 2.3

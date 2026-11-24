@@ -4,7 +4,7 @@
 
 Definir os requisitos verificáveis da identidade visual do produto — o nome
 comercial da aplicação (**PapelHub**), a logomarca oficial e a identificação do
-cliente da implantação (ex.: **SETES**) — como propriedade **configurada por
+cliente da implantação (ex.: **ISEG**) — como propriedade **configurada por
 implantação**, entregue ao SPA por um endpoint público restrito a branding
 (porque a tela onde ela aparece é anterior ao login), exibida na tela de login
 e no shell autenticado sem contaminar o nome acessível do heading, e
@@ -13,11 +13,14 @@ configuração está ausente ou indisponível. Não decorre de uma US do PRD
 (`docs/prd_final.md`) — é um pedido direto do cliente sobre nome comercial,
 logomarca e identificação da organização. Onde toca comportamento já
 normatizado, preserva-o: o nome acessível do heading de login continua sendo o
-nome da aplicação puro, conforme a US 1.2. A logomarca oficial é a logo branca do
-Instituto SETES, de fundo transparente, apresentada sem moldura e apenas sobre
-os fundos escuros da marca; o símbolo isolado representa a marca na navegação
-colapsada, no favicon e como marca d'água (change
-`identidade-isetes-e-menu-compacto`).
+nome da aplicação puro, conforme a US 1.2. A logomarca oficial é a versão
+negativa da logo do ISEG (Instituto de Soluções Estratégicas em Gestão), de
+fundo transparente, apresentada sem moldura e apenas sobre os fundos escuros da
+marca; o símbolo isolado representa a marca na navegação colapsada, no favicon
+e como marca d'água, em versão negativa sobre fundo escuro e colorida sobre
+fundo claro. Os ativos são derivados das artes do cliente por procedimento
+versionado (changes `identidade-isetes-e-menu-compacto` e
+`sync-upstream-identidade-iseg`).
 
 ## Requirements
 
@@ -66,15 +69,12 @@ objeto deste requisito.
 
 ### Requirement: Logomarca oficial é exibida na tela de login e no shell expandido
 
-A aplicação SHALL exibir a logomarca oficial — a logo **branca** do Instituto
-SETES, de fundo transparente — na tela de login e no shell autenticado com a
-navegação expandida. A logomarca SHALL ser apresentada apenas sobre os fundos
-escuros da marca (o degradê da navegação e o campo escuro da tela de login), e
-NÃO SHALL ser exibida sobre fundo claro. Por ter fundo transparente, ela NÃO
-SHALL receber moldura própria.
+A aplicação SHALL exibir a logomarca oficial — a **versão negativa** da logo
+horizontal do ISEG, de fundo transparente — na tela de login e no shell
+expandido, apenas sobre os fundos escuros da marca, sem moldura própria, e
+NÃO SHALL exibi-la sobre fundo claro.
 
-Referência: `docs/demanda_cliente_3.md`, item 1; dependência externa E1 de
-`docs/plano_demanda_cliente_2.md`.
+Referência: change `sync-upstream-identidade-iseg`, design.md D3 e D4.
 
 #### Scenario: Logomarca aparece na tela de login
 - **WHEN** uma pessoa não autenticada abre a tela de login
@@ -89,6 +89,12 @@ Referência: `docs/demanda_cliente_3.md`, item 1; dependência externa E1 de
 #### Scenario: Logomarca não aparece sobre fundo claro
 - **WHEN** qualquer tela da aplicação apresenta a logomarca oficial
 - **THEN** o fundo imediatamente atrás dela é um dos fundos escuros da marca
+
+#### Scenario: Nenhum vestígio da identidade de outro cliente
+- **WHEN** uma pessoa percorre a tela de login, o shell autenticado e o manual
+  do usuário desta implantação
+- **THEN** nenhuma logo, símbolo, favicon, nome acessível ou exemplo de
+  identificação pertence a outra organização que não o ISEG
 
 ### Requirement: Logomarca no shell expandido preserva o nome acessível da marca
 
@@ -484,3 +490,28 @@ A aplicação SHALL apresentar o símbolo da marca como marca d'água no lado di
 - **THEN** o contraste do texto apresentado diretamente sobre o fundo da área
   principal, contra a mistura desse fundo com o ponto mais escuro do símbolo, é
   apurado numericamente e atende ao piso de 4,5:1
+
+### Requirement: Ativos da marca são derivados das artes do cliente
+
+Os ativos da marca SHALL ser derivados das artes fornecidas pelo cliente por um
+procedimento versionado e reproduzível, sem edição à mão e sem franja do fundo
+branco original. O símbolo SHALL existir em versão negativa (fundos escuros) e
+colorida (fundos claros), cada superfície usando a do seu fundo.
+
+Referência: change `sync-upstream-identidade-iseg`, design.md D3 e D4.
+
+#### Scenario: Símbolo usa a versão adequada ao fundo
+- **WHEN** o símbolo da marca é apresentado sobre a navegação escura e sobre a
+  área principal clara
+- **THEN** sobre a navegação aparece a versão negativa, e sobre a área principal
+  a versão colorida
+
+#### Scenario: Versão negativa preserva o degradê e clareia o texto
+- **WHEN** a logomarca ou o símbolo é apresentado sobre um fundo escuro da marca
+- **THEN** o anel e a cruz mantêm o degradê turquesa → laranja, e a sigla e o
+  texto institucional aparecem em branco
+
+#### Scenario: Ativos são regeráveis a partir das artes do cliente
+- **WHEN** o cliente substitui as artes de origem da marca
+- **THEN** os ativos da aplicação são regerados pelo procedimento versionado, sem
+  edição manual de imagem
