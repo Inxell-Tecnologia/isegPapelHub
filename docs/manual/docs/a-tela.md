@@ -1,11 +1,12 @@
 # Conhecendo a tela
 
-A tela de **login** traz a marca em destaque: um fundo azul cobre toda a tela,
-com a logo branca do **Instituto SETES**, o nome **PapelHub** e o cartão de
+A tela de **login** traz a marca em destaque: um fundo verde-petróleo escuro
+cobre toda a tela, com a logo do **ISEG** — o círculo e a cruz em degradê do
+turquesa ao laranja, com o nome do instituto em branco —, o nome **PapelHub** e o cartão de
 acesso branco, com o formulário de e-mail e senha.
 
 Na tela de **login**, logo abaixo do nome **PapelHub**, aparece a identificação
-da sua organização (por exemplo, "SETES") — ela confirma que você está na
+da sua organização (por exemplo, "ISEG") — ela confirma que você está na
 implantação correta quando existe mais de uma.
 
 ## Tela inicial
@@ -94,7 +95,7 @@ clique, a "quem sou, onde estou, o que posso fazer e o que mudou":
     visualizar ou baixar um documento não o coloca ali.
 
 !!! note "O símbolo claro à direita é só decoração"
-    Em todas as telas, o símbolo do ISETES aparece bem clarinho, como marca
+    Em todas as telas, o símbolo do ISEG aparece bem clarinho, como marca
     d'água, no lado direito da área principal, atrás do conteúdo. Ele não é
     clicável, não atrapalha a leitura e clicar sobre ele aciona normalmente o
     que estiver por cima.
@@ -136,9 +137,9 @@ perfil, reunidos em dois grupos — **NAVEGAÇÃO** e **AJUDA**:
 
 O título do grupo é só um rótulo: ele não é clicável e não leva a nenhuma tela.
 
-No alto do menu fica a marca — a logo branca do **Instituto SETES** e, logo
+No alto do menu fica a marca — a logo do **ISEG** e, logo
 abaixo, **PapelHub · Gestão de Documentos**. No pé do menu, bem clarinho, fica o
-símbolo do ISETES como marca d'água: é só decoração, e clicar sobre ele aciona
+símbolo do ISEG como marca d'água: é só decoração, e clicar sobre ele aciona
 normalmente o item ou o cartão que está por cima.
 
 Todos os itens cabem no menu sem barra de rolagem numa tela de computador
@@ -157,7 +158,7 @@ painel; tocar no Manual do usuário abre a nova aba e mantém o painel como
 estava — é o único item que leva para fora da aplicação.
 
 Você pode **recolher** o menu pelo controle no **topo** da coluna, ao lado da
-logo, para ganhar largura: ficam só o símbolo do ISETES, os ícones e o seu
+logo, para ganhar largura: ficam só o símbolo do ISEG, os ícones e o seu
 avatar, e o nome de cada item aparece ao apontá-lo. Os títulos dos grupos dão
 lugar a um traço que separa NAVEGAÇÃO de AJUDA. O mesmo controle, logo
 abaixo do símbolo, expande o menu de novo.

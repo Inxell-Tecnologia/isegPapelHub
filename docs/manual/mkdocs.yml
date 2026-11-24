@@ -7,16 +7,24 @@ strict: true
 theme:
   name: material
   language: pt-BR
-  logo: assets/isetes-simbolo.png
-  favicon: assets/isetes-simbolo.png
+  # Símbolo negativo sobre o cabeçalho verde-petróleo; colorido na aba do
+  # navegador (change sync-upstream-identidade-iseg, design.md D4).
+  logo: assets/iseg-simbolo-negativo.png
+  favicon: assets/iseg-simbolo-cor.png
+  # Paleta "custom": as cores da marca vêm de stylesheets/marca.css, derivadas
+  # da logo do ISEG — as mesmas da aplicação (app/theme.ts).
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Modo escuro
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Modo claro
@@ -25,6 +33,9 @@ theme:
     - navigation.top
     - search.suggest
     - content.action.edit
+
+extra_css:
+  - stylesheets/marca.css
 
 # Caixas de aviso (`!!! note`, `!!! warning`…): 34 delas em 13 páginas eram
 # renderizadas como texto literal, porque a extensão nunca foi habilitada

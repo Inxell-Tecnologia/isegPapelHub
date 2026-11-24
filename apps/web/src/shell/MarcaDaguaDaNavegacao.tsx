@@ -9,19 +9,29 @@ import { ATIVOS_DA_MARCA } from './BrandMark';
  * sobre a mistura do pixel mais luminoso do símbolo com `marinhoClaro`, a base
  * do degradê:
  *
+ * Reapurada com a paleta e o símbolo negativo do ISEG (change
+ * `sync-upstream-identidade-iseg`, design.md D7) — a opacidade não muda; o
+ * degradê verde-petróleo dá mais folga que o marinho do upstream:
+ *
  *   opacidade   textoSobreEscuro   branco
- *     0%          5,48:1            8,16:1
- *     6%          4,98:1            7,42:1
- *     8%          4,79:1            7,14:1   ← adotada
- *    10%          4,62:1            6,88:1
- *    14%          4,35:1 ✗          6,48:1   (medida da demanda nº 2)
+ *     0%          7,98:1           10,07:1
+ *     6%          6,76:1            8,52:1
+ *     8%          6,43:1            8,11:1   ← adotada
+ *    10%          6,06:1            7,65:1
+ *    14%          5,43:1            6,84:1   (medida da demanda nº 2)
+ *    20%          4,58:1            5,77:1
+ *    22%          4,32:1 ✗          5,44:1   (teto: primeira a reprovar)
  *
  * O teste de contraste refaz a conta a partir desta constante.
  */
 export const OPACIDADE_MARCA_DAGUA_NAVEGACAO = 0.08;
 
-/** Pixel mais luminoso do símbolo — o pior caso para o texto que passa por cima. */
-export const COR_MAIS_CLARA_DO_SIMBOLO = '#00DE89';
+/**
+ * Pixel opaco mais luminoso do símbolo negativo (`iseg-simbolo-negativo.png`,
+ * medido no ativo gerado: a sigla em branco) — o pior caso para o texto que
+ * passa por cima.
+ */
+export const COR_MAIS_CLARA_DO_SIMBOLO = '#FFFFFF';
 
 /** Altura do símbolo — medida da demanda nº 2, seção 1.1. */
 const ALTURA_MARCA_DAGUA = 200;

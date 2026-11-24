@@ -358,7 +358,7 @@ export function AppShell() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {!isNarrow && (
-        // Degradê azul-marinho da marca (change `identidade-visual-isetes`,
+        // Degradê da marca — verde-petróleo no fork ISEG (change `identidade-visual-isetes`,
         // tasks 3.1): pintado na própria navegação, que é quem cobre a coluna
         // inteira. O token `siderBg` do design system fica transparente
         // (theme.ts) para o fundo chapado dele não vazar por cima.

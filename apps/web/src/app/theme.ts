@@ -1,33 +1,49 @@
 import type { ThemeConfig } from 'antd';
 
 /**
+ * **Fork ISEG** (change `sync-upstream-identidade-iseg`, design.md D5 e D6):
+ * os VALORES da `paleta` derivam da logo do ISEG — turquesa `#00A9A5`,
+ * laranja `#F26522` —, mas os NOMES dos tokens são papéis herdados do
+ * upstream e não se renomeiam: `marinhoEscuro`/`marinhoClaro` guardam o
+ * verde-petróleo do degradê, `verdeMarca` o laranja de destaque, `verdeAcao`
+ * o turquesa de ação e `azulLink`/`azulAvatar` tons do turquesa. Renomear
+ * espalharia conflito por dezenas de usos a cada sync com o upstream.
+ *
  * Origem única dos tokens de apresentação da SPA (capability
  * `sistema-de-design`, requisito "Tokens de apresentação têm origem única";
  * change `identidade-visual-isetes`, design.md D1). Nenhuma tela declara cor
  * de marca, família tipográfica ou raio por literal: tudo deriva daqui e
  * chega aos componentes pelo `ConfigProvider` de `App.tsx`.
  *
- * As cores vêm do guia visual do cliente, **menos** nos dois pontos em que o
- * próprio guia se contradiz com o piso de acessibilidade que ele exige — ver
- * `verdeAcao` (design.md D2) e `bordaControle` (design.md D3). Os pares
+ * Os neutros (texto, superfície, bordas) vêm do guia visual original —
+ * `bordaControle` ajustada ao piso de 3:1 (design.md D3 de
+ * `identidade-visual-isetes`). Os pares
  * normatizados são apurados por cálculo em `__tests__/contraste.test.ts`, não
  * por inspeção visual.
  */
 export const paleta = {
-  /** Topo do degradê da navegação e fundo da tela de login (15,76:1 com branco — nível AAA). */
-  marinhoEscuro: '#012442',
-  /** Base do degradê da navegação (8,16:1 com branco). */
-  marinhoClaro: '#0B5382',
   /**
-   * Verde da logomarca. Superfície de destaque — item de navegação ativo,
-   * indicador —, **nunca** fundo de texto branco: mede 2,21:1 com branco
-   * (design.md D2). Sobre ele vai `texto`, que mede 7,77:1.
+   * Topo do degradê da navegação e fundo da tela de login: turquesa da logo
+   * do ISEG escurecido (14,27:1 com branco — nível AAA).
    */
-  verdeMarca: '#0EC782',
-  /** Verde de ação: fundo de botão principal, com rótulo branco a 5,37:1 (design.md D2). */
-  verdeAcao: '#067A52',
-  /** Links (8,06:1 sobre branco). */
-  azulLink: '#025484',
+  marinhoEscuro: '#06302F',
+  /**
+   * Base do degradê da navegação (10,07:1 com branco). Escura de propósito:
+   * o laranja de destaque precisa de 3:1 contra o degradê inteiro, e o
+   * turquesa médio (`#00706C`) o derrubaria a 1,88:1 aqui.
+   */
+  marinhoClaro: '#0A4A48',
+  /**
+   * Laranja da logomarca. Superfície de destaque — item de navegação ativo,
+   * indicador, anel de foco sobre a navegação —, **nunca** fundo de texto
+   * branco: mede 3,15:1 com branco. Sobre ele vai `texto`, que mede 5,44:1.
+   * Contra o degradê: 4,53:1 no topo e 3,19:1 na base.
+   */
+  verdeMarca: '#F26522',
+  /** Cor de ação (turquesa escurecido): fundo de botão principal, com rótulo branco a 5,56:1. */
+  verdeAcao: '#00756F',
+  /** Links, turquesa escurecido (7,02:1 sobre branco; 6,51:1 sobre a superfície). */
+  azulLink: '#006460',
   /** Texto corrente (17,16:1 sobre branco; 15,92:1 sobre a superfície). */
   texto: '#0F1D26',
   /** Texto de apoio (6,30:1 sobre branco; 5,85:1 sobre a superfície). */
@@ -40,10 +56,10 @@ export const paleta = {
    * Texto de apoio **sobre a navegação escura** — identificação do cliente
    * sob a logomarca, por exemplo. Opaco de propósito: o branco a 65% que
    * havia antes media 3,78:1 contra a base do degradê, abaixo do piso de
-   * 4,5:1 que esta change passa a exigir. Este tom mede 10,58:1 no topo do
-   * degradê e 5,48:1 na base — folgado nos dois extremos.
+   * 4,5:1. Tinta clara do turquesa da logo: mede 11,32:1 no topo do degradê e
+   * 7,98:1 na base — folgado nos dois extremos.
    */
-  textoSobreEscuro: '#CBD5DD',
+  textoSobreEscuro: '#CDEBE9',
   /**
    * Borda **decorativa** — divisória, contorno de cartão, separador de
    * tabela. Não carrega informação, logo não precisa de contraste (mede
@@ -57,15 +73,15 @@ export const paleta = {
    */
   bordaControle: '#788A97',
   /**
-   * Superfície do avatar de identidade (guia do cliente; change
-   * `menu-lateral-e-barra-superior`, design.md D7). Carrega `texto`, a
-   * 11,12:1 — e **nunca** branco, que mede 1,54:1 e reprova no piso de
-   * 4,5:1. É a mesma armadilha de `verdeMarca`: a cor vem do guia, e quem
-   * decide o que vai escrito sobre ela é o piso de acessibilidade. Como
-   * superfície, mede 5,29:1 contra a base do degradê da navegação, acima do
-   * piso de 3:1 de elemento de interface.
+   * Superfície do avatar de identidade (change
+   * `menu-lateral-e-barra-superior`, design.md D7), tinta clara do turquesa
+   * da logo. Carrega `texto`, a 12,99:1 — e **nunca** branco, que mede
+   * 1,32:1 e reprova no piso de 4,5:1. É a mesma armadilha de `verdeMarca`:
+   * quem decide o que vai escrito sobre a cor é o piso de acessibilidade.
+   * Como superfície, mede 7,62:1 contra a base do degradê da navegação,
+   * acima do piso de 3:1 de elemento de interface.
    */
-  azulAvatar: '#9ED8F6',
+  azulAvatar: '#BFE8E6',
   /**
    * Vermelho do **indicador numérico** do sino (`docs/demanda_cliente_3.md`,
    * item 10; change `marca-dagua-e-inicio-rodada-3`, design.md D7). Carrega o

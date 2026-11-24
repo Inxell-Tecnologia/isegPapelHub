@@ -18,7 +18,7 @@ import {
  * Marca do shell (capability `identidade-visual`), na forma da change
  * `identidade-isetes-e-menu-compacto`:
  *
- * - expandida: a logo branca do Instituto SETES (anunciada pelo nome da
+ * - expandida: a logo negativa do ISEG (anunciada pelo nome da
  *   organização, por ter texto escrito), "PapelHub" e o descritor em texto,
  *   sem a linha da identificação do cliente (design.md D3);
  * - colapsada: o símbolo, anunciado como PapelHub;
@@ -58,21 +58,23 @@ async function recolher() {
 describe('Identidade visual no shell (identidade-visual)', () => {
   it('expandida: logo da organização, nome do produto uma vez e descritor, sem repetir o cliente', async () => {
     mockViewportWidth(WIDE_VIEWPORT);
-    mockFetch(configComCliente('SETES'));
+    mockFetch(configComCliente('ISEG'));
     renderApp(['/']);
 
     await screen.findByText('PapelHub');
 
-    const logo = within(marca()).getByRole('img', { name: 'Instituto SETES' });
+    const logo = within(marca()).getByRole('img', { name: ATIVOS_DA_MARCA.logo.nome });
     expect(logo).toHaveAttribute('src', ATIVOS_DA_MARCA.logo.src);
-    // 150 px de largura (demanda nº 2), altura pela proporção do ativo.
-    expect(logo).toHaveAttribute('width', '150');
+    // 142 px de largura — mesma altura de 64 px da logo da demanda nº 2
+    // (sync-upstream-identidade-iseg, design.md D8).
+    expect(logo).toHaveAttribute('width', '142');
+    expect(logo).toHaveAttribute('height', '64');
     // O nome do produto é anunciado uma única vez — pelo texto.
     expect(within(marca()).getAllByText('PapelHub')).toHaveLength(1);
     expect(within(marca()).queryByRole('img', { name: 'PapelHub' })).not.toBeInTheDocument();
     expect(within(marca()).getByText('Gestão de Documentos')).toBeInTheDocument();
-    // A logo já identifica a organização: a linha "SETES" não se repete.
-    expect(within(marca()).queryByText('SETES')).not.toBeInTheDocument();
+    // A logo já identifica a organização: a linha "ISEG" não se repete.
+    expect(within(marca()).queryByText('ISEG')).not.toBeInTheDocument();
   });
 
   it('a logomarca não tem moldura própria: é a imagem transparente, direto sobre o degradê', async () => {
@@ -81,14 +83,14 @@ describe('Identidade visual no shell (identidade-visual)', () => {
     renderApp(['/']);
 
     await screen.findByText('PapelHub');
-    const logo = within(marca()).getByRole('img', { name: 'Instituto SETES' });
+    const logo = within(marca()).getByRole('img', { name: ATIVOS_DA_MARCA.logo.nome });
     expect(logo.parentElement?.style.background ?? '').toBe('');
     expect(document.querySelector('img[src="/logo-papelhub.jpg"]')).toBeNull();
   });
 
   it('colapsada: só o símbolo, anunciado como PapelHub, sem logo, descritor nem cliente', async () => {
     mockViewportWidth(WIDE_VIEWPORT);
-    mockFetch(configComCliente('SETES'));
+    mockFetch(configComCliente('ISEG'));
     renderApp(['/']);
 
     await screen.findByText('PapelHub');
@@ -97,10 +99,10 @@ describe('Identidade visual no shell (identidade-visual)', () => {
     const simbolo = within(marca()).getByRole('img', { name: 'PapelHub' });
     expect(simbolo).toHaveAttribute('src', ATIVOS_DA_MARCA.simbolo.src);
     expect(
-      within(coluna()).queryByRole('img', { name: 'Instituto SETES' }),
+      within(coluna()).queryByRole('img', { name: ATIVOS_DA_MARCA.logo.nome }),
     ).not.toBeInTheDocument();
     expect(within(coluna()).queryByText('Gestão de Documentos')).not.toBeInTheDocument();
-    expect(within(coluna()).queryByText('SETES')).not.toBeInTheDocument();
+    expect(within(coluna()).queryByText('ISEG')).not.toBeInTheDocument();
   });
 });
 
@@ -176,7 +178,7 @@ describe("Marca d'água da área principal (identidade-visual)", () => {
 
   it('aparece em mais de uma tela, decorativa, sem capturar o ponteiro e a 6%', async () => {
     mockViewportWidth(WIDE_VIEWPORT);
-    mockFetch(configComCliente('SETES'));
+    mockFetch(configComCliente('ISEG'));
     const inicio = renderApp(['/']);
     await screen.findByText('Pastas da unidade');
 
@@ -188,14 +190,15 @@ describe("Marca d'água da área principal (identidade-visual)", () => {
     expect(camada.style.overflow).toBe('hidden');
     const img = camada.querySelector('img')!;
     expect(img).toHaveAttribute('alt', '');
-    expect(img).toHaveAttribute('src', ATIVOS_DA_MARCA.simbolo.src);
+    // Fundo claro: a versão colorida do símbolo (sync-upstream-identidade-iseg, D4).
+    expect(img).toHaveAttribute('src', ATIVOS_DA_MARCA.simboloSobreClaro.src);
     expect(img.style.opacity).toBe(String(OPACIDADE_MARCA_DAGUA_AREA_PRINCIPAL));
     // Atrás do conteúdo.
     const conteudo = document.querySelector('.ant-layout-content') as HTMLElement;
     expect(Number(conteudo.style.zIndex)).toBeGreaterThan(Number(camada.style.zIndex));
     inicio.unmount();
 
-    mockFetch(configComCliente('SETES'));
+    mockFetch(configComCliente('ISEG'));
     renderApp(['/pastas']);
     await screen.findByRole('button', { name: /^Notificações/ });
     expect(marcaDagua()).not.toBeNull();
@@ -203,7 +206,7 @@ describe("Marca d'água da área principal (identidade-visual)", () => {
 
   it('acompanha a largura da navegação: expandida, colapsada e modo estreito', async () => {
     mockViewportWidth(WIDE_VIEWPORT);
-    mockFetch(configComCliente('SETES'));
+    mockFetch(configComCliente('ISEG'));
     const largo = renderApp(['/']);
     await screen.findByText('Pastas da unidade');
     expect(marcaDagua()!.style.left).toBe(`${LARGURA_NAVEGACAO}px`);
@@ -212,7 +215,7 @@ describe("Marca d'água da área principal (identidade-visual)", () => {
     largo.unmount();
 
     mockViewportWidth(NARROW_VIEWPORT);
-    mockFetch(configComCliente('SETES'));
+    mockFetch(configComCliente('ISEG'));
     renderApp(['/']);
     await screen.findByText('Pastas da unidade');
     expect(marcaDagua()!.style.left).toBe('0px');
@@ -226,7 +229,7 @@ describe("Marca d'água da área principal (identidade-visual)", () => {
 describe('Rótulo de grupo na navegação colapsada (web-shell-e-auth)', () => {
   it('colapsada, o rótulo fica só para tecnologia assistiva; expandida, volta inteiro', async () => {
     mockViewportWidth(WIDE_VIEWPORT);
-    mockFetch(configComCliente('SETES'));
+    mockFetch(configComCliente('ISEG'));
     renderApp(['/']);
     await screen.findByText('Pastas da unidade');
 

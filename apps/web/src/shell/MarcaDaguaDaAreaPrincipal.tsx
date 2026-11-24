@@ -11,19 +11,25 @@ import { ATIVOS_DA_MARCA } from './BrandMark';
  * pior era o mais claro). Mistura de `COR_MAIS_ESCURA_DO_SIMBOLO` com
  * `superficie`, contra os textos que aparecem direto sobre o fundo:
  *
+ * Reapurada com a paleta e o símbolo colorido do ISEG (change
+ * `sync-upstream-identidade-iseg`, design.md D7); a opacidade não muda:
+ *
  *   opacidade   textoApoio   texto     azulLink   verdeAcao (texto)
- *     0%          5,85:1     15,92:1    7,48:1      4,98:1
- *     6%          5,44:1     14,81:1    6,96:1      4,63:1   ← adotada
- *     8%          5,29:1     14,39:1    6,76:1      4,50:1
- *    10%          5,16:1     14,04:1    6,60:1      4,39:1 ✗
+ *     0%          5,85:1     15,92:1    6,51:1      5,16:1
+ *     6%          5,30:1     14,43:1    5,90:1      4,68:1   ← adotada
+ *     8%          5,16:1     14,04:1    5,74:1      4,55:1
+ *    10%          4,98:1     13,56:1    5,55:1      4,40:1 ✗
  *
  * Os cartões são opacos e ficam **por cima**: o texto deles não muda. O teste
  * de contraste refaz a conta a partir desta constante.
  */
 export const OPACIDADE_MARCA_DAGUA_AREA_PRINCIPAL = 0.06;
 
-/** Pixel opaco mais escuro do símbolo servido — o pior caso sobre fundo claro. */
-export const COR_MAIS_ESCURA_DO_SIMBOLO = '#008C5A';
+/**
+ * Pixel opaco mais escuro do símbolo colorido (`iseg-simbolo-cor.png`, medido
+ * no ativo gerado: o cinza da sigla) — o pior caso sobre fundo claro.
+ */
+export const COR_MAIS_ESCURA_DO_SIMBOLO = '#444444';
 
 /** Altura do símbolo: acompanha telas baixas, com teto no desenho do mockup. */
 const ALTURA_MARCA_DAGUA = 'min(70vh, 560px)';
@@ -59,7 +65,7 @@ export function MarcaDaguaDaAreaPrincipal({ esquerda }: { esquerda: number }) {
       }}
     >
       <img
-        src={ATIVOS_DA_MARCA.simbolo.src}
+        src={ATIVOS_DA_MARCA.simboloSobreClaro.src}
         alt=""
         style={{
           position: 'absolute',
@@ -67,7 +73,7 @@ export function MarcaDaguaDaAreaPrincipal({ esquerda }: { esquerda: number }) {
           right: 0,
           height: ALTURA_MARCA_DAGUA,
           width: 'auto',
-          aspectRatio: `${ATIVOS_DA_MARCA.simbolo.proporcao}`,
+          aspectRatio: `${ATIVOS_DA_MARCA.simboloSobreClaro.proporcao}`,
           // ~⅓ do símbolo sai pela borda direita, como no mockup.
           transform: 'translate(33%, -50%)',
           opacity: OPACIDADE_MARCA_DAGUA_AREA_PRINCIPAL,

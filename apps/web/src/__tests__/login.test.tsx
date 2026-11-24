@@ -98,12 +98,12 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
       'GET /auth/me': { status: 401 },
       'GET /auth/public-config': {
         status: 200,
-        body: { appName: 'PapelHub', clientName: 'SETES', manualUrl: '' },
+        body: { appName: 'PapelHub', clientName: 'ISEG', manualUrl: '' },
       },
     });
     renderApp(['/login']);
 
-    await screen.findByText('SETES');
+    await screen.findByText('ISEG');
     expect(screen.getByRole('heading', { name: 'PapelHub' })).toBeInTheDocument();
   });
 
@@ -113,12 +113,12 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
       'GET /auth/me': { status: 401 },
       'GET /auth/public-config': {
         status: 200,
-        body: { appName: 'PapelHub', clientName: 'SETES', manualUrl: '' },
+        body: { appName: 'PapelHub', clientName: 'ISEG', manualUrl: '' },
       },
     });
     renderApp(['/login']);
 
-    await screen.findByText('SETES');
+    await screen.findByText('ISEG');
     expect(document.querySelector('[data-marca-dagua-area-principal]')).toBeNull();
   });
 
@@ -138,7 +138,7 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
     renderApp(['/login']);
 
     await screen.findByRole('heading', { name: 'PapelHub' });
-    expect(screen.queryByText('SETES')).not.toBeInTheDocument();
+    expect(screen.queryByText('ISEG')).not.toBeInTheDocument();
 
     await fillAndSubmit('ana@example.com', 'senha-correta');
     await screen.findByText('Pastas da unidade');
@@ -157,25 +157,25 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
     renderApp(['/login']);
 
     await screen.findByRole('heading', { name: 'PapelHub' });
-    expect(screen.queryByText('SETES')).not.toBeInTheDocument();
+    expect(screen.queryByText('ISEG')).not.toBeInTheDocument();
 
     await fillAndSubmit('ana@example.com', 'senha-correta');
     await screen.findByText('Pastas da unidade');
   });
 
-  it('título do documento compõe "PapelHub - SETES" com identificação configurada', async () => {
+  it('título do documento compõe "PapelHub - ISEG" com identificação configurada', async () => {
     mockFetch({
       ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': { status: 401 },
       'GET /auth/public-config': {
         status: 200,
-        body: { appName: 'PapelHub', clientName: 'SETES', manualUrl: '' },
+        body: { appName: 'PapelHub', clientName: 'ISEG', manualUrl: '' },
       },
     });
     renderApp(['/login']);
 
     await screen.findByRole('heading', { name: 'PapelHub' });
-    await waitFor(() => expect(document.title).toBe('PapelHub - SETES'));
+    await waitFor(() => expect(document.title).toBe('PapelHub - ISEG'));
   });
 
   it('sem identificação de cliente, o título do documento permanece "PapelHub"', async () => {
@@ -229,7 +229,7 @@ describe('Identidade visual na tela de login (identidade-visual)', () => {
     renderApp(['/login']);
 
     const heading = await screen.findByRole('heading', { name: 'PapelHub' });
-    const logo = document.querySelector('img[src="/isetes-logo-branca.png"]') as HTMLElement;
+    const logo = document.querySelector('img[src="/iseg-logo-negativa.png"]') as HTMLElement;
     const campoEscuro = heading.parentElement as HTMLElement;
 
     expect(campoEscuro.contains(logo)).toBe(true);
@@ -258,7 +258,7 @@ describe('Composição em dois campos da tela de login (identidade-visual)', () 
       'GET /auth/me': { status: 401 },
       'GET /auth/public-config': {
         status: 200,
-        body: { appName: 'PapelHub', clientName: 'SETES', manualUrl: '', supportContact: '' },
+        body: { appName: 'PapelHub', clientName: 'ISEG', manualUrl: '', supportContact: '' },
       },
     });
     const primeira = renderApp(['/login']);

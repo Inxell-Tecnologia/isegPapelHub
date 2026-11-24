@@ -51,32 +51,37 @@ describe('Razão de contraste (sistema-de-design, apuração por cálculo)', () 
     expect(luminanciaRelativa('#000000')).toBeCloseTo(0, 10);
   });
 
-  // Tabela da decisão D2/D3 do design.md desta change, verificada valor a
-  // valor: se um token mudar, é aqui que a mudança aparece antes de chegar à
-  // tela.
+  // Tabela da decisão D5 do design.md de `sync-upstream-identidade-iseg`
+  // (paleta derivada da logo do ISEG; os nomes dos tokens são papéis herdados
+  // — D6), verificada valor a valor: se um token mudar, é aqui que a mudança
+  // aparece antes de chegar à tela.
   it.each([
-    ['branco sobre o verde de ação', paleta.branco, paleta.verdeAcao, 5.37],
-    ['branco sobre o verde da marca', paleta.branco, paleta.verdeMarca, 2.21],
-    ['texto sobre o verde da marca', paleta.texto, paleta.verdeMarca, 7.77],
-    ['branco sobre o topo do degradê', paleta.branco, paleta.marinhoEscuro, 15.76],
-    ['branco sobre a base do degradê', paleta.branco, paleta.marinhoClaro, 8.16],
+    ['branco sobre a cor de ação', paleta.branco, paleta.verdeAcao, 5.56],
+    ['branco sobre o laranja de destaque', paleta.branco, paleta.verdeMarca, 3.15],
+    ['texto sobre o laranja de destaque', paleta.texto, paleta.verdeMarca, 5.44],
+    ['branco sobre o topo do degradê', paleta.branco, paleta.marinhoEscuro, 14.27],
+    ['branco sobre a base do degradê', paleta.branco, paleta.marinhoClaro, 10.07],
     ['texto sobre a superfície', paleta.texto, paleta.superficie, 15.92],
     ['texto de apoio sobre a superfície', paleta.textoApoio, paleta.superficie, 5.85],
-    ['link sobre branco', paleta.azulLink, paleta.branco, 8.06],
+    ['link sobre branco', paleta.azulLink, paleta.branco, 7.02],
     [
       'texto de apoio sobre o topo do degradê',
       paleta.textoSobreEscuro,
       paleta.marinhoEscuro,
-      10.58,
+      11.32,
     ],
-    ['texto de apoio sobre a base do degradê', paleta.textoSobreEscuro, paleta.marinhoClaro, 5.48],
+    ['texto de apoio sobre a base do degradê', paleta.textoSobreEscuro, paleta.marinhoClaro, 7.98],
+    // O laranja de destaque é anel de foco e item ativo sobre a navegação:
+    // precisa de 3:1 contra o degradê inteiro (design.md D5).
+    ['laranja de destaque sobre o topo do degradê', paleta.verdeMarca, paleta.marinhoEscuro, 4.53],
+    ['laranja de destaque sobre a base do degradê', paleta.verdeMarca, paleta.marinhoClaro, 3.19],
     ['borda de controle sobre branco', paleta.bordaControle, paleta.branco, 3.57],
     ['borda de controle sobre a superfície', paleta.bordaControle, paleta.superficie, 3.31],
     ['borda decorativa sobre branco', paleta.bordaDecorativa, paleta.branco, 1.27],
     // Avatar de identidade (change `menu-lateral-e-barra-superior`, design.md D7)
-    ['iniciais escuras sobre o avatar', paleta.texto, paleta.azulAvatar, 11.12],
-    ['branco sobre o avatar — par RECUSADO', paleta.branco, paleta.azulAvatar, 1.54],
-    ['avatar sobre a base do degradê', paleta.azulAvatar, paleta.marinhoClaro, 5.29],
+    ['iniciais escuras sobre o avatar', paleta.texto, paleta.azulAvatar, 12.99],
+    ['branco sobre o avatar — par RECUSADO', paleta.branco, paleta.azulAvatar, 1.32],
+    ['avatar sobre a base do degradê', paleta.azulAvatar, paleta.marinhoClaro, 7.62],
   ])('%s mede %s:1, como apurado no design', (_nome, a, b, esperado) => {
     expect(razaoDeContraste(a as string, b as string)).toBeCloseTo(esperado as number, 2);
   });
@@ -141,7 +146,7 @@ describe('Piso de acessibilidade dos tokens (sistema-de-design)', () => {
   // ativo com rótulo **branco** sobre o verde da marca. Este caso registra
   // por que a implementação divergiu (design.md D2) — se alguém "corrigir" a
   // cor do rótulo para branco, o par passa a reprovar aqui.
-  it('o verde da marca reprova como fundo de texto branco, e por isso não o recebe', () => {
+  it('o laranja de destaque reprova como fundo de texto branco, e por isso não o recebe', () => {
     expect(atendeAoPiso(paleta.branco, paleta.verdeMarca, PISO_CONTRASTE_TEXTO)).toBe(false);
     expect(theme.components?.Menu?.darkItemSelectedColor).toBe(paleta.texto);
     expect(theme.components?.Menu?.darkItemSelectedBg).toBe(paleta.verdeMarca);
@@ -241,7 +246,7 @@ describe('Piso de acessibilidade dos tokens (sistema-de-design)', () => {
     expect(ESTILO_GLOBAL).toContain(`min-height: ${ALTURA_MINIMA_ACIONAMENTO}px`);
   });
 
-  it('o botão principal usa o verde de ação, não o verde da marca', () => {
+  it('o botão principal usa a cor de ação, não o laranja de destaque', () => {
     expect(theme.token?.colorPrimary).toBe(paleta.verdeAcao);
   });
 
@@ -286,8 +291,14 @@ describe("Marca d'água da navegação (identidade-isetes-e-menu-compacto, desig
     expect(atendeAoPiso(paleta.branco, fundo, PISO_CONTRASTE_TEXTO)).toBe(true);
   });
 
-  it('os 14% da demanda nº 2 reprovariam o piso — o teto não é arbitrário', () => {
-    expect(atendeAoPiso(paleta.textoSobreEscuro, fundoSobAMarca(0.14), PISO_CONTRASTE_TEXTO)).toBe(
+  // Com o degradê verde-petróleo do ISEG, os 14% da demanda nº 2 passariam;
+  // o texto só reprova a partir de 22% (sync-upstream-identidade-iseg,
+  // design.md D7). A opacidade adotada continua 8%.
+  it('a 22% o texto da navegação reprovaria o piso — o teto não é arbitrário', () => {
+    expect(atendeAoPiso(paleta.textoSobreEscuro, fundoSobAMarca(0.2), PISO_CONTRASTE_TEXTO)).toBe(
+      true,
+    );
+    expect(atendeAoPiso(paleta.textoSobreEscuro, fundoSobAMarca(0.22), PISO_CONTRASTE_TEXTO)).toBe(
       false,
     );
   });
@@ -320,7 +331,7 @@ describe("Marca d'água da área principal (marca-dagua-e-inicio-rodada-3, desig
     }
   });
 
-  it('a 10% o verde de ação reprovaria — o teto não é arbitrário', () => {
+  it('a 10% a cor de ação reprovaria — o teto não é arbitrário', () => {
     expect(atendeAoPiso(paleta.verdeAcao, fundoSobAMarca(0.1), PISO_CONTRASTE_TEXTO)).toBe(false);
   });
 });

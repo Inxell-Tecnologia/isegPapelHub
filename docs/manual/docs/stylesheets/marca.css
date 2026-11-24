@@ -1,0 +1,37 @@
+/*
+ * Cores da marca no site do manual (paleta "custom" do tema Material).
+ *
+ * Derivadas da logo do ISEG — turquesa #00A9A5 e laranja #F26522 — e iguais
+ * aos tokens da aplicação em apps/web/src/app/theme.ts (change
+ * sync-upstream-identidade-iseg, design.md D5). Se a paleta da aplicação
+ * mudar, esta folha muda junto.
+ */
+
+:root,
+[data-md-color-scheme="default"] {
+  /* Cabeçalho e abas: verde-petróleo do degradê (marinhoEscuro), branco a 14,27:1. */
+  --md-primary-fg-color: #06302f;
+  --md-primary-fg-color--light: #0a4a48;
+  --md-primary-fg-color--dark: #03201f;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #cdebe9;
+  /* Destaque ao passar o ponteiro: turquesa de ação (verdeAcao, 5,56:1 sobre
+     branco) — o laranja vivo da logo mede 3,15:1 e não serve como texto. */
+  --md-accent-fg-color: #00756f;
+  --md-accent-fg-color--transparent: rgba(0, 117, 111, 0.1);
+  /* Links: turquesa escurecido (azulLink, 7,02:1 sobre branco). */
+  --md-typeset-a-color: #006460;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #06302f;
+  --md-primary-fg-color--light: #0a4a48;
+  --md-primary-fg-color--dark: #03201f;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #cdebe9;
+  /* No fundo escuro o laranja vivo da logo tem contraste: é ele o destaque. */
+  --md-accent-fg-color: #f26522;
+  --md-accent-fg-color--transparent: rgba(242, 101, 34, 0.1);
+  /* Links: tinta clara do turquesa (azulAvatar), legível sobre o fundo escuro. */
+  --md-typeset-a-color: #bfe8e6;
+}

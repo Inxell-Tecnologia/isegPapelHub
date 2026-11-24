@@ -111,7 +111,7 @@ export function LoginPage() {
       }}
     >
       <div style={{ display: 'flex', justifyContent: isNarrow ? 'center' : 'flex-start' }}>
-        {/* Logo branca do Instituto SETES, **decorativa**: o heading logo
+        {/* Logo negativa do ISEG, **decorativa**: o heading logo
             abaixo é o nome acessível, e a identificação do cliente segue em
             texto — o requisito "Identificação do cliente não contamina o nome
             acessível do título" exige que o nome acessível do heading seja
