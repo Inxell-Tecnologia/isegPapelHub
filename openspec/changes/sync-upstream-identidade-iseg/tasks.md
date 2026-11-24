@@ -155,12 +155,13 @@
 
 - [x] 7.1 `mkdocs.yml`: logo = símbolo negativo, favicon = símbolo colorido,
       paleta `custom` com `stylesheets/marca.css` nas cores da D5.
-- [ ] 7.2 `a-tela.md` e `primeiro-acesso.md`: logo, símbolo, cores e exemplo de
-      identificação do ISEG — **feito**; `grep -rni "setes\|isetes" docs/manual/docs`
-      vazio e `mkdocs build --strict` passa. **Pendente:** `index.md` anuncia
-      como "endereço desta implantação" a URL do Cloud Run do GDoc
-      (`gdoc-prod-api-hmwigy67mq-uc.a.run.app`); trocar pela URL real do ISEG
-      (`terraform output -raw api_url` no Cloud Shell).
+- [x] 7.2 `a-tela.md` e `primeiro-acesso.md`: logo, símbolo, cores e exemplo de
+      identificação do ISEG; `index.md`: o "endereço desta implantação" passa da
+      URL do Cloud Run do GDoc para a do ISEG,
+      `https://gdoc-prod-api-pbr7vkzcga-uc.a.run.app/` (`terraform output -raw
+      api_url` no Cloud Shell, 2026-11-24). Verificado:
+      `grep -rni "setes\|isetes\|hmwigy67mq" docs/manual/docs` vazio e
+      `mkdocs build --strict` passa.
 
 ## 8. Verificação final
 
