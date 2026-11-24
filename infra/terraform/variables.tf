@@ -248,6 +248,17 @@ variable "notify_expiring_grants_schedule" {
   default     = "30 3 * * *"
 }
 
+variable "notify_readings_schedule" {
+  description = <<-EOT
+    Expressão cron (fuso do Cloud Scheduler) da rotina diária de avisos de
+    leitura obrigatória (change avisos-e-atrasos, design.md D4). Depois do
+    expurgo (03:00) e dos avisos de concessão (03:30), para não concorrer por
+    conexões de banco.
+  EOT
+  type        = string
+  default     = "45 3 * * *"
+}
+
 variable "grant_expiring_notice_window_days" {
   description = <<-EOT
     Janela de antecedência (dias) do aviso prévio de vencimento de permissão
@@ -302,6 +313,21 @@ variable "app_manual_url" {
     design.md D2) — não existe valor que suprima o acesso. Se preenchido,
     deve ser um endereço http/https válido — a API falha no arranque caso
     contrário.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "app_support_contact" {
+  description = <<-EOT
+    Contato do suporte desta implantação, exibido na tela de login a quem não
+    consegue entrar (change identidade-visual-isetes, design.md D8). É por
+    este caminho que a redefinição de senha efetivamente ocorre — não há
+    auto-atendimento. Texto livre: e-mail, ramal ou ambos, como a implantação
+    preferir. Não é segredo — aparece numa tela pré-autenticação —, mesmo
+    tratamento de app_client_name: env var comum do Cloud Run, não Secret
+    Manager. Vazio (padrão) = nenhum aviso de contato é exibido, sem espaço
+    reservado na tela.
   EOT
   type        = string
   default     = ""

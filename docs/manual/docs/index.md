@@ -24,6 +24,8 @@ da organização enxerga somente o seu próprio conteúdo.
 
 Principais recursos:
 
+- **Tela inicial** com saudação, atalhos conforme o seu perfil, acesso rápido às
+  suas pastas e os documentos alterados recentemente.
 - Navegador de arquivos com **pastas e subpastas** e trilha de navegação.
 - **Envio** de vários arquivos de uma vez ou de uma pasta inteira, preservando a
   estrutura de subpastas.
@@ -32,6 +34,7 @@ Principais recursos:
   renomear, excluir).
 - **Lixeira** com retenção temporária para recuperar o que foi excluído.
 - **Auditoria** de quem acessou cada arquivo.
+- **Busca** no cabeçalho, ao alcance de qualquer tela.
 - **Painel** gerencial de uso (para administradores).
 - **Cota de armazenamento** por colaborador.
 
@@ -47,7 +50,7 @@ quando sua conta é criada. Existem três:
 | ----------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Colaborador**              | Apenas os arquivos e pastas que criou ou que lhe foram liberados.                             | Enviar, visualizar, baixar, renomear e excluir conforme sua permissão; ver a auditoria dos arquivos que enviou; trocar a própria senha.                                                     |
 | **Administrador da unidade** | Tudo da **sua unidade** (colaboradores, pastas, arquivos, permissões). Não enxerga outras unidades. | Tudo o que o colaborador faz, mais: cadastrar, editar, ativar/desativar colaboradores da unidade e redefinir a senha deles; conceder e revogar permissões; ver o painel e a auditoria da unidade. |
-| **Administrador global**     | **Todas as unidades**.                                                                        | Tudo o que o administrador de unidade faz, em escala global; além disso, cria e administra as **unidades** e define administradores de unidade.                                             |
+| **Administrador global**     | **Todas as unidades**.                                                                        | Tudo o que o administrador da unidade faz, em escala global; além disso, cria e administra as **unidades** e define os administradores de cada unidade.                                             |
 
 !!! note "Alcance, não exceção"
     Os perfis definem o **alcance** (o que você enxerga). Mesmo sendo

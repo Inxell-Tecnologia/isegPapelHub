@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import type { ChangePasswordRequest, MyProfileResponse, PublicConfigResponse } from '@gdoc/shared';
+import type {
+  AuthenticatedIdentity,
+  ChangePasswordRequest,
+  MyProfileResponse,
+  PublicConfigResponse,
+} from '@gdoc/shared';
 import type { LoginRequest } from '@gdoc/shared';
 import type { Ports } from '../ports/index.js';
 import { config } from '../config.js';
@@ -18,6 +23,12 @@ interface UserAuthRow {
   role: string;
   status: string;
   password_hash: string;
+  full_name: string | null;
+  unit_name: string;
+  job_title: string | null;
+  sector_name: string | null;
+  tour_completed: boolean;
+  reading_oversight: string | null;
 }
 
 /**
@@ -35,9 +46,10 @@ export function authRouter(ports: Ports, appManualUrl: string): Router {
 
   // Configuração pública de apresentação da implantação (change
   // rebranding-doc7-setes, design.md D1/D2/D4; manualUrl acrescentado pela
-  // change acesso-ao-manual-no-shell, design.md D3): sem attachTenantContext
+  // change acesso-ao-manual-no-shell, design.md D3; supportContact pela
+  // change identidade-visual-isetes, design.md D8): sem attachTenantContext
   // — a tela de login é pré-autenticação e precisa desta configuração antes
-  // de haver sessão. Contrato travado a uma allowlist nominal de três
+  // de haver sessão. Contrato travado a uma allowlist nominal de quatro
   // valores; nenhum outro dado de configuração entra aqui. Não abre
   // transação tenant.
   router.get('/auth/public-config', (_req, res) => {
@@ -45,6 +57,7 @@ export function authRouter(ports: Ports, appManualUrl: string): Router {
       appName: 'PapelHub',
       clientName: config.appClientName,
       manualUrl: appManualUrl,
+      supportContact: config.appSupportContact,
     };
     res.json(response);
   });
@@ -61,7 +74,18 @@ export function authRouter(ports: Ports, appManualUrl: string): Router {
         { unitId: BOOTSTRAP_UNIT, userId: BOOTSTRAP_UNIT, role: 'global_admin' },
         async (client) => {
           const { rows } = await client.query<UserAuthRow>(
-            'SELECT id, unit_id, role, status, password_hash FROM users WHERE email = $1',
+            // `LEFT JOIN` no setor pela mesma razão de `tenant-context.ts`:
+            // pessoa sem setor é estado válido, e um `JOIN` a impediria de
+            // autenticar.
+            `SELECT u.id, u.unit_id, u.role, u.status, u.password_hash,
+                    u.full_name, un.name AS unit_name,
+                    u.job_title, s.name AS sector_name,
+                    (u.tour_completed_at IS NOT NULL) AS tour_completed,
+                    u.reading_oversight
+             FROM users u
+             JOIN units un ON un.id = u.unit_id
+             LEFT JOIN sectors s ON s.id = u.sector_id
+             WHERE u.email = $1`,
             [email],
           );
           return rows[0] ?? null;
@@ -85,7 +109,23 @@ export function authRouter(ports: Ports, appManualUrl: string): Router {
         ...sessionCookieOptions(),
         maxAge: config.authSessionTtlSeconds * 1000,
       });
-      res.json({ id: user.id, unitId: user.unit_id, role: user.role });
+      // Nome, unidade, função e setor vêm da **mesma** leitura que autenticou
+      // (change `shell-e-inicio`, design.md D3; função e setor pela change
+      // `funcao-e-setor-na-identidade`, design.md D5) — não há segunda
+      // consulta, e o login devolve a identidade na mesma forma de
+      // `GET /auth/me`.
+      const identity: AuthenticatedIdentity = {
+        id: user.id,
+        unitId: user.unit_id,
+        role: user.role as AuthenticatedIdentity['role'],
+        fullName: user.full_name ?? '',
+        unitName: user.unit_name,
+        jobTitle: user.job_title ?? '',
+        sectorName: user.sector_name ?? '',
+        tourCompleted: user.tour_completed,
+        readingOversight: user.reading_oversight as AuthenticatedIdentity['readingOversight'],
+      };
+      res.json(identity);
     } catch (err) {
       next(err);
     }
@@ -96,9 +136,44 @@ export function authRouter(ports: Ports, appManualUrl: string): Router {
     res.status(204).end();
   });
 
+  // Identidade da sessão corrente. Nome e unidade vêm de `identityDisplay`,
+  // populado pela própria releitura por requisição de `attachTenantContext`
+  // (change `shell-e-inicio`, design.md D3): nenhum dos dois sai do token, por
+  // isso um nome alterado no cadastro aparece já na requisição seguinte.
   router.get('/auth/me', attachTenantContext(ports), (req, res) => {
     const ctx = req.tenantContext!;
-    res.json({ id: ctx.userId, unitId: ctx.unitId, role: ctx.role });
+    const display = req.identityDisplay!;
+    const identity: AuthenticatedIdentity = {
+      id: ctx.userId,
+      unitId: ctx.unitId,
+      role: ctx.role,
+      fullName: display.fullName,
+      unitName: display.unitName,
+      jobTitle: display.jobTitle,
+      sectorName: display.sectorName,
+      tourCompleted: display.tourCompleted,
+      readingOversight: display.readingOversight,
+    };
+    res.json(identity);
+  });
+
+  // Registro de "já fiz o tour" (change `tour-guiado`, design.md D4/D5): só a
+  // **própria** conta — sem corpo, sem identificador na URL —, gravando a
+  // **primeira** vez (`COALESCE`), idempotente. Sob `/auth`, como
+  // `/auth/password`: é estado da conta, e nenhum prefixo de topo novo entra.
+  router.post('/auth/tour-completed', attachTenantContext(ports), async (req, res, next) => {
+    try {
+      const ctx = req.tenantContext!;
+      await ports.database.withTenantTransaction(ctx, (client) =>
+        client.query(
+          'UPDATE users SET tour_completed_at = COALESCE(tour_completed_at, now()) WHERE id = $1',
+          [ctx.userId],
+        ),
+      );
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
   });
 
   // Alteração da própria senha (US 1.3). Qualquer papel autenticado, sem

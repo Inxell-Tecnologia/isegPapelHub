@@ -150,7 +150,11 @@ describe('Rotina de avisos de expiração (jobs/notify-expiring-grants.ts)', () 
     const real = new InAppNotificationPort(database);
     const flaky: NotificationPort = {
       notify: async (input: NotifyInput) => {
-        if (input.payload.resourceId === fileFails) {
+        // `payload` é união discriminada por `kind` desde a change
+        // `arquivo-geral-e-pendente-de-cadastro`; estreitar antes de ler o
+        // campo é o que mantém o canal aberto a assuntos que não são
+        // concessão.
+        if ('resourceId' in input.payload && input.payload.resourceId === fileFails) {
           throw new Error('falha simulada');
         }
         return real.notify(input);

@@ -1,44 +1,29 @@
-import { Badge, Button, Dropdown, Empty, List, Tag, Typography } from 'antd';
-import { BellOutlined } from '@ant-design/icons';
-import type { NotificationResponse } from '@gdoc/shared';
-import { GrantResourceType, NotificationKind } from '@gdoc/shared';
-import { VERB_LABEL } from '../permissoes/PermissoesModal';
+import { Badge, Button, Dropdown, Empty, List, Typography } from 'antd';
+import { IconeNotificacoes } from '../app/icons';
+import { RotuloDeEstado } from '../app/RotuloDeEstado';
+import { paleta } from '../app/theme';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { formatDate } from '../navegacao/format';
+import {
+  destinoDaNotificacao,
+  mensagemDaNotificacao,
+  rotuloDoDestino,
+} from '../notificacoes/mensagens';
 import {
   useMarkNotificationAsRead,
   useNotifications,
   useUnreadNotificationCount,
 } from '../notificacoes/queries';
 
-const RESOURCE_LABEL: Record<GrantResourceType, string> = {
-  [GrantResourceType.FOLDER]: 'pasta',
-  [GrantResourceType.FILE]: 'arquivo',
-};
-
 /**
- * `subjectUserId` (aviso de corte) não é resolvido a nome aqui: a central
- * aparece em toda página do shell, e resolver nomes exigiria mais uma
- * chamada sempre ativa a `GET /users` — o mesmo endpoint que páginas de
- * administração já consultam para outros fins. O uuid identifica a pessoa
- * de forma inequívoca; a listagem de pessoas (`admin/pessoas`) é onde o
- * administrador confere quem é quem.
+ * Nome acessível do sino com a quantidade de não lidas (change
+ * `marca-dagua-e-inicio-rodada-3`, design.md D7): quem não vê o indicador
+ * ouve o número no próprio controle.
  */
-function messageFor(notification: NotificationResponse): string {
-  const { payload } = notification;
-  const resource = RESOURCE_LABEL[payload.resourceType];
-  const verbs = payload.permissions.map((permission) => VERB_LABEL[permission]).join(', ');
-  const date = formatDate(payload.expiresAt);
-
-  switch (notification.kind) {
-    case NotificationKind.GRANT_CREATED:
-      return `Você recebeu acesso (${verbs}) a este ${resource}, válido até ${date}.`;
-    case NotificationKind.GRANT_EXPIRING:
-      return `Seu acesso (${verbs}) a este ${resource} vence em ${date}.`;
-    case NotificationKind.GRANT_EXPIRED:
-      return `O acesso (${verbs}) de ${payload.subjectUserId ?? '—'} a este ${resource} foi encerrado em ${date}.`;
-    default:
-      return 'Notificação';
-  }
+export function nomeAcessivelDoSino(naoLidas: number): string {
+  if (naoLidas <= 0) return 'Notificações';
+  return `Notificações, ${naoLidas} ${naoLidas === 1 ? 'não lida' : 'não lidas'}`;
 }
 
 /**
@@ -48,8 +33,10 @@ function messageFor(notification: NotificationResponse): string {
  */
 export function NotificationCenter() {
   const { data: unreadCount } = useUnreadNotificationCount();
+  const naoLidas = unreadCount ?? 0;
   const { data, refetch } = useNotifications(false);
   const markAsRead = useMarkNotificationAsRead();
+  const [aberto, setAberto] = useState(false);
 
   const notifications = data?.notifications ?? [];
 
@@ -97,15 +84,24 @@ export function NotificationCenter() {
             >
               <List.Item.Meta
                 title={
-                  !notification.readAt && (
-                    <Tag color="blue" style={{ marginRight: 4 }}>
-                      Nova
-                    </Tag>
-                  )
+                  !notification.readAt && <RotuloDeEstado tom="informativo">Nova</RotuloDeEstado>
                 }
                 description={
                   <>
-                    <Typography.Text>{messageFor(notification)}</Typography.Text>
+                    <Typography.Text>{mensagemDaNotificacao(notification)}</Typography.Text>
+                    {destinoDaNotificacao(notification) && (
+                      <div>
+                        {/* Aviso do leitor leva às próprias leituras (change
+                            `avisos-e-atrasos`, design.md D5); navegar fecha o
+                            sino, como acionar um destino. */}
+                        <Link
+                          to={destinoDaNotificacao(notification)!}
+                          onClick={() => setAberto(false)}
+                        >
+                          {rotuloDoDestino(notification)}
+                        </Link>
+                      </div>
+                    )}
                     <div>
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                         {formatDate(notification.createdAt)}
@@ -125,13 +121,43 @@ export function NotificationCenter() {
     <Dropdown
       trigger={['click']}
       popupRender={dropdownRender}
+      open={aberto}
       onOpenChange={(open) => {
+        setAberto(open);
         if (open) refetch();
       }}
     >
-      <Badge count={unreadCount ?? 0} size="small">
-        <Button type="text" icon={<BellOutlined style={{ fontSize: 18 }} />} />
-      </Badge>
+      {/* Indicador **vermelho** sobre o sino (`docs/demanda_cliente_3.md`, item
+          10; design.md D7), no token com o número branco a 5,57:1 — o padrão
+          do design system mede 3,27:1. O indicador é desenho: fica fora da
+          árvore acessível, e a quantidade vai no nome do botão, para não ser
+          anunciada duas vezes. */}
+      <span style={{ position: 'relative', display: 'inline-flex' }}>
+        {/* O ícone é `aria-hidden` (módulo único de ícones), então o nome
+            acessível tem de vir do próprio controle — sem ele este botão não
+            tem nome algum para tecnologia assistiva. */}
+        <Button
+          type="text"
+          aria-label={nomeAcessivelDoSino(naoLidas)}
+          icon={<IconeNotificacoes style={{ fontSize: 18 }} />}
+        />
+        {naoLidas > 0 && (
+          <span
+            aria-hidden
+            data-indicador-do-sino=""
+            style={{
+              position: 'absolute',
+              top: 6,
+              right: 6,
+              transform: 'translate(50%, -50%)',
+              pointerEvents: 'none',
+              lineHeight: 0,
+            }}
+          >
+            <Badge count={naoLidas} size="small" color={paleta.vermelhoIndicador} />
+          </span>
+        )}
+      </span>
     </Dropdown>
   );
 }

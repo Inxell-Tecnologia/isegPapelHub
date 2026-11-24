@@ -40,6 +40,11 @@ cors_allowed_origins = [
 # corrige-alcance-do-manual).
 # app_manual_url = "https://carlossalesnaturaltec.github.io/GDoc/"
 
+# Contato do suporte exibido na tela de login a quem não consegue entrar
+# (design.md D8 do change identidade-visual-isetes). Texto livre — e-mail,
+# ramal ou ambos. Vazio (padrão) = nenhum aviso de contato é exibido.
+# app_support_contact = "suporte@setes.org.br"
+
 # E-mail do administrador global criado pelo Job de bootstrap (obrigatório —
 # ver infra/terraform/README.md, seção "Bootstrap do administrador global").
 # A senha NÃO vai aqui: é criada como versão do secret bootstrap-admin-password

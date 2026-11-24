@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { UserRole } from '@gdoc/shared';
 import type { FileSummaryResponse, FolderContentsResponse, FolderResponse } from '@gdoc/shared';
 import { mockFetch } from './mock-fetch';
+import { SEM_CONTROLE_DOCUMENTAL } from './document-control-fixture';
 import { renderApp } from './render-app';
 import { mockViewportWidth, NARROW_VIEWPORT } from './viewport';
 
@@ -23,6 +24,7 @@ function file(
   overrides: Partial<FileSummaryResponse> & { id: string; fileName: string },
 ): FileSummaryResponse {
   return {
+    ...SEM_CONTROLE_DOCUMENTAL,
     ownerId: 'user-1',
     folderId: null,
     contentType: 'application/pdf',
@@ -34,7 +36,10 @@ function file(
 }
 
 function contents(overrides: Partial<FolderContentsResponse> = {}): FolderContentsResponse {
-  return { folder: null, breadcrumb: [], folders: [], files: [], ...overrides };
+  // `canUpload` vem resolvido pelo servidor (design.md D10 de
+  // `identidade-visual-isetes`); o padrão aqui é a pessoa poder enviar, que é
+  // o caso do dono da pasta — os casos de recusa o sobrescrevem.
+  return { folder: null, breadcrumb: [], folders: [], files: [], canUpload: true, ...overrides };
 }
 
 /**
@@ -49,6 +54,19 @@ async function findDialogByTitle(title: string): Promise<HTMLElement> {
     if (!dialog) throw new Error(`dialog "${title}" ainda não está no DOM`);
     return dialog;
   });
+}
+
+/**
+ * Área de conteúdo, sem o shell em volta.
+ *
+ * A change `menu-lateral-e-barra-superior` acrescentou a ação "Enviar
+ * documento" à barra superior, com o mesmo rótulo do botão da orientação de
+ * pasta vazia. A consulta global passou a ser ambígua: o que estes casos
+ * exercitam é o botão da **tela**, que só aparece quando o servidor já
+ * resolveu `canUpload`.
+ */
+function conteudo(): HTMLElement {
+  return document.querySelector('.ant-layout-content') as HTMLElement;
 }
 
 describe('Explorador de pastas/arquivos (web-navegacao)', () => {
@@ -74,9 +92,9 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
     expect(screen.queryByRole('link', { name: 'Pasta A' })).not.toBeInTheDocument();
     expect(screen.getByText('Pasta A')).toBeInTheDocument(); // agora só na trilha, sem link
 
-    // "Arquivos" também é item do menu lateral — escopa à trilha (`<nav>`).
+    // "Documentos" também é item do menu lateral — escopa à trilha (`<nav>`).
     const breadcrumb = screen.getByRole('navigation');
-    await userEvent.click(within(breadcrumb).getByRole('link', { name: 'Arquivos' }));
+    await userEvent.click(within(breadcrumb).getByRole('link', { name: 'Documentos' }));
 
     await screen.findByRole('link', { name: 'Pasta A' });
     expect(screen.queryByText('relatorio.pdf')).not.toBeInTheDocument();
@@ -379,6 +397,11 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
       renderApp(['/pastas']);
 
       await screen.findByText('relatorio.pdf');
+      // O gatilho do menu agrupado só existe no formato estreito: esperá-lo é
+      // esperar o veredito do breakpoint, que chega um render depois da
+      // montagem (ver `viewport.ts`). Só então o que o formato largo tem a
+      // mais pode ser afirmado ausente.
+      const maisAcoes = await screen.findByRole('button', { name: 'Mais ações' });
       const row = screen.getByText('relatorio.pdf').closest('tr')!;
 
       // Visualizar é o verbo central da consulta e permanece direta.
@@ -387,7 +410,7 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
       expect(within(row).queryByRole('button', { name: /renomear/i })).not.toBeInTheDocument();
       expect(within(row).queryByRole('button', { name: /^baixar$/i })).not.toBeInTheDocument();
 
-      await userEvent.click(within(row).getByRole('button', { name: 'Mais ações' }));
+      await userEvent.click(maisAcoes);
 
       // O popup do menu agrupado é renderizado fora da linha, num portal
       // (`.ant-dropdown`) — nenhuma ação foi suprimida, só reagrupada ali.
@@ -414,8 +437,8 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
       renderApp(['/pastas']);
 
       await screen.findByText('descartavel.pdf');
-      const row = screen.getByText('descartavel.pdf').closest('tr')!;
-      await userEvent.click(within(row).getByRole('button', { name: 'Mais ações' }));
+      // `findByRole`: o gatilho agrupado chega um render depois (ver `viewport.ts`).
+      await userEvent.click(await screen.findByRole('button', { name: 'Mais ações' }));
 
       await userEvent.click(await screen.findByRole('button', { name: /excluir/i }));
       // Ainda não excluído: a confirmação do Popconfirm segue exigida.
@@ -437,12 +460,15 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
       renderApp(['/pastas']);
 
       await screen.findByText('Pasta A');
+      // Mesma espera do caso do arquivo: o formato estreito se estabelece um
+      // render depois da montagem (ver `viewport.ts`).
+      const maisAcoes = await screen.findByRole('button', { name: 'Mais ações' });
       const row = screen.getByText('Pasta A').closest('tr')!;
 
       expect(within(row).queryByRole('button', { name: /renomear/i })).not.toBeInTheDocument();
       expect(within(row).queryByRole('button', { name: /mover para/i })).not.toBeInTheDocument();
 
-      await userEvent.click(within(row).getByRole('button', { name: 'Mais ações' }));
+      await userEvent.click(maisAcoes);
 
       await screen.findByText(/mover para/i);
       const menu = within(document.querySelector('.ant-dropdown')!);
@@ -470,5 +496,214 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
       const manifestCalled = calls.some((call) => String(call[0]).includes('/download-manifest'));
       expect(manifestCalled).toBe(false);
     });
+  });
+});
+
+describe('Pasta sem conteúdo orienta em vez de apresentar tabela vazia (web-navegacao)', () => {
+  it('pasta vazia com permissão de envio apresenta mensagem e a ação de enviar', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': { status: 200, body: contents({ canUpload: true }) },
+    });
+    renderApp(['/pastas']);
+
+    await screen.findByText(/Esta pasta ainda não tem documentos/);
+    expect(
+      within(conteudo()).getByRole('button', { name: 'Enviar documento' }),
+    ).toBeInTheDocument();
+  });
+
+  it('sem permissão de envio, a orientação informa a ausência sem oferecer a ação', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': { status: 200, body: contents({ canUpload: false }) },
+    });
+    renderApp(['/pastas']);
+
+    await screen.findByText(/Esta pasta ainda não tem documentos/);
+    expect(
+      within(conteudo()).queryByRole('button', { name: 'Enviar documento' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('pasta com ao menos um item visível lista normalmente, sem a orientação de vazio', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': {
+        status: 200,
+        body: contents({ files: [file({ id: 'file-1', fileName: 'contrato.pdf' })] }),
+      },
+    });
+    renderApp(['/pastas']);
+
+    await screen.findByText('contrato.pdf');
+    expect(screen.queryByText(/Esta pasta ainda não tem documentos/)).not.toBeInTheDocument();
+  });
+
+  // A ação da orientação leva à área de envio em vez de reimplementar o
+  // envio: é lá que vivem a pré-checagem de espaço e o relato por item.
+  it('a ação de enviar leva o foco ao gatilho da área de envio', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': { status: 200, body: contents({ canUpload: true }) },
+    });
+    renderApp(['/pastas']);
+
+    // Esperar a orientação de vazio (o shell ainda não montou) e só então
+    // escolher o botão da **tela**: há dois com este rótulo desde que a barra
+    // superior ganhou a ação de envio.
+    await screen.findByText(/Esta pasta ainda não tem documentos/);
+    await userEvent.click(within(conteudo()).getByRole('button', { name: 'Enviar documento' }));
+
+    await waitFor(() => expect(document.activeElement?.textContent).toMatch(/Enviar arquivos/i));
+  });
+});
+
+/**
+ * Pedido de envio recebido no endereço (change `cartoes-de-atalho-acionaveis`,
+ * design.md D4/D5): é o que faz o atalho "Enviar documentos" da tela inicial
+ * conduzir ao envio, e não a uma tela onde o envio ainda precise ser
+ * localizado. O gatilho da área de envio é o mesmo a que a orientação de pasta
+ * vazia leva, acima — não há segunda superfície de envio.
+ */
+describe('Explorador atende ao pedido de envio recebido no endereço (web-navegacao)', () => {
+  /**
+   * O gatilho da área de envio — o mesmo a que a orientação de pasta vazia
+   * leva. A área de envio é renderizada independentemente de `canUpload` (a
+   * recusa vem do servidor na emissão da URL assinada), então o gatilho existe
+   * nos dois casos e a pergunta é só se ele recebeu o foco.
+   */
+  function gatilhoDeEnvio(): HTMLElement {
+    return screen.getByRole('button', { name: /Enviar arquivos/i });
+  }
+
+  it('com permissão de envio, a área de envio recebe a pessoa', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': { status: 200, body: contents({ canUpload: true }) },
+    });
+    renderApp(['/pastas?enviar=1']);
+
+    await waitFor(() => expect(gatilhoDeEnvio()).toHaveFocus());
+  });
+
+  it('sem permissão de envio, o pedido não desloca a pessoa', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': { status: 200, body: contents({ canUpload: false }) },
+    });
+    const { router } = renderApp(['/pastas?enviar=1']);
+
+    // A tela apresenta o conteúdo da pasta normalmente...
+    await screen.findByText(/Esta pasta ainda não tem documentos/);
+    // ...e o foco não foi para o gatilho de envio. O veredito é o do servidor
+    // (`canUpload`), nunca uma inferência do cliente: é isso que impede o
+    // atalho de conduzir a uma recusa.
+    expect(gatilhoDeEnvio()).not.toHaveFocus();
+
+    // O parâmetro sai do endereço mesmo na recusa: um pedido latente ali
+    // faria o foco saltar para a área de envio se uma revalidação trocasse
+    // `canUpload` — muito depois do clique que o pediu.
+    await waitFor(() => expect(router.state.location.search).not.toContain('enviar'));
+  });
+
+  it('o pedido só é atendido depois que o veredito do servidor chega', async () => {
+    // O conteúdo da pasta — e com ele `canUpload` — demora. Enquanto não
+    // chega, o cliente não decide nada: nem atende o pedido, nem o descarta.
+    let liberar!: (r: Response) => void;
+    const contentsPendente = new Promise<Response>((resolve) => {
+      liberar = resolve;
+    });
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': { status: 200, body: contents({ canUpload: true }) },
+    });
+    const comRotas = globalThis.fetch;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (new URL(url, 'http://localhost').pathname === '/folders/root/contents') {
+        return contentsPendente;
+      }
+      return comRotas(input, init);
+    }) as typeof fetch;
+
+    const { router } = renderApp(['/pastas?enviar=1']);
+
+    // Enquanto o conteúdo não chega, a tela está em carregamento: o pedido
+    // continua intocado no endereço e não há sequer área de envio a focar.
+    await waitFor(() => expect(document.querySelector('.ant-spin')).toBeInTheDocument());
+    expect(router.state.location.search).toContain('enviar');
+    expect(screen.queryByRole('button', { name: /Enviar arquivos/i })).not.toBeInTheDocument();
+
+    liberar(
+      new Response(JSON.stringify(contents({ canUpload: true })), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    // Chegado o veredito, e só então, o pedido é atendido.
+    await waitFor(() => expect(gatilhoDeEnvio()).toHaveFocus());
+    globalThis.fetch = comRotas;
+  });
+
+  it('o pedido não se repete depois de atendido', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': { status: 200, body: contents({ canUpload: true }) },
+    });
+    const { router } = renderApp(['/pastas?enviar=1']);
+
+    await waitFor(() => expect(gatilhoDeEnvio()).toHaveFocus());
+
+    // O parâmetro sai do endereço assim que é atendido: sem isso, recarregar a
+    // tela ou voltar a ela pelo histórico roubaria o foco de quem já está
+    // trabalhando na pasta, e o endereço guardado nos favoritos carregaria
+    // para sempre um pedido que fazia sentido uma única vez.
+    await waitFor(() => expect(router.state.location.search).not.toContain('enviar'));
+
+    // Movido o foco para outro lugar, nada o traz de volta ao envio: a
+    // condição do efeito depende do parâmetro, que já não está no endereço.
+    gatilhoDeEnvio().blur();
+    expect(gatilhoDeEnvio()).not.toHaveFocus();
+  });
+});
+
+/**
+ * Pedido de nova pasta recebido no endereço (change `conteudo-da-tela-inicio`,
+ * design.md D5): é o que faz o atalho "Nova pasta" da tela inicial conduzir ao
+ * formulário. Atendido só na raiz — onde criar pasta é livre a qualquer pessoa
+ * autenticada — e uma vez só.
+ */
+describe('Explorador atende ao pedido de nova pasta recebido no endereço (web-navegacao)', () => {
+  it('na raiz, o formulário de nova pasta é apresentado e o pedido sai do endereço', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/root/contents': { status: 200, body: contents() },
+    });
+    const { router } = renderApp(['/pastas?nova-pasta=1']);
+
+    expect(await findDialogByTitle('Nova pasta')).toBeInTheDocument();
+    // Substitui a entrada de histórico: recarregar ou voltar não reabre.
+    await waitFor(() => expect(router.state.location.search).not.toContain('nova-pasta'));
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+
+  it('numa subpasta, o pedido é descartado sem abrir o formulário', async () => {
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/folder-a/contents': {
+        status: 200,
+        body: contents({
+          folder: folder({ id: 'folder-a', name: 'Pasta A' }),
+          breadcrumb: [folder({ id: 'folder-a', name: 'Pasta A' })],
+        }),
+      },
+    });
+    const { router } = renderApp(['/pastas/folder-a?nova-pasta=1']);
+
+    await screen.findByRole('button', { name: /Excluir esta pasta/ });
+    await waitFor(() => expect(router.state.location.search).not.toContain('nova-pasta'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

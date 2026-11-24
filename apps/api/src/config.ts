@@ -168,8 +168,34 @@ export const config = {
   // `ensureFolderPath` + N `INSERT` sequenciais, versus a memória do parser),
   // e amarrar um ao outro reproduz o acoplamento que causou o defeito do
   // corpo de 100 KB.
+  // Teto de favoritos por pessoa (change `favoritos`, design.md D4): a lista
+  // resolve o alcance item a item, então o tamanho dela precisa de limite.
+  favorites: {
+    maxPerUser: Number(optional('FAVORITES_MAX_PER_USER', '200')),
+  },
+
   uploadBatch: {
     maxItems: Number(optional('UPLOAD_BATCH_MAX_ITEMS', String(UPLOAD_BATCH_MAX_ITEMS_DEFAULT))),
+  },
+
+  // Recorte da lista de documentos alterados recentemente (change
+  // `shell-e-inicio`, design.md D1/Risks). O recorte é **duplo** de
+  // propósito: `audit_events` cresce sem limite, e o teto de itens sozinho
+  // não evitaria varrer a tabela inteira para descobrir quais são os mais
+  // recentes. `candidateLimit` é o teto de candidatos lidos antes do filtro
+  // de permissão item a item (design.md D2) — precisa ser maior que
+  // `maxItems`, porque boa parte dos candidatos pode ser inacessível a quem
+  // consulta. Configuráveis por ambiente, mesmo molde dos demais tetos.
+  recentDocuments: {
+    maxItems: Number(optional('RECENT_DOCUMENTS_MAX_ITEMS', '10')),
+    windowDays: Number(optional('RECENT_DOCUMENTS_WINDOW_DAYS', '90')),
+    candidateLimit: Number(optional('RECENT_DOCUMENTS_CANDIDATE_LIMIT', '300')),
+    // Janela da contagem de "documentos novos" da tela Início (change
+    // `conteudo-da-tela-inicio`, design.md D1; resposta 3b do cliente em
+    // `docs/respostas_d1_d3_d5_decisoes_estruturais.txt`). "Novo" é
+    // **publicado** na janela, não alterado. O teto de candidatos é o mesmo
+    // `candidateLimit` acima (design.md D3).
+    newWindowDays: Number(optional('RECENT_DOCUMENTS_NEW_WINDOW_DAYS', '7')),
   },
 
   // Teto de corpo aceito pelo parser de JSON (change
@@ -222,4 +248,12 @@ export const config = {
   // acesso (design.md D3). Validado (esquema http/https) no arranque de
   // `createApp` (app.ts), não aqui — design.md D5.
   appManualUrl: resolveManualUrl(process.env.APP_MANUAL_URL),
+
+  // Contato do suporte exibido na tela de login (change
+  // identidade-visual-isetes, design.md D8) — dado público, servido por
+  // GET /auth/public-config ao lado de APP_CLIENT_NAME e **sem** passar pelo
+  // SecretsPort: aparece numa tela pré-autenticação, logo é público por
+  // natureza. Texto livre (e-mail, ramal ou ambos), para a implantação
+  // escolher. Vazio/ausente ⇒ nenhum aviso de contato é exibido.
+  appSupportContact: optional('APP_SUPPORT_CONTACT', ''),
 };

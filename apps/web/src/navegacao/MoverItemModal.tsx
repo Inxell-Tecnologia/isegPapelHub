@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Breadcrumb, Button, List, Modal, Space, Spin, Typography } from 'antd';
-import { FolderOutlined } from '@ant-design/icons';
+import { IconePasta } from '../app/icons';
 import { useFolderContents } from './queries';
 
 export interface MovingItem {
@@ -97,7 +97,7 @@ export function MoverItemModal({ items, submitting, onCancel, onConfirm }: Mover
                 ]}
               >
                 <Space>
-                  <FolderOutlined />
+                  <IconePasta />
                   {folder.name}
                 </Space>
               </List.Item>

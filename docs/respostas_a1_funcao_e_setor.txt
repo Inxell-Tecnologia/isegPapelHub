@@ -1,0 +1,73 @@
+RESPOSTAS DO CLIENTE AO QUESTIONARIO DE "PERFIL", "SETOR" E "GESTOR"
+
+Retorno de `docs/questionario_a1_funcao_e_setor.txt` (fatia A1 do plano em
+`docs/plano_demanda_cliente_2.md`). Recebido em 2026-11-04. Transcricao fiel do
+que o cliente respondeu — os nomes da pergunta 2 vieram ocultados pelo proprio
+cliente como "[NOME - UNIDADE]".
+
+Leia junto com o questionario: as perguntas, as alternativas e o que cada uma
+implica estao la, e nao sao repetidas aqui.
+
+
+BLOCO 1 - PERFIL
+
+1. Opcao (a). Abaixo da saudacao deve aparecer o cargo da pessoa, por exemplo
+   "Gerente de Governanca". Se o cargo nao estiver preenchido, ai sim aparece o
+   nivel de acesso. Para quem usa o sistema, o cargo e o que faz sentido;
+   "Colaborador" ou "Gestor" e coisa interna do sistema.
+
+2. Opcao (b). Alem de mim (Governanca), quem deve administrar cada unidade e uma
+   pessoa de referencia dela: [NOME - UNIDADE], [NOME - UNIDADE],
+   [NOME - UNIDADE]. Vale lembrar que o controle dos documentos institucionais
+   continua com a Governanca, entao eu preciso enxergar todas as unidades.
+
+BLOCO 2 - GESTOR E EQUIPE
+
+3. Opcao (b), com um ajuste: coordenador e gerente acompanham as pessoas do seu
+   setor, e o diretor da unidade acompanha a unidade inteira. Prefiro nao usar a
+   lista nominal de chefe por enquanto, porque voces mesmos alertaram que ela
+   desatualiza facil com as admissoes e desligamentos.
+
+4. Opcao (b), sao papeis diferentes. O coordenador precisa ver se a equipe leu os
+   documentos, mas nao precisa cadastrar pessoas nem liberar permissoes. Isso
+   fica so com quem administra a unidade.
+
+BLOCO 3 - SETOR
+
+5. Opcao (a), sim. Muitos documentos valem so para um setor (por exemplo, um POP
+   da CME ou do Centro Cirurgico), entao preciso conseguir mandar a leitura
+   obrigatoria para "todo o setor X" e ver no relatorio quem leu em cada setor.
+   Entendo que isso aumenta um pouco o prazo da Fase 2, mas e o que da sentido a
+   leitura obrigatoria.
+
+6. Opcao (a), e o mesmo conceito. Podem aproveitar o que ja esta cadastrado em
+   "Area de trabalho", so precisa padronizar a escrita.
+
+7. Preciso ver com Ana e enviar uma lista dos setores de cada unidade em anexo,
+   do jeito que deve aparecer na tela.
+
+OBSERVACAO FINAL DO CLIENTE
+
+Sobre o "voce tem acesso a X unidades", combinado tratarmos separado. So reforco
+que a Governanca precisa enxergar os documentos de todas as unidades, porque e
+responsavel pelo controle documental do Instituto.
+
+
+O QUE ISSO RESOLVE, E O QUE CONTINUA ABERTO
+
+- **D2 (perfil exibido) — resolvida** pela resposta 1 (a): a linha abaixo da
+  saudacao passa a mostrar o cargo do cadastro, com o nivel de acesso como
+  recaida. A correcao de cadastro da resposta 2 (b) depende dos nomes, que vieram
+  ocultados — e operacao do cliente, nao de codigo.
+- **D4 (setor) — resolvida** pelas respostas 5 (a) e 6 (a): setor e entidade por
+  unidade, aproveitando o que esta em "Area de trabalho". A pergunta 7 (lista
+  oficial por unidade) segue pendente, mas **nao trava**: a lista inicial nasce
+  do que ja esta cadastrado e e padronizada por renomeacao.
+- **D3 (gestor e equipe) — parcialmente resolvida.** As respostas 3 (b) e 4 (b)
+  definem o alcance (setor para coordenador e gerente, unidade para o diretor) e
+  que e papel distinto de quem administra a unidade. **Continua aberta a colisao
+  de nome:** "Gestor" ja e o rotulo de `unit_admin` na interface, e
+  `nomenclatura-interface` proibe dois rotulos iguais com alcances diferentes.
+  Um dos dois tem de ser renomeado, e isso e decisao do cliente. Trava C1 e C3.
+- **D1 e D5 (acesso a varias unidades, alcance da Governanca) — abertas**, por
+  combinacao explicita do cliente. Travam A3 e C4.

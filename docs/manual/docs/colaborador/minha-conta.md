@@ -1,6 +1,6 @@
 # Minha conta e troca de senha
 
-Clique no seu perfil no canto superior direito e escolha **Minha conta**. A página tem
+Clique no seu cartão, no pé do menu lateral, para abrir **Minha conta**. A página tem
 duas partes:
 
 - **Dados cadastrais** — seu nome, e-mail, unidade e papel, apenas para consulta.

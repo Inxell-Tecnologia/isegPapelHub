@@ -49,7 +49,11 @@ export function useAuthorOptions(role: UserRole | undefined) {
     queryFn: async () => {
       const raw = await apiClient.get<PersonResponse[]>('/users');
       const people = authorPersonListSchema.parse(raw);
-      return people.map((person) => ({ value: person.id, label: person.fullName ?? person.id }));
+      return people.map((person) => ({
+        value: person.id,
+        label: person.fullName ?? person.id,
+        unitId: person.unitId,
+      }));
     },
   });
 }

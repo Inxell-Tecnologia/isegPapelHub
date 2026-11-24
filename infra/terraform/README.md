@@ -19,6 +19,13 @@ projeto GCP nem credenciais, onde só `terraform validate`/`fmt` rodavam;
 três ajustes que só a API real revelou). A API ainda sobe com a imagem
 placeholder pública até o CI/CD publicar a imagem real — ver "Uso" abaixo.
 
+**Procedimento passo a passo** — de um projeto vazio até o primeiro login, e
+para atualizar uma implantação no ar — está em
+[`docs/runbook-implantacao.md`](../../docs/runbook-implantacao.md), com as
+armadilhas que falham em silêncio (CORS com duas URLs, ordem do OIDC do
+Pub/Sub, `deletion_protection` dos Jobs, assinatura que expira, checklist de
+Job novo). Este README guarda as **decisões**; o runbook, a **ordem**.
+
 ## Pré-requisitos
 
 - Um projeto GCP existente, com billing habilitado.
@@ -84,18 +91,16 @@ Secrets and variables → Actions → _Variables_ — não são segredos: acesso
 controlado pela condição do WIF + IAM, não por elas serem secretas) com os
 outputs deste Terraform:
 
-| Variável do repositório          | Valor (`terraform output ...`)                                                                                                                                                           |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GCP_PROJECT_ID`                 | `var.project_id` (o mesmo de `terraform.tfvars`)                                                                                                                                         |
-| `GCP_REGION`                     | `var.region`                                                                                                                                                                             |
-| `GCP_ARTIFACT_REPOSITORY`        | `artifact_registry_repository`                                                                                                                                                           |
-| `GCP_CLOUD_RUN_SERVICE`          | nome do serviço (`google_cloud_run_v2_service.api.name`, também visível prefixado em `api_url`)                                                                                          |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `github_actions_workload_identity_provider`                                                                                                                                              |
-| `GCP_DEPLOYER_SERVICE_ACCOUNT`   | `github_actions_deployer_service_account`                                                                                                                                                |
-| `GCP_MIGRATE_JOB`                | `migrate_job_name` — nome do Cloud Run Job de migração (change `deploy-migrations-e-docs-only`), executado pelo pipeline antes do `gcloud run deploy`                                    |
-| `GCP_BOOTSTRAP_JOB`              | `bootstrap_job_name` — nome do Job de bootstrap do administrador global; o pipeline só mantém a IMAGEM em dia, quem executa é o operador (ver seção "Bootstrap do administrador global") |
-| `GCP_TRASH_PURGE_JOB`            | `trash_purge_job_name` — idem; quem executa é o Cloud Scheduler                                                                                                                          |
-| `GCP_NOTIFY_GRANTS_JOB`          | `notify_expiring_grants_job_name` — idem; quem executa é o Cloud Scheduler                                                                                                               |
+| Variável do repositório          | Valor (`terraform output ...`)                                                                                                                                                                |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GCP_PROJECT_ID`                 | `var.project_id` (o mesmo de `terraform.tfvars`)                                                                                                                                              |
+| `GCP_REGION`                     | `var.region`                                                                                                                                                                                  |
+| `GCP_ARTIFACT_REPOSITORY`        | `artifact_registry_repository`                                                                                                                                                                |
+| `GCP_CLOUD_RUN_SERVICE`          | nome do serviço (`google_cloud_run_v2_service.api.name`, também visível prefixado em `api_url`)                                                                                               |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `github_actions_workload_identity_provider`                                                                                                                                                   |
+| `GCP_DEPLOYER_SERVICE_ACCOUNT`   | `github_actions_deployer_service_account`                                                                                                                                                     |
+| `GCP_MIGRATE_JOB`                | `migrate_job_name` — nome do Cloud Run Job de migração (change `deploy-migrations-e-docs-only`), executado pelo pipeline antes do `gcloud run deploy`                                         |
+| `GCP_DEPLOY_UPDATED_JOBS`        | `deploy_updated_job_names` — Jobs cuja imagem o deploy alinha à do serviço depois do `gcloud run deploy`, sem executá-los (change `deploy-atualiza-jobs-agendados`); vazia faz o passo falhar |
 
 Sem chave de service account em lugar nenhum — `cicd.tf` provisiona um
 Workload Identity Pool que só aceita tokens OIDC do repositório configurado
@@ -104,7 +109,7 @@ em `github_repository` (`CarlosSalesNaturalTec/GDoc` por padrão).
 Os bindings de IAM do deployer (`cicd.tf`) são **por recurso** (privilégio
 mínimo): `roles/artifactregistry.writer` no repositório de imagens,
 `roles/run.developer` **no serviço da API** e `roles/iam.serviceAccountUser` na
-service account de runtime da API. Como o pipeline também atualiza a imagem do
+service account de runtime da API. Como o pipeline também atualiza e executa o
 **Job de migração** (`${local.name_prefix}-migrate`) e um Job é um recurso
 distinto do serviço, o deployer recebe `roles/run.developer` **também no Job de
 migração** (`deployer_run_developer_migrate_job`) — sem isso o passo "Update
@@ -112,21 +117,6 @@ migration job image" do deploy falha com `PERMISSION_DENIED` em `run.jobs.get` e
 tanto a migração quanto o `deploy` são pulados. O act-as não precisa de binding
 novo: o Job reusa a mesma service account de runtime da API, já coberta pelo
 `serviceAccountUser` acima.
-
-Pelo mesmo motivo, o deployer recebe `run.developer` também nos Jobs de
-**bootstrap**, **expurgo da lixeira** e **aviso de permissões a vencer**
-(`deployer_run_developer_bootstrap_job`/`..._trash_purge_job`/
-`..._notify_expiring_grants_job`) — o `deploy.yml` atualiza a imagem dos
-quatro a cada push em `main` (só o de migração é _executado_ pelo pipeline; os
-outros três são acionados pelo operador ou pelo Cloud Scheduler). Sem isso,
-esses três Jobs ficariam presos para sempre na imagem placeholder do primeiro
-`apply` (`us-docker.pkg.dev/cloudrun/container/hello`, que nem tem Node), e
-qualquer execução falharia com "Application failed to start" sem nenhum log
-da aplicação — foi o que aconteceu com o bootstrap antes desta correção.
-Diferente da migração, `trash_purge` e `notify_expiring_grants` rodam sob
-service accounts próprias (não a da API), então o deployer também recebe
-`iam.serviceAccountUser` nelas (`deployer_act_as_trash_purge_job`/
-`..._notify_expiring_grants_job`).
 
 ## Bootstrap do administrador global
 
@@ -351,17 +341,19 @@ recriadas, mas não remove o que já foi criado antes dela existir.
   em reexecuções. Não é agendado — sempre `gcloud run jobs execute` manual
   (ver seção "Bootstrap do administrador global" acima). Mesmo racional de
   imagem "não avança sozinho" do Job de expurgo, abaixo.
-- **A imagem dos demais Jobs não é redeployada automaticamente pelo CI/CD —
-  só a do Job de migração.** `.github/workflows/deploy.yml` faz
-  `gcloud run deploy` do **serviço** (API) a cada push em `main` e, antes
-  disso, `gcloud run jobs update --image` + `execute --wait` no Job de
-  migração (abaixo). Os demais Jobs (expurgo, bootstrap) só pegam uma imagem
-  nova quando o Terraform for reaplicado (o `lifecycle.ignore_changes` em
-  `containers[0].image` evita que um `apply` de rotina reverta uma imagem já
-  publicada, mas também significa que eles não avançam sozinhos). Mantê-los
-  atualizados hoje exige `terraform apply` manual apontando `var.api_image`
-  para a tag desejada, ou estender o CI/CD para também rodar
-  `gcloud run jobs deploy` neles — fora de escopo desta mudança.
+- **A imagem dos demais Jobs acompanha a do serviço a cada deploy (change
+  `deploy-atualiza-jobs-agendados`).** `.github/workflows/deploy.yml` faz
+  `gcloud run jobs update --image` + `execute --wait` no Job de migração antes
+  do `gcloud run deploy` do serviço e, **depois** dele, só `update --image`
+  (nunca `execute`) em cada Job da lista `GCP_DEPLOY_UPDATED_JOBS` — bootstrap,
+  expurgo e avisos. A lista sai do mapa `deploy_updated_jobs` (`locals.tf`),
+  origem única também das permissões do deployer sobre esses Jobs (`cicd.tf`).
+  `terraform apply` **não** atualiza a imagem: o `lifecycle.ignore_changes` em
+  `containers[0].image` (que impede um `apply` de rotina de reverter a imagem
+  publicada) ignora o atributo nos dois sentidos, então mudar `var.api_image`
+  não produz diff. Fora do deploy, o caminho é `gcloud run jobs update
+--image`. Job novo segue o checklist da Armadilha 10 do runbook (change
+  `correcoes-herdadas-do-fork`).
 - **Job de migração de banco (change `deploy-migrations-e-docs-only`).**
   `${local.name_prefix}-migrate` (`migrate_job.tf`) roda a mesma imagem/SA/
   integração Cloud SQL da API, entrypoint `apps/api/dist/db/migrate.js`

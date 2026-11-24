@@ -70,6 +70,12 @@ export async function purgeFile(
       GrantResourceType.FILE,
       file.id,
     ]);
+    // 5b. Marcas de favorito, pelo mesmo motivo: sem FK para o recurso
+    // (change `favoritos`, design.md D7).
+    await client.query('DELETE FROM favorites WHERE resource_type = $1 AND resource_id = $2', [
+      GrantResourceType.FILE,
+      file.id,
+    ]);
     // 6. A linha por último.
     await client.query('DELETE FROM files WHERE id = $1', [file.id]);
   });

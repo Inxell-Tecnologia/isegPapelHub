@@ -7,8 +7,8 @@ strict: true
 theme:
   name: material
   language: pt-BR
-  logo: assets/logo-papelhub.png
-  favicon: assets/logo-papelhub.png
+  logo: assets/isetes-simbolo.png
+  favicon: assets/isetes-simbolo.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -26,6 +26,12 @@ theme:
     - search.suggest
     - content.action.edit
 
+# Caixas de aviso (`!!! note`, `!!! warning`…): 34 delas em 13 páginas eram
+# renderizadas como texto literal, porque a extensão nunca foi habilitada
+# (change correcoes-herdadas-do-fork).
+markdown_extensions:
+  - admonition
+
 nav:
   - Início: index.md
   - Primeiro acesso: primeiro-acesso.md
@@ -33,9 +39,13 @@ nav:
   - Colaborador:
       - Navegar e criar pastas: colaborador/navegar-e-criar.md
       - Enviar arquivos: colaborador/enviar.md
+      - Controle documental: colaborador/controle-documental.md
       - Visualizar e baixar: colaborador/visualizar-e-baixar.md
       - Mover, renomear e excluir: colaborador/renomear-e-excluir.md
       - Buscar e filtrar: colaborador/buscar.md
+      - Favoritos: colaborador/favoritos.md
+      - Leitura obrigatória: colaborador/leitura-obrigatoria.md
+      - Compartilhados comigo: colaborador/compartilhados-comigo.md
       - Auditoria: colaborador/auditoria.md
       - Minha conta: colaborador/minha-conta.md
   - Administrador:

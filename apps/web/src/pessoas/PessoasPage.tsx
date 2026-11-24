@@ -1,16 +1,21 @@
 import { useState } from 'react';
-import { App, Button, Popconfirm, Result, Space, Spin, Table, Tag } from 'antd';
+import { App, Button, Input, Popconfirm, Result, Space, Spin, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined } from '@ant-design/icons';
+import { IconeNovo } from '../app/icons';
 import type { PersonResponse } from '@gdoc/shared';
 import { PersonStatus } from '@gdoc/shared';
 import { UserRole } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
 import { useSession } from '../auth/session-context';
 import { useUnits } from '../unidades/queries';
-import { ROLE_LABEL, PessoaFormModal } from './PessoaFormModal';
+import { PessoaFormModal } from './PessoaFormModal';
+import { SetoresDrawer } from '../setores/SetoresDrawer';
+import { RotuloDeEstado } from '../app/RotuloDeEstado';
+import { ROLE_LABEL } from '../shell/role-label';
+import { ACOMPANHAMENTO_LABEL } from '../shell/acompanhamento-label';
 import { SenhaGeradaModal } from './SenhaGeradaModal';
 import { useResetPersonPassword, useUpdatePerson, useUsers } from './queries';
+import { filtrarPessoas, normalizarBusca } from './filtro-pessoas';
 
 const STATUS_LABEL: Record<PersonStatus, string> = {
   [PersonStatus.ACTIVE]: 'Ativo',
@@ -52,6 +57,14 @@ export function PessoasPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<PersonResponse | null>(null);
+  // Manutenção da lista de setores (change `funcao-e-setor-na-identidade`,
+  // design.md D9): painel desta página, sem item de navegação próprio.
+  const [setoresOpen, setSetoresOpen] = useState(false);
+  // Busca de colaborador (change `busca-de-colaboradores`, design.md D1–D3):
+  // recorte no cliente do que `GET /users` já entregou; mudar o termo volta à
+  // primeira página, para não ficar numa página que deixou de existir.
+  const [termoBusca, setTermoBusca] = useState('');
+  const [paginaAtual, setPaginaAtual] = useState(1);
 
   function openCreate() {
     setEditingPerson(null);
@@ -99,6 +112,7 @@ export function PessoasPage() {
     { title: 'Nome', key: 'name', render: (_, person) => person.fullName ?? person.email },
     { title: 'E-mail', key: 'email', dataIndex: 'email' },
     { title: 'Função', key: 'jobTitle', render: (_, person) => person.jobTitle ?? '—' },
+    { title: 'Setor', key: 'sector', render: (_, person) => person.sectorName ?? '—' },
     ...(isGlobalAdmin
       ? [
           {
@@ -111,15 +125,27 @@ export function PessoasPage() {
     {
       title: 'Papel',
       key: 'role',
-      render: (_, person) => <Tag>{ROLE_LABEL[person.role]}</Tag>,
+      render: (_, person) => <RotuloDeEstado>{ROLE_LABEL[person.role]}</RotuloDeEstado>,
+    },
+    {
+      // Acompanhamento de leituras (change `gestor-de-acompanhamento`): rótulo
+      // de origem única; quem não acompanha fica com a ausência explícita.
+      title: 'Acompanhamento',
+      key: 'readingOversight',
+      render: (_, person) =>
+        person.readingOversight ? (
+          <RotuloDeEstado>{ACOMPANHAMENTO_LABEL[person.readingOversight]}</RotuloDeEstado>
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Status',
       key: 'status',
       render: (_, person) => (
-        <Tag color={person.status === PersonStatus.ACTIVE ? 'green' : 'default'}>
+        <RotuloDeEstado tom={person.status === PersonStatus.ACTIVE ? 'positivo' : 'neutro'}>
           {STATUS_LABEL[person.status]}
-        </Tag>
+        </RotuloDeEstado>
       ),
     },
     {
@@ -184,18 +210,49 @@ export function PessoasPage() {
     );
   }
 
+  const buscando = normalizarBusca(termoBusca) !== '';
+  const pessoasFiltradas = filtrarPessoas(
+    data ?? [],
+    termoBusca,
+    isGlobalAdmin ? (unitId) => unitNameById.get(unitId) : undefined,
+  );
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Novo colaborador
-        </Button>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          gap: 8,
+          marginBottom: 16,
+        }}
+      >
+        <Input.Search
+          allowClear
+          aria-label="Buscar colaborador"
+          placeholder="Buscar por nome, e-mail, função ou setor"
+          value={termoBusca}
+          onChange={(event) => {
+            setTermoBusca(event.target.value);
+            setPaginaAtual(1);
+          }}
+          style={{ flex: '1 1 280px', maxWidth: 420 }}
+        />
+        <Space wrap>
+          <Button onClick={() => setSetoresOpen(true)}>Setores</Button>
+          <Button type="primary" icon={<IconeNovo />} onClick={openCreate}>
+            Novo colaborador
+          </Button>
+        </Space>
       </div>
       <Table<PersonResponse>
         rowKey="id"
         columns={columns}
-        dataSource={data ?? []}
+        dataSource={pessoasFiltradas}
         scroll={{ x: 'max-content' }}
+        pagination={{ current: paginaAtual, onChange: (pagina) => setPaginaAtual(pagina) }}
+        locale={buscando ? { emptyText: 'Nenhum colaborador encontrado' } : undefined}
       />
       <PessoaFormModal
         target={editingPerson ?? undefined}
@@ -206,6 +263,7 @@ export function PessoasPage() {
         generatedPassword={generatedPassword}
         onClose={() => setGeneratedPassword(null)}
       />
+      <SetoresDrawer open={setoresOpen} onClose={() => setSetoresOpen(false)} />
     </div>
   );
 }

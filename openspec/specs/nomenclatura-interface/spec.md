@@ -52,17 +52,44 @@ vista do vocabulário da interface.
 ### Requirement: Rótulo do papel de acesso preservado
 
 A aplicação SHALL manter **"Colaborador"** como rótulo do papel de acesso sem
-privilégio administrativo, ao lado de "Administrador da unidade" e
-"Administrador global". A adoção do mesmo termo para a entidade NÃO SHALL alterar
-o conjunto de papéis, seus rótulos nem sua semântica, e a interface SHALL
-continuar exibindo o papel de cada conta como atributo próprio, distinto do termo
-que nomeia a entidade.
+privilégio administrativo, ao lado de **"Administrador da unidade"** — rótulo do
+papel com privilégio administrativo sobre a própria unidade — e de
+"Administrador global".
+O conjunto de papéis, sua semântica e seus limites de autorização NÃO SHALL ser
+alterados por esta nomenclatura: muda o texto apresentado, não o papel. A
+interface SHALL continuar exibindo o papel de cada conta como atributo próprio,
+distinto do termo que nomeia a entidade.
+
+O termo **"Gestor"** NÃO SHALL nomear o papel com privilégio administrativo de
+unidade em texto visível ao usuário — nem na interface, nem no manual. "Gestor"
+fica **reservado** a quem acompanha as leituras da equipe sem administrar a
+unidade (demanda do cliente nº 2, seção 3.1;
+`docs/respostas_d1_d3_d5_decisoes_estruturais.txt`, resposta 5a), e só SHALL
+aparecer como rótulo quando esse papel existir. Identificadores internos de
+código, esquema de banco e contratos de API permanecem inalterados e não são
+objeto deste requisito.
 
 #### Scenario: Papel continua distinguindo administradores de colaboradores comuns
 - **WHEN** um administrador consulta a listagem de colaboradores de sua unidade
 - **THEN** cada linha exibe o papel da conta — "Colaborador", "Administrador da
   unidade" ou "Administrador global" — permitindo distinguir, entre os
   colaboradores listados, quem tem privilégio administrativo
+
+#### Scenario: O rótulo anterior não aparece em texto visível
+- **WHEN** uma pessoa percorre as telas que nomeiam o papel de acesso
+- **THEN** em nenhuma delas "Gestor" nomeia o papel de quem administra a
+  unidade
+
+#### Scenario: Mudança de rótulo não amplia nem reduz privilégio
+- **WHEN** uma conta com privilégio administrativo de unidade passa a ser
+  rotulada como "Administrador da unidade"
+- **THEN** as ações que ela pode executar permanecem exatamente as mesmas de
+  antes da mudança de rótulo
+
+#### Scenario: O manual usa o mesmo rótulo da interface
+- **WHEN** uma pessoa lê, no manual, o que quem administra a unidade pode fazer
+- **THEN** encontra "Administrador da unidade", o mesmo texto que a interface
+  exibe para esse papel
 
 ### Requirement: Alcance da nomenclatura limitado à camada de apresentação
 
@@ -103,3 +130,36 @@ de integridade de links.
 - **WHEN** o manual é publicado após a troca de nomenclatura
 - **THEN** cada página continua acessível pelo mesmo endereço de antes e a
   verificação de integridade de links do manual passa sem apontar quebra
+
+### Requirement: Rótulo do papel é idêntico em toda a interface
+
+A aplicação SHALL apresentar o rótulo de um mesmo papel de acesso com texto
+idêntico em **toda tela que o exiba** — perfil da própria conta, listagem de
+colaboradores, seletor de papel no cadastro e, no shell autenticado e na tela
+inicial, nas situações em que o papel é exibido. Um rótulo alterado SHALL mudar
+simultaneamente em todas elas, sem possibilidade de uma tela ficar com o texto
+antigo.
+
+O shell autenticado e a tela inicial apresentam a **função** do cadastro, e
+exibem o rótulo do papel **apenas como recaída**, quando a pessoa não tem função
+preenchida (capabilities `web-shell-e-auth` e `tela-inicial`). Nessa recaída o
+rótulo SHALL vir da mesma origem única das demais telas. A função NÃO SHALL ser
+tratada como rótulo de papel: ela é texto do cadastro, sem efeito sobre
+autorização, e NÃO SHALL ser padronizada por esta regra.
+
+#### Scenario: Mesmo papel exibe o mesmo rótulo em telas distintas
+- **WHEN** uma pessoa com privilégio administrativo de unidade, e sem função
+  preenchida no cadastro, consulta o shell autenticado, o perfil da própria conta
+  e a listagem de colaboradores
+- **THEN** o papel aparece com exatamente o mesmo texto nas três telas
+
+#### Scenario: Alteração de rótulo não deixa tela para trás
+- **WHEN** o rótulo de um papel de acesso é alterado
+- **THEN** nenhuma tela da aplicação continua exibindo o texto anterior
+
+#### Scenario: Função exibida no lugar do papel não é rótulo de papel
+- **WHEN** uma pessoa com função "Gerente de Governança" e papel `collaborator`
+  consulta o shell autenticado e a listagem de colaboradores
+- **THEN** o shell apresenta a função, a listagem apresenta o papel com o rótulo
+  de origem única, e a divergência entre os dois textos não configura rótulo de
+  papel inconsistente

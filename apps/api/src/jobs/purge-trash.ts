@@ -111,6 +111,12 @@ async function purgeExpiredFolders(database: DatabasePort, summary: PurgeSummary
             GrantResourceType.FOLDER,
             leaf.id,
           ]);
+          // Marcas de favorito sobre a pasta, sem FK para o recurso (change
+          // `favoritos`, design.md D7).
+          await client.query(
+            'DELETE FROM favorites WHERE resource_type = $1 AND resource_id = $2',
+            [GrantResourceType.FOLDER, leaf.id],
+          );
           await client.query('DELETE FROM folders WHERE id = $1', [leaf.id]);
         });
         summary.purgedFolders += 1;

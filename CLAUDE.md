@@ -49,6 +49,7 @@ npm run seed --workspace apps/api       # popula dados de dev (idempotente)
 npm run bootstrap --workspace apps/api  # provisiona o primeiro global_admin/unidade
 npm run purge:trash --workspace apps/api      # job de expurgo da lixeira
 npm run notify:grants --workspace apps/api    # job de aviso de permissões a vencer/vencidas
+npm run notify:readings --workspace apps/api  # job de avisos de leitura obrigatória (nova, atraso, gestor)
 npm run backfill:pending --workspace apps/api # reconcilia uploads pendentes (finalize do Pub/Sub)
 
 # se editar packages/shared/src, recompile para os consumidores enxergarem:
@@ -99,7 +100,7 @@ O download de pasta não abre exceção a isso: `POST /folders/:id/download-mani
 
 ### Rotas e camadas (`apps/api/src`)
 
-`server.ts` → `app.ts` (monta os routers; rotas tenant-scoped passam por `attachTenantContext`) → `routes/*` (HTTP + validação) → `lib/*` (`access.ts`, `folder-tree.ts`, `search-filters.ts`, regras puras) → `ports/*` (seams). `db/migrations/*.sql` são numeradas e aplicadas em ordem por `db/migrate.ts`. Os jobs de `jobs/` rodam como Cloud Run Jobs + Scheduler em prod (`purge-trash` 03:00, retenção 30 dias; `notify-expiring-grants` 03:30 — ver `infra/terraform/scheduler.tf`) e por `npm run` em dev. Job novo = script em `package.json` **e** par job+scheduler no Terraform. Jobs usam um `TenantContext` de sistema com papel `global_admin` para a varredura cross-unit, mas cada escrita/notificação subsequente usa a unidade real do recurso — nunca o placeholder.
+`server.ts` → `app.ts` (monta os routers; rotas tenant-scoped passam por `attachTenantContext`) → `routes/*` (HTTP + validação) → `lib/*` (`access.ts`, `folder-tree.ts`, `search-filters.ts`, regras puras) → `ports/*` (seams). `db/migrations/*.sql` são numeradas e aplicadas em ordem por `db/migrate.ts`. Os jobs de `jobs/` rodam como Cloud Run Jobs + Scheduler em prod (`purge-trash` 03:00, retenção 30 dias; `notify-expiring-grants` 03:30; `notify-readings` 03:45 — ver `infra/terraform/scheduler.tf`) e por `npm run` em dev. Job novo = script em `package.json` **e** par job+scheduler no Terraform, com `args` em `apps/api/dist/jobs/<job>.js` (relativo ao `WORKDIR /app` da imagem — `dist/...` não existe), `deletion_protection = false`, `depends_on` na concessão `secretAccessor` da própria service account e uma linha em `deploy_updated_jobs` (`locals.tf`) + a variável `GCP_DEPLOY_UPDATED_JOBS` no GitHub — checklist completo na Armadilha 10 de `docs/runbook-implantacao.md`. Jobs usam um `TenantContext` de sistema com papel `global_admin` para a varredura cross-unit, mas cada escrita/notificação subsequente usa a unidade real do recurso — nunca o placeholder.
 
 ### SPA servida pela API (mesma origem) — invariante de prefixos
 

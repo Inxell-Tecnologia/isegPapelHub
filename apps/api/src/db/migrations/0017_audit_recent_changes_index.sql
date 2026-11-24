@@ -1,0 +1,36 @@
+-- Change `shell-e-inicio` (US 11.2, design.md D1 e Risks): índice de apoio à
+-- consulta de documentos alterados recentemente (`GET /files/recent`).
+--
+-- A consulta agrega `audit_events` pelas ações que **alteram** o documento
+-- (`replace`, `rename`, `move`) dentro de uma janela de tempo, agrupando por
+-- `file_id`. O risco assumido na decisão D1 — derivar o instante da auditoria
+-- em vez de criar uma coluna `updated_at` — é justamente que essa tabela
+-- cresce sem limite. Este índice é a mitigação prometida ali, medida antes de
+-- entrar, no mesmo espírito de 0009.
+--
+-- `EXPLAIN (ANALYZE, BUFFERS)` com 120 mil eventos (duas unidades, 5 mil
+-- documentos, proporção realista de ~60% de leituras):
+--   - sem índice: Parallel Seq Scan varrendo a tabela inteira (120 mil linhas,
+--     ~58 mil descartadas por worker), 14–15 ms;
+--   - com este índice: Index **Only** Scan lendo só as alterações da unidade
+--     dentro da janela (~2,4 mil linhas), 5–7 ms, sem tocar o heap.
+-- O ganho de tempo é de ~2x no volume medido, mas o que importa é a mudança
+-- de **forma**: o custo deixa de ser proporcional ao histórico inteiro de
+-- auditoria e passa a ser proporcional ao que a janela contém.
+--
+-- Parcial em dois eixos, pelas mesmas razões de 0016:
+--   - `action IN (...)`: as ações de **leitura** (`view`/`download`) são a
+--     maioria esmagadora das linhas e, por decisão D1, nunca entram em
+--     recentes — não têm por que disputar espaço neste índice;
+--   - as colunas cobrem a consulta inteira (`unit_id` para o recorte da RLS,
+--     `created_at` para a janela e a ordenação, `file_id` para o agrupamento),
+--     o que habilita o Index Only Scan.
+--
+-- `unit_id` à frente (design.md, Migration Plan: "índice de apoio por unidade
+-- e instante") porque o recorte por unidade é a primeira coisa que a consulta
+-- faz, e é o que mantém o custo estável conforme o número de unidades cresce.
+--
+-- Aditiva, `IF NOT EXISTS`, sem tocar migrações já aplicadas.
+CREATE INDEX IF NOT EXISTS audit_events_recent_changes_idx
+  ON audit_events (unit_id, created_at DESC, file_id)
+  WHERE action IN ('replace', 'rename', 'move');

@@ -1,0 +1,86 @@
+RESPOSTAS DO CLIENTE AO QUESTIONARIO DE ACESSO A VARIAS UNIDADES, PAPEL
+"GESTOR" E ALCANCE DO RELATORIO DE LEITURA
+
+Retorno de `docs/questionario_d1_d3_d5_decisoes_estruturais.txt` (decisoes D1,
+D3 e D5 do plano em `docs/plano_demanda_cliente_2.md`). Recebido em 2026-11-05.
+Transcricao fiel do que o cliente respondeu.
+
+Leia junto com o questionario: as perguntas, as alternativas e o que cada uma
+implica estao la, e nao sao repetidas aqui.
+
+
+BLOCO 1 - VARIAS UNIDADES
+
+1. Opcao (a). Cada pessoa trabalha na sua unidade, entao a tela deve mostrar as
+   pastas principais da unidade dela, com o titulo "Pastas da unidade". Aceito
+   essa diferenca em relacao ao desenho que enviei. O caso da Governanca eu
+   respondo no bloco 3.
+
+2. Nao se aplica.
+
+3. Opcao (b). Pode trocar para "documentos novos nos ultimos 7 dias". E mais
+   simples e ja funciona para todo mundo desde o primeiro dia.
+
+4. Opcao (a). Cada cartao abre a pasta ao clicar.
+
+BLOCO 2 - NOMES DOS PAPEIS
+
+5. Opcao (a). Quem administra o sistema na unidade passa a se chamar
+   "Administrador da unidade", e "Gestor" fica para quem acompanha as leituras
+   da equipe. Nos hospitais, "gestor" ja e como as pessoas chamam coordenador,
+   gerente e diretor, entao fica mais natural. Podem trocar em todas as telas.
+
+6. Opcao (a). Prefiro a marcacao no cadastro: quem cadastra marca se a pessoa
+   acompanha as leituras do setor ou da unidade inteira. Fica claro e nao
+   depende de como o cargo foi escrito.
+
+BLOCO 3 - O QUE A GOVERNANCA PRECISA VER
+
+7. Opcao (a) para a Fase 2: acompanhar quem leu e quem nao leu em cada unidade,
+   com nomes, setores, datas e percentual, sem abrir os arquivos. Assim nao
+   atrasamos a Fase 2.
+   Mas quero deixar registrado que, mais para frente, a Governanca vai precisar
+   tambem abrir e baixar os documentos das unidades (opcao b), porque e
+   responsavel pelo controle documental. Podemos planejar isso como um trabalho
+   a parte, com o prazo e a revisao de seguranca que voce explicou.
+
+8. Mariana Bispo - Sede (Gerencia de Governanca e Performance Corporativa) e
+   Ana Morais - Sede (Diretoria de Servicos Compartilhados).
+
+OBSERVACAO FINAL DO CLIENTE (DOCUMENTOS INSTITUCIONAIS)
+
+Sobre os documentos institucionais: hoje as unidades enxergam as pastas do
+OneDrive, e acho que no PapelHub todos devem enxergar os documentos
+padronizados da Sede. Minha sugestao e criar uma area unica, algo como
+"Documentos Institucionais", que todas as unidades possam abrir e baixar, mas
+so a Governanca publique e revise. Assim existe uma versao so de cada
+documento, sem copias em cada unidade, o que facilita muito o controle de
+revisoes. Entram ali apenas politicas, normas, protocolos, POPs e formularios
+institucionais aprovados.
+
+
+O QUE ISSO RESOLVE, E O QUE CONTINUA ABERTO
+
+- **D1 (acesso a varias unidades) - resolvida** pela resposta 1 (a): a tenancy
+  fica como esta. A grade da tela Inicio lista as pastas de primeiro nivel da
+  unidade da pessoa, com o titulo "Pastas da unidade", e o cliente aceitou por
+  escrito a diferenca em relacao ao Anexo A. A resposta 3 (b) troca o
+  "desde o ultimo acesso" por "nos ultimos 7 dias" - nao ha coluna nova de
+  ultimo acesso. A resposta 4 (a) mantem o cartao clicavel. Libera a A3.
+- **D3 (colisao do nome "Gestor") - resolvida** pela resposta 5 (a):
+  `unit_admin` passa a ser exibido como "Administrador da unidade" em todas as
+  telas, e "Gestor" fica para quem acompanha leituras. A resposta 6 (a) define
+  o mecanismo: marcacao explicita no cadastro (setor ou unidade inteira),
+  nunca deduzida do cargo. Libera o bloco C.
+- **D5 (alcance da Governanca) - resolvida para a Fase 2** pela resposta 7 (a):
+  excecao estreita - situacao nominal de leitura obrigatoria das outras
+  unidades, SEM bytes e SEM auditoria de acesso -, concedida pessoa a pessoa
+  (resposta 8: Mariana Bispo e Ana Morais, ambas da Sede). Cabe na C4.
+- **Abrir e baixar documentos das outras unidades (7b) - registrado como
+  trabalho futuro**, fora da demanda nº 2, com prazo proprio e revisao de
+  seguranca antes do codigo. Nao trava nenhuma fatia.
+- **"Documentos Institucionais" - pedido novo**, fora da demanda nº 2. E leitura
+  de conteudo atravessando unidades (uma area, todas as unidades leem, so a
+  Governanca publica): reabre o isolamento, ainda que num formato mais estreito
+  que o 7b. Registrado no plano como D7, a especificar a parte. Nao trava
+  nenhuma fatia.

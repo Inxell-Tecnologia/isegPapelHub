@@ -1,20 +1,15 @@
 import { useState } from 'react';
 import { App, Button, Card, Descriptions, Form, Input, Spin, Typography } from 'antd';
-import { PASSWORD_MIN_LENGTH, UserRole } from '@gdoc/shared';
+import { PASSWORD_MIN_LENGTH } from '@gdoc/shared';
 import type { ChangePasswordRequest } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
+import { ROLE_LABEL } from '../shell/role-label';
 import { useChangePassword, useMyProfile } from './queries';
 
 interface ChangePasswordFormValues {
   currentPassword: string;
   newPassword: string;
 }
-
-const ROLE_LABEL: Record<UserRole, string> = {
-  [UserRole.COLLABORATOR]: 'Colaborador',
-  [UserRole.UNIT_ADMIN]: 'Administrador da unidade',
-  [UserRole.GLOBAL_ADMIN]: 'Administrador global',
-};
 
 /**
  * "Minha conta" (US 1.3, `web-minha-conta`, design.md D6): dados cadastrais

@@ -34,7 +34,14 @@ export interface AuditEvent {
 export interface AuditActorResponse {
   id: string;
   name: string | null;
-  email: string;
+  /**
+   * `null` quando a pessoa é de **outra unidade** (acesso por compartilhamento
+   * entre unidades, design.md D9 de `compartilhamento-entre-unidades`): o
+   * e-mail dela não é exposto à unidade de origem.
+   */
+  email: string | null;
+  /** Unidade da pessoa quando o acesso veio de outra unidade; ausente/nulo nos demais. */
+  unitName?: string | null;
 }
 
 /**

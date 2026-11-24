@@ -8,8 +8,6 @@ resource "google_service_account" "trash_purge_job" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-trash-purge"
   display_name = "Trash purge job runtime (${var.environment})"
-
-  depends_on = [google_project_service.required]
 }
 
 resource "google_project_iam_member" "trash_purge_cloudsql_client" {
@@ -39,9 +37,6 @@ resource "google_cloud_run_v2_job" "trash_purge" {
   name     = "${local.name_prefix}-trash-purge"
   location = var.region
   labels   = local.labels
-  # Job stateless recriado a cada deploy (nenhum dado próprio) — diferente do
-  # Cloud SQL, que mantém `deletion_protection = true` de propósito.
-  deletion_protection = false
 
   template {
     template {
@@ -55,9 +50,16 @@ resource "google_cloud_run_v2_job" "trash_purge" {
       }
 
       containers {
-        image   = var.api_image
+        image = var.api_image
+        # Caminho relativo ao WORKDIR `/app` do Dockerfile, que copia o build
+        # da API para `/app/apps/api/dist` — mesma forma do CMD
+        # (`apps/api/dist/server.js`) e dos Jobs de migração e bootstrap.
+        # Estava `dist/jobs/...`, que não existe: o Job falharia com "Cannot
+        # find module" TODA noite, e passou despercebido porque Job com a
+        # imagem placeholder falha antes de chegar ao módulo (change
+        # correcoes-herdadas-do-fork).
         command = ["node"]
-        args    = ["dist/jobs/purge-trash.js"]
+        args    = ["apps/api/dist/jobs/purge-trash.js"]
 
         resources {
           limits = {
@@ -125,6 +127,21 @@ resource "google_cloud_run_v2_job" "trash_purge" {
     }
   }
 
+  # O provider google 6.x introduziu `deletion_protection` com default `true`
+  # em Cloud Run v2, e é uma trava DO TERRAFORM (não existe campo equivalente
+  # na API do Cloud Run). Nos Jobs ela só atrapalha: Job não guarda dado algum
+  # e destruir/recriar é gratuito. Pior, ela cria um impasse quando um `create`
+  # falha na espera de prontidão: o recurso fica `tainted`, o apply seguinte
+  # planeja SUBSTITUIR, e o destroy é recusado — `cannot destroy job without
+  # setting deletion_protection=false`. Como o provider lê a flag do STATE, não
+  # da configuração, mudar isto aqui não desfaz um impasse já instalado (aí é
+  # `terraform untaint` ou `state rm`); serve para não haver o próximo.
+  # Deliberadamente NÃO replicado no Cloud Run Service da API (cloud_run.tf),
+  # onde o default `true` é rede de segurança desejável: o serviço é o endpoint
+  # de produção, e destruí-lo é indisponibilidade, não recriação barata.
+  # Change correcoes-herdadas-do-fork; runbook, Armadilha 7.
+  deletion_protection = false
+
   lifecycle {
     # Mesmo racional do Cloud Run Service (cloud_run.tf): a imagem publicada
     # pelo CI/CD não deve ser revertida por um `terraform apply` seguinte.
@@ -134,6 +151,15 @@ resource "google_cloud_run_v2_job" "trash_purge" {
   depends_on = [
     google_project_service.required,
     google_secret_manager_secret_version.database_url,
+    # O Cloud Run valida o acesso da service account ao secret NO MOMENTO da
+    # criação do Job, e `version = "latest"` é resolvido ali. Sem esta aresta,
+    # o Terraform cria o Job em paralelo com a própria concessão e a criação
+    # falha com `Error code 9 ... Permission denied on secret ... The service
+    # account used must be granted the 'Secret Manager Secret Accessor' role`.
+    # É corrida, não configuração ausente: a concessão existe logo acima. Este
+    # Job tem service account PRÓPRIA, criada na mesma camada do grafo, então
+    # não herda nenhuma aresta de ordenação por acaso (change
+    # correcoes-herdadas-do-fork; runbook, Armadilha 6).
     google_secret_manager_secret_iam_member.trash_purge_database_url,
   ]
 }
@@ -142,8 +168,6 @@ resource "google_service_account" "scheduler_invoker" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-scheduler"
   display_name = "Cloud Scheduler -> Cloud Run Job invoker (${var.environment})"
-
-  depends_on = [google_project_service.required]
 }
 
 resource "google_cloud_run_v2_job_iam_member" "scheduler_invoker" {
@@ -190,8 +214,6 @@ resource "google_service_account" "notify_expiring_grants_job" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-notify-grants"
   display_name = "Grant expiration notice job runtime (${var.environment})"
-
-  depends_on = [google_project_service.required]
 }
 
 resource "google_project_iam_member" "notify_expiring_grants_cloudsql_client" {
@@ -211,9 +233,6 @@ resource "google_cloud_run_v2_job" "notify_expiring_grants" {
   name     = "${local.name_prefix}-notify-grants"
   location = var.region
   labels   = local.labels
-  # Job stateless recriado a cada deploy (nenhum dado próprio) — diferente do
-  # Cloud SQL, que mantém `deletion_protection = true` de propósito.
-  deletion_protection = false
 
   template {
     template {
@@ -229,7 +248,7 @@ resource "google_cloud_run_v2_job" "notify_expiring_grants" {
       containers {
         image   = var.api_image
         command = ["node"]
-        args    = ["dist/jobs/notify-expiring-grants.js"]
+        args    = ["apps/api/dist/jobs/notify-expiring-grants.js"]
 
         resources {
           limits = {
@@ -295,6 +314,21 @@ resource "google_cloud_run_v2_job" "notify_expiring_grants" {
     }
   }
 
+  # O provider google 6.x introduziu `deletion_protection` com default `true`
+  # em Cloud Run v2, e é uma trava DO TERRAFORM (não existe campo equivalente
+  # na API do Cloud Run). Nos Jobs ela só atrapalha: Job não guarda dado algum
+  # e destruir/recriar é gratuito. Pior, ela cria um impasse quando um `create`
+  # falha na espera de prontidão: o recurso fica `tainted`, o apply seguinte
+  # planeja SUBSTITUIR, e o destroy é recusado — `cannot destroy job without
+  # setting deletion_protection=false`. Como o provider lê a flag do STATE, não
+  # da configuração, mudar isto aqui não desfaz um impasse já instalado (aí é
+  # `terraform untaint` ou `state rm`); serve para não haver o próximo.
+  # Deliberadamente NÃO replicado no Cloud Run Service da API (cloud_run.tf),
+  # onde o default `true` é rede de segurança desejável: o serviço é o endpoint
+  # de produção, e destruí-lo é indisponibilidade, não recriação barata.
+  # Change correcoes-herdadas-do-fork; runbook, Armadilha 7.
+  deletion_protection = false
+
   lifecycle {
     ignore_changes = [template[0].template[0].containers[0].image]
   }
@@ -302,6 +336,9 @@ resource "google_cloud_run_v2_job" "notify_expiring_grants" {
   depends_on = [
     google_project_service.required,
     google_secret_manager_secret_version.database_url,
+    # Mesma aresta, mesmo motivo do Job de expurgo acima: sem ela a criação
+    # do Job corre contra a concessão de secretAccessor da sua própria service
+    # account (change correcoes-herdadas-do-fork).
     google_secret_manager_secret_iam_member.notify_expiring_grants_database_url,
   ]
 }
@@ -337,5 +374,169 @@ resource "google_cloud_scheduler_job" "notify_expiring_grants" {
   depends_on = [
     google_project_service.required,
     google_cloud_run_v2_job_iam_member.notify_expiring_grants_scheduler_invoker,
+  ]
+}
+
+# Cloud Scheduler -> Cloud Run Job da rotina de avisos de leitura obrigatória
+# (change `avisos-e-atrasos`, US 12.5, design.md D4): reconcilia o público das
+# marcações em curso e emite os avisos de nova leitura e de atraso. Mesmo molde
+# do job de avisos de concessão — domínio e falha independentes, sem papel
+# sobre o bucket — e horário deslocado (03:45) para não concorrer por conexões
+# com o expurgo (03:00) e com os avisos de concessão (03:30).
+resource "google_service_account" "notify_readings_job" {
+  project      = var.project_id
+  account_id   = "${local.name_prefix}-notify-readings"
+  display_name = "Required reading notice job runtime (${var.environment})"
+}
+
+resource "google_project_iam_member" "notify_readings_cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.notify_readings_job.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "notify_readings_database_url" {
+  secret_id = google_secret_manager_secret.database_url.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.notify_readings_job.email}"
+}
+
+resource "google_cloud_run_v2_job" "notify_readings" {
+  project  = var.project_id
+  name     = "${local.name_prefix}-notify-readings"
+  location = var.region
+  labels   = local.labels
+
+  template {
+    template {
+      service_account = google_service_account.notify_readings_job.email
+
+      volumes {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [google_sql_database_instance.main.connection_name]
+        }
+      }
+
+      containers {
+        image   = var.api_image
+        command = ["node"]
+        # Caminho relativo ao WORKDIR `/app` do Dockerfile — mesma forma dos
+        # Jobs de expurgo e de avisos de permissão acima. `dist/jobs/...` não
+        # existe na imagem: o Job falharia com "Cannot find module" toda noite
+        # às 03:45, em silêncio (change correcoes-herdadas-do-fork).
+        args = ["apps/api/dist/jobs/notify-readings.js"]
+
+        resources {
+          limits = {
+            cpu    = "1"
+            memory = "512Mi" # mesmo piso do trash_purge (Cloud Run gen2 unthrottled)
+          }
+        }
+
+        volume_mounts {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
+
+        env {
+          name  = "NODE_ENV"
+          value = "production"
+        }
+        env {
+          name  = "DATABASE_SSL"
+          value = "false" # socket Unix local ao Cloud Run — mesmo racional de cloud_run.tf
+        }
+        # Mesmo envelope de conexões da API (cloud_run.tf): sem teto, o `pg`
+        # assume 10 por processo e um Job concorrendo com o serviço estoura
+        # o `max_connections` do Cloud SQL. Um Job é sequencial — 2 basta.
+        env {
+          name  = "DATABASE_POOL_MAX"
+          value = tostring(var.api_db_pool_max)
+        }
+        # config.ts exige STORAGE_BUCKET/GCP_PROJECT_ID mesmo aqui, ainda que
+        # este job nunca chame o StoragePort — createPorts() monta os quatro
+        # seams incondicionalmente (design.md, Ports & Adapters).
+        env {
+          name  = "STORAGE_DRIVER"
+          value = "gcs"
+        }
+        env {
+          name  = "STORAGE_BUCKET"
+          value = google_storage_bucket.files.name
+        }
+        env {
+          name  = "GCP_PROJECT_ID"
+          value = var.project_id
+        }
+        env {
+          name  = "SECRETS_DRIVER"
+          value = "env"
+        }
+        env {
+          name = "DATABASE_URL"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.database_url.secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+      max_retries = 1
+    }
+  }
+
+  # Mesmo racional dos Jobs de expurgo e de avisos de permissão: Job não guarda
+  # dado, e com o default `true` um `create` que falha na espera vira impasse
+  # (runbook, Armadilha 7; change correcoes-herdadas-do-fork).
+  deletion_protection = false
+
+  lifecycle {
+    ignore_changes = [template[0].template[0].containers[0].image]
+  }
+
+  depends_on = [
+    google_project_service.required,
+    google_secret_manager_secret_version.database_url,
+    # Mesma aresta dos outros Jobs agendados: sem ela, o Job é criado em
+    # paralelo com a concessão de secretAccessor da sua própria service account
+    # e a criação falha com `Error code 9 ... Permission denied on secret`
+    # (runbook, Armadilha 6; change correcoes-herdadas-do-fork).
+    google_secret_manager_secret_iam_member.notify_readings_database_url,
+  ]
+}
+
+resource "google_cloud_run_v2_job_iam_member" "notify_readings_scheduler_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.notify_readings.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.scheduler_invoker.email}"
+}
+
+resource "google_cloud_scheduler_job" "notify_readings" {
+  project   = var.project_id
+  region    = var.region
+  name      = "${local.name_prefix}-notify-readings"
+  schedule  = var.notify_readings_schedule
+  time_zone = var.scheduler_time_zone
+
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${google_cloud_run_v2_job.notify_readings.name}:run"
+
+    oauth_token {
+      service_account_email = google_service_account.scheduler_invoker.email
+    }
+  }
+
+  retry_config {
+    retry_count = 1
+  }
+
+  depends_on = [
+    google_project_service.required,
+    google_cloud_run_v2_job_iam_member.notify_readings_scheduler_invoker,
   ]
 }

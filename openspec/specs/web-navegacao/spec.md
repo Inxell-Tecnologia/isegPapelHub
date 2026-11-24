@@ -52,10 +52,16 @@ pasta** (`PATCH /folders/:id`), **excluir arquivo** (`DELETE /files/:id`) e
 exclusão SHALL ser confirmada pelo usuário antes de ser enviada. Ao concluir com
 sucesso, a SPA SHALL refletir o novo estado recarregando a listagem da pasta
 corrente; ao mover com sucesso, o item movido SHALL deixar de aparecer na
-listagem de origem. Como os DTOs de listagem não informam os verbos concedidos, a
-SPA NÃO SHALL inferir permissão no cliente: SHALL oferecer a ação e, quando o
-servidor responder **403**, exibir um aviso de **permissão insuficiente**, sem
-aplicar a mudança.
+listagem de origem. Como os DTOs de listagem **não informam os verbos concedidos
+sobre cada item**, a SPA NÃO SHALL inferir no cliente a permissão dessas ações
+por item: SHALL oferecê-las e, quando o servidor responder **403**, exibir um
+aviso de **permissão insuficiente**, sem aplicar a mudança.
+
+A proibição é de **inferir**, não de refletir: onde a resposta do servidor já
+trouxer um veredito de permissão explícito, a SPA SHALL respeitá-lo em vez de
+oferecer a ação — é o caso do veredito de envio da pasta corrente, que a
+capability `navegacao` normatiza. O que a SPA NÃO SHALL fazer é derivar um
+veredito a partir de posse, papel ou qualquer outro campo da resposta.
 
 A recusa de mover por **ciclo** e a recusa por **nome já existente no destino**
 SHALL produzir avisos **distinguíveis entre si e distinguíveis do aviso de
@@ -286,3 +292,235 @@ Referência: PRD US 4.2 (cenário 1); design.md D6.
   API responde 403
 - **THEN** a SPA exibe um bloqueio de acesso e nenhum conteúdo ou nome de item
   da pasta é mostrado
+
+### Requirement: Pasta sem conteúdo orienta em vez de apresentar tabela vazia
+
+A SPA SHALL apresentar, numa pasta sem itens visíveis à pessoa, uma mensagem
+que explique a ausência e ofereça o próximo passo disponível, em vez da tabela
+vazia herdada do design system. A ação oferecida SHALL respeitar a permissão
+já resolvida pelo servidor — nenhuma ação que a pessoa não possa executar SHALL
+ser apresentada.
+
+#### Scenario: Pasta vazia apresenta mensagem e ação de envio
+- **WHEN** uma pessoa com permissão de envio abre uma pasta que não contém
+  nenhum item
+- **THEN** a tela apresenta mensagem informando que ainda não há documentos ali
+  e oferece a ação de enviar documento
+
+#### Scenario: Sem permissão de envio, a orientação não oferece a ação
+- **WHEN** uma pessoa sem permissão de envio abre uma pasta que não contém
+  nenhum item
+- **THEN** a tela informa que não há documentos ali, sem oferecer a ação de
+  enviar
+
+#### Scenario: Pasta com itens não apresenta a orientação de vazio
+- **WHEN** uma pessoa abre uma pasta que contém ao menos um item visível
+- **THEN** a listagem é apresentada normalmente, sem a mensagem de pasta vazia
+
+### Requirement: Listagem do explorador apresenta os dados de controle
+
+A SPA SHALL apresentar, por documento listado, a etiqueta do tipo com sua
+sigla, a revisão, o setor responsável, a data de próxima revisão e a situação
+apurada pelo servidor. A SPA NÃO SHALL recalcular a situação por conta própria
+— SHALL apresentar a que o servidor devolveu. Dado ausente SHALL ser
+apresentado como ausência explícita, nunca como valor presumido. O arquivo
+pendente de cadastro SHALL ser apresentado com etiqueta própria, e o Arquivo
+geral SHALL ser apresentado sem situação de revisão.
+
+#### Scenario: Documento controlado exibe seus dados na linha
+- **WHEN** uma pessoa abre uma pasta que contém um documento com dados de
+  controle registrados
+- **THEN** a linha apresenta sigla do tipo, revisão, responsável, data de
+  próxima revisão e situação
+
+#### Scenario: Documento sem dados não inventa valores
+- **WHEN** uma pessoa abre uma pasta que contém um arquivo sem dados de controle
+- **THEN** os campos correspondentes aparecem vazios e a situação apresentada é
+  Sem controle de revisão
+
+#### Scenario: A situação apresentada é a do servidor
+- **WHEN** o servidor devolve a situação de um documento
+- **THEN** a SPA apresenta exatamente essa situação, sem recalculá-la a partir
+  da data e do relógio do dispositivo
+
+#### Scenario: Arquivo pendente de cadastro é identificado como tal
+- **WHEN** quem enviou um arquivo pendente de cadastro, ou um administrador da
+  unidade, abre a pasta que o contém
+- **THEN** a linha apresenta a etiqueta Pendente de cadastro, distinguível da
+  situação Sem controle de revisão
+
+#### Scenario: Arquivo geral não apresenta situação de revisão
+- **WHEN** uma pessoa abre uma pasta que contém arquivo do tipo Arquivo geral
+- **THEN** a linha apresenta a sigla do tipo e nenhuma situação de revisão, com
+  código, revisão e data de próxima revisão como ausência explícita
+
+#### Scenario: Situação desconhecida não quebra a listagem
+- **WHEN** o servidor devolve uma situação que a SPA não reconhece
+- **THEN** a linha é apresentada com tratamento neutro para aquele valor, sem
+  impedir a apresentação do restante da listagem
+
+### Requirement: Dados de controle são editáveis a partir do explorador
+
+A SPA SHALL oferecer, no explorador, o caminho para preencher ou corrigir os
+dados de controle de um documento, apresentando-o apenas a quem tem a permissão
+exigida pelo servidor. A ação NÃO SHALL ser oferecida a quem o servidor
+recusaria.
+
+#### Scenario: Quem pode substituir pode editar os dados
+- **WHEN** uma pessoa com permissão de substituir um documento abre suas ações
+  no explorador
+- **THEN** encontra a ação de editar os dados de controle
+
+#### Scenario: Sem permissão, a ação não é oferecida
+- **WHEN** uma pessoa sem permissão de substituir um documento abre suas ações
+  no explorador
+- **THEN** a ação de editar os dados de controle não é apresentada
+
+### Requirement: Explorador atende ao pedido de envio recebido no endereço
+
+O explorador SHALL atender a um pedido de envio recebido no próprio endereço da
+tela, levando a pessoa à área de envio da pasta aberta. SHALL atendê-lo somente
+após o servidor resolver que ela pode enviar ali, e NÃO SHALL inferir essa
+permissão no cliente. O pedido SHALL valer uma única vez, e NÃO SHALL se repetir
+ao recarregar a tela nem ao voltar a ela pelo histórico do navegador.
+
+#### Scenario: Com permissão de envio, a área de envio recebe a pessoa
+- **WHEN** uma pessoa com permissão de envio na pasta aberta chega ao explorador
+  com um pedido de envio no endereço
+- **THEN** a área de envio daquela pasta fica à sua frente e pronta para uso, sem
+  que ela precise localizá-la na tela
+
+#### Scenario: Sem permissão de envio, o pedido não desloca a pessoa
+- **WHEN** uma pessoa sem permissão de envio na pasta aberta chega ao explorador
+  com um pedido de envio no endereço
+- **THEN** a tela apresenta o conteúdo da pasta normalmente, sem conduzi-la à área
+  de envio
+
+#### Scenario: O pedido é resolvido pelo veredito do servidor
+- **WHEN** o explorador recebe um pedido de envio antes de o servidor devolver o
+  conteúdo da pasta
+- **THEN** o pedido só é atendido depois que o veredito de envio daquela pasta
+  chega, nunca por decisão do cliente
+
+#### Scenario: O pedido não se repete
+- **WHEN** uma pessoa chega ao explorador com um pedido de envio, é levada à área
+  de envio e em seguida recarrega a tela ou volta a ela pelo histórico
+- **THEN** o pedido não é atendido outra vez, e a tela se comporta como uma
+  chegada comum ao explorador
+
+### Requirement: Explorador atende ao pedido de nova pasta recebido no endereço
+
+O explorador SHALL atender a um pedido de nova pasta recebido no próprio
+endereço da tela, apresentando o formulário de nova pasta. SHALL atendê-lo
+**somente na raiz da unidade**, onde criar pasta é permitido a qualquer pessoa
+autenticada; recebido numa subpasta, o pedido SHALL ser descartado sem
+apresentar o formulário, e o cliente NÃO SHALL inferir permissão para atendê-lo
+ali. O pedido SHALL ser atendido depois que o conteúdo da raiz chegar, SHALL
+valer uma única vez e NÃO SHALL se repetir ao recarregar a tela ou voltar a ela
+pelo histórico. Referência: PRD US 11.1, cenário 2; US 2.1; demanda do cliente
+nº 2, seção 1.3 (atalho "Nova pasta").
+
+#### Scenario: Pedido na raiz apresenta o formulário
+- **WHEN** uma pessoa chega à raiz do explorador com um pedido de nova pasta no
+  endereço
+- **THEN** o formulário de nova pasta é apresentado, sem que ela precise
+  localizar a ação na tela
+
+#### Scenario: Pedido fora da raiz é descartado
+- **WHEN** uma pessoa chega a uma subpasta do explorador com um pedido de nova
+  pasta no endereço
+- **THEN** a tela apresenta o conteúdo da pasta normalmente, sem o formulário
+
+#### Scenario: O pedido de nova pasta não se repete
+- **WHEN** uma pessoa chega ao explorador com um pedido de nova pasta, vê o
+  formulário e em seguida recarrega a tela ou volta a ela pelo histórico
+- **THEN** o formulário não é apresentado outra vez
+
+### Requirement: Explorador oferece marcar e desmarcar favorito
+
+O explorador SHALL oferecer, em cada pasta e arquivo listados, a ação de marcar
+como favorito ou, quando o item já for favorito da pessoa, a de removê-lo dos
+favoritos. A indicação de favorito SHALL vir do servidor, junto com a listagem
+da pasta, e NÃO SHALL ser inferida pelo cliente. A indicação NÃO SHALL depender
+apenas de cor. Referência: PRD US 2.5; capability `favoritos`.
+
+#### Scenario: Item não favorito oferece favoritar
+- **WHEN** uma pessoa abre as ações de um arquivo que não é seu favorito
+- **THEN** encontra a ação de marcá-lo como favorito
+
+#### Scenario: Item favorito oferece remover
+- **WHEN** uma pessoa abre as ações de um arquivo que já é seu favorito
+- **THEN** encontra a ação de removê-lo dos favoritos, e o item indica por texto
+  ou nome acessível que é favorito
+
+#### Scenario: Marcar reflete na listagem sem recarregar a tela
+- **WHEN** uma pessoa marca um item como favorito no explorador
+- **THEN** a indicação de favorito do item é atualizada, e o item passa a
+  constar do destino de favoritos
+
+### Requirement: Explorador oferece marcar leitura obrigatória
+
+O explorador SHALL oferecer, na linha do arquivo, a ação **Leitura
+obrigatória** somente a quem pode editar os dados de controle do documento, pelo
+veredito já resolvido pelo servidor na listagem. A ação SHALL abrir o
+formulário de marcação com o público, o prazo (padrão de 15 dias), a mensagem e
+a prévia da contagem de pessoas, e SHALL informar quando o documento não é
+elegível ou quando a revisão vigente já está marcada. Referência: PRD US 12.2;
+demanda do cliente nº 2, seção 3.2 (etapa 1).
+
+#### Scenario: Quem não edita o documento não vê a ação
+- **WHEN** uma pessoa sem permissão de editar os dados de controle abre as
+  ações de um arquivo
+- **THEN** a ação Leitura obrigatória não é apresentada
+
+#### Scenario: Formulário mostra a contagem antes de confirmar
+- **WHEN** o publicador escolhe o público no formulário
+- **THEN** vê quantas pessoas serão incluídas antes de confirmar
+
+### Requirement: Explorador sinaliza documento de leitura obrigatória
+
+O explorador SHALL apresentar, na linha do arquivo, um ícone de leitura
+obrigatória quando a **revisão vigente** do documento estiver marcada como
+leitura obrigatória, pelo veredito apurado pelo servidor na própria listagem. O
+ícone SHALL ter nome acessível e dica que digam "Leitura obrigatória". Revisão
+vigente sem marcação, documento cuja marcação é de revisão anterior e resposta
+sem o veredito NÃO SHALL apresentar o ícone. Referência: PRD US 12.4; demanda
+do cliente nº 2, seção 3.5 (Documentos).
+
+#### Scenario: Documento marcado mostra o ícone
+- **WHEN** uma pessoa abre a pasta de um documento cuja revisão vigente é de
+  leitura obrigatória
+- **THEN** a linha do documento apresenta o ícone de leitura obrigatória, com o
+  nome acessível correspondente
+
+#### Scenario: Nova revisão sem marcação não mostra o ícone
+- **WHEN** um documento marcado é substituído e a revisão nova não é marcada
+- **THEN** a linha do documento deixa de apresentar o ícone
+
+#### Scenario: Sem veredito, sem ícone
+- **WHEN** a listagem não informa se o documento é de leitura obrigatória
+- **THEN** a linha não apresenta o ícone, e a listagem continua sendo exibida
+
+### Requirement: Navegação somente leitura em pasta compartilhada por outra unidade
+
+O explorador SHALL exibir a pasta identificada com a unidade de origem
+("Compartilhada pela unidade {nome}") quando a resposta de conteúdo de
+pasta indicar `readOnly` e `sharedFrom`. A trilha SHALL começar na raiz
+compartilhada (precedida de "Compartilhados comigo", nunca de
+"Documentos"), e a SPA SHALL oferecer somente visualizar e, quando o
+servidor indicar `canDownload`, baixar. Não SHALL oferecer enviar, nova pasta, renomear, mover,
+excluir, permissões nem favorito. O orientador de pasta vazia SHALL
+informar que não há documentos compartilhados, sem sugerir envio. A SPA NÃO
+SHALL inferir esses vereditos no cliente: eles vêm da resposta do servidor.
+Referência: PRD US 5.2, cenários 1 e 2; design.md D6.
+
+#### Scenario: Raíra abre a Governança
+- **WHEN** a Raíra aciona a pasta Governança em "Compartilhados comigo"
+- **THEN** o explorador mostra o conteúdo da pasta, a identificação
+  "Compartilhada pela unidade SEDE" e a trilha começando em "Governança",
+  sem ações de escrita
+
+#### Scenario: Subpasta navegável
+- **WHEN** a Raíra abre uma subpasta da Governança
+- **THEN** a trilha mostra "Governança › {subpasta}", e nenhuma pasta acima
+  da Governança é nomeada

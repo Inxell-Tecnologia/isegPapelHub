@@ -7,12 +7,16 @@ type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 
 // Fallback quando `GET /auth/public-config` falha ou ainda não resolveu
 // (design.md D7/D9; `manualUrl` pela change `acesso-ao-manual-no-shell`,
-// design.md D4): sem identificação de cliente e sem `manualUrl`, o item do
-// manual desaparece do rodapé em vez de apontar para lugar nenhum.
+// design.md D4; `supportContact` pela change `identidade-visual-isetes`,
+// design.md D8): sem identificação de cliente e sem `manualUrl`, o item do
+// manual desaparece do rodapé em vez de apontar para lugar nenhum; sem
+// `supportContact`, o aviso de contato não é exibido — nem como espaço
+// reservado.
 const DEFAULT_PUBLIC_CONFIG: PublicConfigResponse = {
   appName: 'PapelHub',
   clientName: '',
   manualUrl: '',
+  supportContact: '',
 };
 
 interface SessionContextValue {
@@ -22,6 +26,12 @@ interface SessionContextValue {
   /** Lança `ApiError` (401) em credenciais inválidas — a página de login trata a mensagem genérica. */
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Registra, na conta, que o tour guiado foi feito (change `tour-guiado`,
+   * design.md D4) e atualiza a identidade em memória — o convite da saudação
+   * some sem nova leitura de `/auth/me`.
+   */
+  markTourCompleted: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -110,6 +120,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await apiClient.post('/auth/logout');
         setIdentity(null);
         setStatus('anonymous');
+      },
+      async markTourCompleted() {
+        setIdentity((atual) => (atual ? { ...atual, tourCompleted: true } : atual));
+        await apiClient.post('/auth/tour-completed');
       },
     }),
     [status, identity, publicConfig],

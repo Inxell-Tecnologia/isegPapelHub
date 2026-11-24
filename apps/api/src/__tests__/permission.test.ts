@@ -7,7 +7,13 @@ import { InAppNotificationPort } from '../adapters/in-app-notification-port.js';
 import { EnvSecretsPort } from '../adapters/env-secrets-port.js';
 import { Argon2AuthPort } from '../adapters/argon2-auth-port.js';
 import { InMemoryStoragePort } from './in-memory-storage-port.js';
-import { setupTestDatabase, seedTwoUnits, withSystemBypass, sessionCookieFor } from './test-db.js';
+import {
+  setupTestDatabase,
+  seedTwoUnits,
+  withSystemBypass,
+  sessionCookieFor,
+  controleDeTeste,
+} from './test-db.js';
 import type { Ports } from '../ports/index.js';
 
 describe('Endpoints de URL assinada: checagem de permissão', () => {
@@ -239,18 +245,24 @@ describe('Épico 4: grants por pessoa — imposição dono-ou-grant', () => {
     const folderId = await insertFolder(ids.userA, 'Pasta Alheia');
     const cookieA2 = await sessionCookieFor(ports, userA2Id);
 
-    const blocked = await request(app)
-      .post('/files/upload-url')
-      .set('Cookie', cookieA2)
-      .send({ fileName: 'novo.txt', contentType: 'text/plain', declaredSizeBytes: 5, folderId });
+    const blocked = await request(app).post('/files/upload-url').set('Cookie', cookieA2).send({
+      fileName: 'novo.txt',
+      contentType: 'text/plain',
+      declaredSizeBytes: 5,
+      folderId,
+      documentControl: controleDeTeste(),
+    });
     expect(blocked.status).toBe(403);
 
     await grant('folder', folderId, ['upload']);
 
-    const allowed = await request(app)
-      .post('/files/upload-url')
-      .set('Cookie', cookieA2)
-      .send({ fileName: 'novo.txt', contentType: 'text/plain', declaredSizeBytes: 5, folderId });
+    const allowed = await request(app).post('/files/upload-url').set('Cookie', cookieA2).send({
+      fileName: 'novo.txt',
+      contentType: 'text/plain',
+      declaredSizeBytes: 5,
+      folderId,
+      documentControl: controleDeTeste(),
+    });
     expect(allowed.status).toBe(200);
   });
 
@@ -319,5 +331,42 @@ describe('Épico 4: grants por pessoa — imposição dono-ou-grant', () => {
 
     const opened = await request(app).get(`/folders/${folderId}/contents`).set('Cookie', cookieA2);
     expect(opened.status).toBe(200);
+  });
+
+  /**
+   * Épico 10 (US 10.7, design.md D6 de `controle-documental`): a primeira
+   * exceção de `hasAccess` é **restritiva**. Este caso prova as duas metades
+   * da afirmação: com o grant, o colaborador alcança; declarado obsoleto, o
+   * mesmo grant deixa de alcançar — a exceção só subtrai, e nenhuma
+   * concessão nova nasce dela.
+   */
+  it('documento obsoleto deixa de ser alcançável mesmo com grant view/download (Épico 10)', async () => {
+    const app = createApp(ports);
+    const fileId = await insertFile(ids.userA, 'unitA/perm-obsoleto', 'obsoleto.txt');
+    const cookieA2 = await sessionCookieFor(ports, userA2Id);
+
+    await grant('file', fileId, ['view', 'download']);
+    expect(
+      (await request(app).post(`/files/${fileId}/view-url`).set('Cookie', cookieA2)).status,
+    ).toBe(200);
+
+    await withSystemBypass(pool, (client) =>
+      client.query("UPDATE files SET lifecycle_state = 'obsolete' WHERE id = $1", [fileId]),
+    );
+
+    expect(
+      (await request(app).post(`/files/${fileId}/view-url`).set('Cookie', cookieA2)).status,
+    ).toBe(403);
+    expect(
+      (await request(app).post(`/files/${fileId}/download-url`).set('Cookie', cookieA2)).status,
+    ).toBe(403);
+    // Nem o dono, que não é gestão da unidade, segue alcançando.
+    expect(
+      (
+        await request(app)
+          .post(`/files/${fileId}/view-url`)
+          .set('Cookie', await sessionCookieFor(ports, ids.userA))
+      ).status,
+    ).toBe(403);
   });
 });

@@ -1,6 +1,6 @@
 # Enviar arquivos
 
-Na página **Arquivos**, há três formas de escolher o que enviar para a pasta atual:
+Na página **Documentos**, há três formas de escolher o que enviar para a pasta atual:
 
 - **Arrastar e soltar** — arraste **várias pastas e arquivos de uma vez** para a área
   de envio e solte. A estrutura de subpastas de **cada** pasta solta é recriada igual
@@ -16,6 +16,79 @@ Na página **Arquivos**, há três formas de escolher o que enviar para a pasta 
   essa operação (ver [Limites](../referencia/limites.md)). Use um computador para
   enviar uma pasta inteira.
 
+## Todo envio pede os dados de controle
+
+Nenhum documento é publicado sem os dados obrigatórios — **tipo, código, revisão,
+responsável e data de próxima revisão** —, enviado sozinho ou em lote. Cada arquivo
+tem os seus próprios dados.
+
+Quando a seleção tem **exatamente um arquivo** (e ele não vem de uma pasta), o
+PapelHub pede os dados num formulário, antes de publicar, e recusa o envio se algum
+faltar.
+
+Para o que não é documento da Matriz — atas, planilhas de trabalho, apresentações —
+escolha o tipo **Arquivo geral**, que pede **só o título**: os campos de código,
+revisão e próxima revisão ficam indisponíveis, porque esse tipo declara não ter prazo
+de revisão. Ver [Controle documental](controle-documental.md).
+
+### A tabela de cadastro, no envio de vários arquivos
+
+Ao selecionar ou arrastar **vários arquivos, ou uma pasta**, o PapelHub abre uma
+**tabela de cadastro com uma linha por arquivo**. Ela é a confirmação do envio: nada é
+transferido antes de você publicar ali.
+
+A tabela aparece **depois** da verificação de espaço (abaixo) — se a seleção não
+couber, você recebe o veredito antes de preencher qualquer coisa.
+
+Em cada linha:
+
+- **Título** vem preenchido com o nome do arquivo e é editável. É o nome com que o
+  arquivo será gravado; a extensão original é preservada, você não precisa redigitá-la.
+  Título em branco impede publicar — é o único dado que não admite pendência.
+- **Tipo** e **Código** vêm **sugeridos** quando o nome do arquivo segue o padrão
+  `SIGLA-AREA-Nº` (por exemplo, `PRT-NSP-001_Identificacao.pdf` sugere o tipo
+  Protocolo e o código `PRT-NSP-001`). A célula sugerida aparece destacada, para você
+  distinguir o que o sistema propôs do que você confirmou — confira antes de publicar.
+- **Código** é individual de cada documento e único na sua unidade. Se dois arquivos
+  do mesmo envio declararem o mesmo código, os dois são apontados e a publicação fica
+  bloqueada até você ajustar.
+- Uma etiqueta diz se a linha está **Completa** ou **Incompleta**; passando o mouse
+  sobre a incompleta você vê quais dados faltam.
+
+### Aplicar a todos
+
+No topo da tabela, a linha **Aplicar a todos** preenche **tipo, revisão, responsável e
+próxima revisão** em todas as linhas de uma vez, quando você clica em **Aplicar a
+todos**. É o caminho para lotes grandes: cadastre o que é comum num gesto e ajuste
+depois só as exceções.
+
+Dois detalhes que valem saber:
+
+- o **código não** entra no "aplicar a todos", porque é individual de cada documento;
+- aplicar **sobrescreve** as linhas que você já tinha editado. Faça a aplicação
+  primeiro e os ajustes individuais depois — cada linha pode ser alterada a qualquer
+  momento antes de publicar.
+
+### Publicar completos, e o que acontece com os incompletos
+
+O botão de publicação diz quantos arquivos serão publicados e quantos ficarão
+pendentes, e as duas coisas acontecem **no mesmo envio**: os arquivos das linhas
+completas são publicados, e os das incompletas são enviados e ficam **Pendente de
+cadastro** — fora de circulação, visíveis só para você e para a gestão da unidade, com
+um aviso no sino, até que você complete o cadastro pela ação **Dados de controle** na
+listagem. Nenhum arquivo é descartado por estar incompleto.
+
+!!! info "Arquivo pendente ocupa o seu espaço"
+    Um arquivo Pendente de cadastro é um arquivo de verdade na pasta: ele **conta na
+    sua cota** como qualquer outro, mesmo sem aparecer para os leitores. Completar o
+    cadastro não muda o espaço ocupado — o que muda é a circulação.
+
+!!! warning "O cadastro da tabela não é rascunho"
+    O que você digita na tabela existe só até você publicar. Se fechar a tela, ou
+    cancelar, o cadastro é perdido e a seleção precisa ser refeita. Para lotes grandes,
+    use **Aplicar a todos** e publique; o que ficar pendente você completa depois, com
+    calma, pela listagem.
+
 ## Verificação antes de começar
 
 Um envio grande pode levar dezenas de minutos, e por isso **nada é transferido antes
@@ -27,14 +100,17 @@ de o sistema verificar se cabe**. Ao receber sua seleção, o PapelHub:
 2. **Consulta o seu espaço disponível** no servidor.
 3. **Responde se cabe**, antes de transferir qualquer arquivo.
 
-**Se couber**, a tela mostra a quantidade de arquivos e o volume a enviar e aguarda
-você clicar em **Enviar** — o envio só começa depois dessa confirmação.
+**Se couber**, a tela mostra a quantidade de arquivos e o volume a enviar e aguarda a
+sua confirmação — o envio só começa depois dela. Com **um** arquivo, a confirmação é o
+botão **Publicar documento** do formulário; com **vários**, é o botão de publicação da
+tabela de cadastro.
 
 **Se não couber**, nenhum arquivo é transferido e a tela mostra o volume da seleção, o
 espaço disponível, quanto falta, e **onde o seu espaço está**: em arquivos ativos, em
 arquivos na lixeira e em envios ainda não concluídos. Você pode então **enviar só o
-que cabe** — o sistema envia o subconjunto que couber no espaço disponível e informa
-com clareza quantos arquivos ficaram de fora.
+que cabe** — o sistema abre a tabela de cadastro **apenas com o subconjunto que
+couber**, informando com clareza quantos arquivos ficaram de fora. Você não cadastra
+arquivo que não será enviado.
 
 Não existe limite de **quantidade** de arquivos por envio imposto pela tela: o envio é
 dividido internamente em partes, e a única recusa por tamanho é a que o seu espaço

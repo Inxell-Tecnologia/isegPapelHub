@@ -347,3 +347,105 @@ design.md D4/D5 do change `mover-e-renomear-itens`.
 - **WHEN** um arquivo é movido para uma pasta que já contém outro arquivo de mesmo
   nome
 - **THEN** a ação é aceita e ambos os arquivos coexistem
+
+### Requirement: Resposta de conteúdo informa o veredito de envio da pasta corrente
+
+A rota de navegação SHALL informar, junto do conteúdo da pasta, se o
+solicitante pode **enviar** nela, resolvendo o veredito pela mesma regra de
+acesso que governa a rota de envio. O valor SHALL estar sempre presente na
+resposta, e NÃO SHALL substituir a autorização da rota de envio.
+
+#### Scenario: Dono da pasta recebe veredito favorável
+- **WHEN** a pessoa que criou a pasta solicita o conteúdo dela
+- **THEN** a resposta informa que ela pode enviar nessa pasta
+
+#### Scenario: Concessão de envio sobre pasta de outra pessoa é refletida
+- **WHEN** uma pessoa com concessão vigente do verbo de envio sobre pasta de
+  outra pessoa solicita o conteúdo dessa pasta
+- **THEN** a resposta informa que ela pode enviar, embora não seja dona nem
+  administradora da unidade
+
+#### Scenario: Quem só pode visualizar recebe veredito desfavorável
+- **WHEN** uma pessoa com concessão apenas de visualização sobre pasta de
+  outra pessoa solicita o conteúdo dessa pasta
+- **THEN** a resposta apresenta o conteúdo e informa que ela **não** pode
+  enviar nessa pasta
+
+#### Scenario: O veredito não dispensa a autorização da rota de envio
+- **WHEN** um pedido de envio chega a uma pasta sobre a qual o solicitante não
+  tem o verbo de envio
+- **THEN** a rota de envio recusa por conta própria, independentemente do
+  veredito que a rota de navegação tenha informado antes
+
+#### Scenario: Raiz da unidade sempre admite envio
+- **WHEN** qualquer pessoa autenticada solicita o conteúdo da raiz da própria
+  unidade
+- **THEN** a resposta informa que ela pode enviar, por a raiz não ser recurso
+  concedível
+
+### Requirement: Resposta de conteúdo informa, por subpasta, a contagem de documentos da subárvore alcançável pelo solicitante
+
+A rota de navegação SHALL informar, em cada subpasta listada, quantos documentos o solicitante pode abrir **dentro dela, incluindo as subpastas que ele pode abrir**, contando em cada pasta alcançada o mesmo recorte da listagem de documentos e podando a subpasta sem acesso com toda a sua descendência. NÃO SHALL contar nada de outra unidade nem de pasta que o solicitante não pode abrir. Referência: PRD US 11.1 (cenário 3), US 4.1, US 4.3, US 5.1, US 10.7, US 10.9.
+
+#### Scenario: A contagem é a soma do que a pessoa encontra navegando
+- **WHEN** uma pessoa solicita o conteúdo de uma pasta e, em seguida, o conteúdo
+  de uma das subpastas listadas
+- **THEN** a contagem informada para essa subpasta é igual ao número de
+  documentos apresentados ao abri-la somado às contagens informadas para as
+  subpastas que aparecem dentro dela
+
+#### Scenario: Documentos de subpastas entram na soma
+- **WHEN** uma pasta contém apenas subpastas com documentos que o solicitante
+  pode abrir
+- **THEN** a contagem dessa pasta é a soma desses documentos
+
+#### Scenario: Subpasta sem acesso fica fora da soma
+- **WHEN** uma pasta visível contém uma subpasta que o solicitante não pode
+  abrir, ainda que ele tenha concessão de visualização sobre documentos dentro
+  dela
+- **THEN** os documentos dessa subpasta não entram na contagem da pasta, sem
+  revelar a existência deles
+
+#### Scenario: A poda vale para toda a descendência
+- **WHEN** abaixo de uma subpasta que o solicitante não pode abrir existe outra
+  subpasta, com documentos, que ele poderia abrir
+- **THEN** nem essa subpasta nem seus documentos entram na contagem
+
+#### Scenario: Concessão sobre a pasta não faz contar os documentos dela
+- **WHEN** uma pessoa com concessão de visualização apenas sobre uma pasta de
+  outra pessoa, que contém documentos, solicita o conteúdo da pasta-mãe
+- **THEN** a pasta aparece com contagem zero
+
+#### Scenario: Documento sem acesso não é contado
+- **WHEN** uma pasta visível contém documentos dos quais o solicitante só pode
+  visualizar parte
+- **THEN** a contagem informa apenas os documentos que ele pode visualizar, sem
+  revelar a existência dos demais
+
+#### Scenario: Concessão expirada deixa de contar na requisição seguinte
+- **WHEN** a concessão de visualização de um documento ou de uma subpasta
+  expira
+- **THEN** a contagem deixa de incluir o documento, ou o ramo daquela subpasta,
+  na requisição seguinte, sem depender de rotina agendada
+
+#### Scenario: Documento ou subpasta na lixeira não é contado
+- **WHEN** um documento, ou uma subpasta com documentos, é excluído para a
+  lixeira
+- **THEN** a contagem deixa de incluí-lo para qualquer solicitante, inclusive o
+  administrador da unidade
+
+#### Scenario: Obsoleto e pendente de cadastro seguem a listagem
+- **WHEN** uma pasta ou uma de suas subpastas contém um documento obsoleto e um
+  pendente de cadastro
+- **THEN** o administrador da unidade vê os dois contados, quem enviou o
+  pendente o vê contado, e um terceiro com concessão de visualização sobre eles
+  não vê nenhum dos dois contado
+
+#### Scenario: Administrador global conta só a própria unidade
+- **WHEN** o administrador global solicita o conteúdo da raiz da sua unidade
+- **THEN** cada contagem considera apenas pastas e documentos da sua unidade, e
+  pastas de outras unidades não aparecem nem são contadas
+
+#### Scenario: Estrutura inconsistente não trava a requisição
+- **WHEN** a cadeia de pastas em torno da pasta solicitada contém um ciclo
+- **THEN** a requisição termina, sem laço infinito na contagem

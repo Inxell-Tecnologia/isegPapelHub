@@ -10,9 +10,6 @@ resource "google_cloud_run_v2_job" "migrate" {
   name     = "${local.name_prefix}-migrate"
   location = var.region
   labels   = local.labels
-  # Job stateless recriado a cada deploy (nenhum dado próprio) — diferente do
-  # Cloud SQL, que mantém `deletion_protection = true` de propósito.
-  deletion_protection = false
 
   template {
     template {
@@ -86,6 +83,21 @@ resource "google_cloud_run_v2_job" "migrate" {
       max_retries = 1
     }
   }
+
+  # O provider google 6.x introduziu `deletion_protection` com default `true`
+  # em Cloud Run v2, e é uma trava DO TERRAFORM (não existe campo equivalente
+  # na API do Cloud Run). Nos Jobs ela só atrapalha: Job não guarda dado algum
+  # e destruir/recriar é gratuito. Pior, ela cria um impasse quando um `create`
+  # falha na espera de prontidão: o recurso fica `tainted`, o apply seguinte
+  # planeja SUBSTITUIR, e o destroy é recusado — `cannot destroy job without
+  # setting deletion_protection=false`. Como o provider lê a flag do STATE, não
+  # da configuração, mudar isto aqui não desfaz um impasse já instalado (aí é
+  # `terraform untaint` ou `state rm`); serve para não haver o próximo.
+  # Deliberadamente NÃO replicado no Cloud Run Service da API (cloud_run.tf),
+  # onde o default `true` é rede de segurança desejável: o serviço é o endpoint
+  # de produção, e destruí-lo é indisponibilidade, não recriação barata.
+  # Change correcoes-herdadas-do-fork; runbook, Armadilha 7.
+  deletion_protection = false
 
   lifecycle {
     # Mesmo racional do Cloud Run Service e dos demais Jobs: passo único,

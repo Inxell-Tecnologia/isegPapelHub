@@ -1,7 +1,6 @@
 # Colaboradores
 
-Além de tudo que o colaborador faz, o administrador de unidade gerencia **sua própria
-unidade**. Seu alcance é **restrito à unidade** — você não enxerga nem gerencia
+Além de tudo que o colaborador faz, o administrador da unidade gerencia **sua própria unidade**. Seu alcance é **restrito à unidade** — você não enxerga nem gerencia
 conteúdo de outras.
 
 ## Cadastrar e editar colaboradores
@@ -12,17 +11,108 @@ Abra **Colaboradores** no menu e clique em **Novo colaborador**. Informe:
 - **E-mail** (único; será o login)
 - **Senha inicial** (mínimo de 8 caracteres)
 - **Telefone**
-- **Função/cargo**
-- **Área de trabalho**
+- **Função/cargo** — o cargo da pessoa, como "Gerente de Governança". É o que
+  aparece para ela abaixo da saudação na tela inicial e no seu cartão, no pé do
+  menu. Preencher este campo não altera permissão nenhuma.
+- **Setor** — escolhido de uma **lista** dos setores da unidade, não digitado.
+  Pode ficar **sem setor**. Veja [Setores da unidade](#setores-da-unidade).
 - **Observação**
 - **Papel** (Colaborador ou Administrador da unidade)
+- **Acompanhamento de leituras** — se a pessoa é **gestora** e de quê (ver
+  [Gestores de acompanhamento](#gestores-de-acompanhamento))
 
 Confirme em **Cadastrar**. O colaborador passa a poder entrar com essas credenciais.
 
 - Se o **e-mail já estiver em uso**, o cadastro é recusado e o campo é sinalizado —
   ajuste o e-mail sem perder o resto do preenchimento.
-- Para **editar** um colaborador, clique em **Editar** na linha dele. O **e-mail** não
-  pode ser alterado na edição; os demais dados e o papel, sim.
+- Para **editar** um colaborador, clique em **Editar** na linha dele. Nome,
+  **e-mail**, telefone, função, setor, observação e papel podem ser alterados. Para
+  deixar a pessoa **sem setor**, limpe a escolha no campo Setor.
+
+### Corrigir o e-mail de um colaborador
+
+O e-mail é o **login** da pessoa. Para corrigir um e-mail cadastrado errado, abra
+**Editar** na linha dela, troque o e-mail e clique em **Salvar**.
+
+- A pessoa passa a entrar **com o novo e-mail e a mesma senha** a partir desse
+  momento; o e-mail antigo deixa de funcionar. Se ela já estiver com o sistema
+  aberto, continua usando normalmente.
+- **O sistema não avisa a pessoa** — o formulário mostra um lembrete enquanto o
+  e-mail estiver alterado. Comunique a troca você mesmo.
+- Se o novo e-mail **já pertencer a outra conta**, a alteração é recusada e o campo
+  é sinalizado; nada do que você alterou no formulário é salvo até corrigir.
+- O administrador da unidade troca o e-mail dos **colaboradores da sua unidade**;
+  o administrador global troca o de **qualquer pessoa**, inclusive o próprio — as
+  mesmas regras de "Quem pode editar quem", mais abaixo.
+
+## Encontrar um colaborador
+
+Acima da lista de **Colaboradores** há um campo de busca. Digite parte do
+**nome**, do **e-mail**, da **função/cargo** ou do **setor** e a lista mostra só
+quem corresponde — a partir de qualquer trecho, não só do começo. Maiúsculas e
+acentos não importam: "joao" encontra "João". O administrador global também
+pode buscar pelo **nome da unidade**.
+
+- Se ninguém corresponder, a lista mostra **Nenhum colaborador encontrado**.
+- Para voltar a ver todos, apague o texto ou clique no **×** do campo.
+- A busca só filtra a lista que você já vê: não mostra ninguém fora do seu
+  alcance.
+
+## Gestores de acompanhamento
+
+**Gestor** é quem acompanha se a equipe leu os documentos de leitura
+obrigatória — coordenador, gerente, diretor. Não é papel de acesso: a pessoa
+continua **Colaborador** (ou Administrador da unidade), e marcar alguém como
+gestor **não** permite cadastrar pessoas, liberar permissões nem abrir arquivo
+nenhum.
+
+No campo **Acompanhamento de leituras** do cadastro, escolha:
+
+| Opção                           | Acompanha                                    | Quem pode marcar          |
+| ------------------------------- | -------------------------------------------- | ------------------------- |
+| **Não acompanha**               | —                                            | —                         |
+| **Gestor do setor**             | As pessoas do **setor** da pessoa            | Administração da unidade  |
+| **Gestor da unidade**           | Todas as pessoas da **unidade**              | Administração da unidade  |
+| **Gestor de todas as unidades** | Todas as unidades (Governança da Sede)       | Só o administrador global |
+
+- **Gestor do setor precisa de setor.** Se a pessoa não tiver setor, o sistema
+  recusa e pede que você escolha o setor. E, enquanto ela for gestora do setor,
+  não é possível deixá-la sem setor — troque antes o acompanhamento.
+- O sistema **não** deduz o gestor pelo cargo: "Coordenadora" escrito na
+  Função/cargo não faz ninguém gestor. É a marcação que vale.
+- Ninguém marca a si mesmo.
+- Quem tem **Gestor de todas as unidades** só pode ter o acompanhamento
+  alterado pelo administrador global; para o administrador da unidade, o campo
+  aparece travado.
+- A coluna **Acompanhamento** da lista mostra quem é gestor e de quê. O sistema
+  registra quem fez cada marcação e quando.
+
+!!! note "O que o gestor recebe"
+    A marcação define quem recebe, no sino, o **aviso de atraso da equipe** da
+    leitura obrigatória — com os nomes de quem está atrasado no seu alcance (ver
+    [Leitura obrigatória](../colaborador/leitura-obrigatoria.md#avisos)), e
+    quem vê, na aba **Acompanhamento**, quem leu cada documento (ver
+    [Acompanhar quem leu](../colaborador/leitura-obrigatoria.md#acompanhar-quem-leu-publicador-gestor-e-governanca)).
+
+## Setores da unidade
+
+O setor é uma **lista fechada, por unidade** — e não um texto que cada pessoa
+digita do seu jeito. A razão é prática: a mesma área escrita como "Governança",
+"governanca" e "Gov." seria tratada como três setores diferentes, e quem
+estivesse escrito de um jeito ficaria de fora de uma consulta feita pelo outro.
+
+Para manter a lista, abra **Colaboradores** e clique em **Setores**. No painel
+que abre você pode:
+
+- **Adicionar** um setor;
+- **Renomear** um setor — útil para padronizar a escrita. Renomear **não**
+  desfaz nenhum vínculo: quem estava no setor continua nele, com o nome novo;
+- **Remover** um setor **sem colaboradores**. Se ainda houver gente vinculada, a
+  remoção é recusada e o sistema informa quantas pessoas são — mova-as antes.
+
+O nome do setor é único dentro da unidade, sem diferenciar maiúsculas de
+minúsculas. Duas unidades podem ter setores de mesmo nome, independentes entre
+si.
 
 A lista mostra nome, e-mail, função, papel e **status** (ativo ou desativado).
 
@@ -62,8 +152,8 @@ próprio acesso — por isso a ação **Desativar** não aparece na sua própria
 
 !!! warning "Editar não é o mesmo que redefinir a senha"
 
-    Um administrador global edita outro administrador global — inclusive o papel,
-    o status e a cota —, mas **não redefine a senha dele**. A senha de um
+    Um administrador global edita outro administrador global — inclusive o
+    e-mail, o papel, o status e a cota —, mas **não redefine a senha dele**. A senha de um
     administrador global só muda por ele mesmo, em **Minha conta**. É por isso
     que as duas tabelas desta página são diferentes.
 
@@ -72,7 +162,7 @@ próprio acesso — por isso a ação **Desativar** não aparece na sua própria
 | Quem redefine            | Pode redefinir de                                                             |
 | ------------------------- | ------------------------------------------------------------------------------ |
 | Administrador da unidade | Colaboradores da própria unidade                                              |
-| Administrador global     | Colaboradores e administradores de unidade                                    |
+| Administrador global     | Colaboradores e administradores da unidade                                    |
 | Ninguém                  | Administrador global — a senha dele só muda por ele mesmo, em **Minha conta** |
 
 Quando a ação não é permitida para determinado colaborador, o botão **Redefinir senha**
@@ -90,8 +180,7 @@ alterar o limite de mais ninguém.
 
 !!! info "Só o administrador global"
 
-    A cota é a única coisa na tela de colaboradores que o administrador de unidade
-    não edita. Para ele, o campo nem aparece.
+    A cota é a única coisa na tela de colaboradores que o administrador da unidade não edita. Para ele, o campo nem aparece.
 
 No formulário de **Editar** de um colaborador, o campo **Cota de armazenamento**
 funciona como uma chave de duas posições:

@@ -33,7 +33,12 @@ export function AuditoriaModal({ file, onClose }: AuditoriaModalProps) {
     {
       title: 'Colaborador',
       key: 'person',
-      render: (_, row) => row.actor.name ?? row.actor.email,
+      // Quem acessou vindo de outra unidade (compartilhamento entre unidades,
+      // design.md D9) vem sem e-mail e com a unidade: "Nome (Unidade)".
+      render: (_, row) => {
+        const quem = row.actor.name ?? row.actor.email ?? 'Pessoa sem nome';
+        return row.actor.unitName ? `${quem} (${row.actor.unitName})` : quem;
+      },
     },
     {
       title: 'Ação',

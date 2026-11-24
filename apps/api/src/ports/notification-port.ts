@@ -1,16 +1,21 @@
-import type { GrantNotificationPayload, NotificationKind } from '@gdoc/shared';
+import type { NotificationKind, NotificationPayload } from '@gdoc/shared';
 
 export interface NotifyInput {
   unitId: string;
   recipientUserId: string;
   kind: NotificationKind;
-  payload: GrantNotificationPayload;
+  /** Discriminado por `kind`; quem lê ramifica antes de acessar campos. */
+  payload: NotificationPayload;
   /**
    * Identificador do evento de origem, usado para deduplicação (design.md
    * D5). Para avisos de concessão, é composto de `(recurso, vencimento)` —
    * **nunca** do id do grant nem do instante da execução: é o que colapsa
    * vários verbos concedidos juntos numa única notificação, e o que faz uma
    * mudança de prazo notificar de novo.
+   *
+   * Para o aviso de pendência de cadastro (US 10.9), é o **identificador do
+   * arquivo**: um aviso por arquivo, e repetir a transferência do mesmo
+   * arquivo não produz aviso novo.
    */
   sourceRef: string;
 }

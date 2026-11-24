@@ -1,5 +1,5 @@
 import { App, Button, Modal, Typography } from 'antd';
-import { CopyOutlined } from '@ant-design/icons';
+import { IconeCopiar } from '../app/icons';
 
 interface SenhaGeradaModalProps {
   /** `null` ⇒ modal fechado. O valor só existe no estado do chamador — descartado ao fechar (design.md D7). */
@@ -40,7 +40,7 @@ export function SenhaGeradaModal({ generatedPassword, onClose }: SenhaGeradaModa
         {generatedPassword}
       </Typography.Text>
       <div style={{ marginTop: 12 }}>
-        <Button icon={<CopyOutlined />} onClick={handleCopy}>
+        <Button icon={<IconeCopiar />} onClick={handleCopy}>
           Copiar
         </Button>
       </div>

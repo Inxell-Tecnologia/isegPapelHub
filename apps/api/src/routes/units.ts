@@ -9,9 +9,10 @@ interface UnitRow {
   name: string;
   status: string;
   created_at: string;
+  is_headquarters: boolean;
 }
 
-const UNIT_COLUMNS = 'id, name, status, created_at';
+const UNIT_COLUMNS = 'id, name, status, created_at, is_headquarters';
 
 function toUnitResponse(row: UnitRow): UnitResponse {
   return {
@@ -19,7 +20,13 @@ function toUnitResponse(row: UnitRow): UnitResponse {
     name: row.name,
     status: row.status as UnitStatus,
     createdAt: new Date(row.created_at).toISOString(),
+    isHeadquarters: row.is_headquarters,
   };
+}
+
+/** Violação do índice de SEDE única (change `compartilhamento-entre-unidades`, design.md D11). */
+function isHeadquartersViolation(err: unknown): boolean {
+  return (err as { constraint?: string } | null)?.constraint === 'units_single_headquarters_uidx';
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -117,8 +124,9 @@ export function unitsRouter(ports: Ports): Router {
       const body = req.body as UpdateUnitRequest;
       const wantsRename = body.name !== undefined;
       const wantsStatus = body.status !== undefined;
+      const wantsHeadquarters = body.isHeadquarters !== undefined;
 
-      if (!wantsRename && !wantsStatus) {
+      if (!wantsRename && !wantsStatus && !wantsHeadquarters) {
         res.status(400).json({ error: 'no fields to update' });
         return;
       }
@@ -130,6 +138,10 @@ export function unitsRouter(ports: Ports): Router {
       }
       if (wantsStatus && body.status !== UnitStatus.ACTIVE && body.status !== UnitStatus.DISABLED) {
         res.status(400).json({ error: 'invalid status' });
+        return;
+      }
+      if (wantsHeadquarters && typeof body.isHeadquarters !== 'boolean') {
+        res.status(400).json({ error: 'invalid request body' });
         return;
       }
 
@@ -146,11 +158,31 @@ export function unitsRouter(ports: Ports): Router {
         | { kind: 'name_conflict' }
         | { kind: 'unit_not_empty' }
         | { kind: 'cannot_deactivate' }
+        | { kind: 'headquarters_already_set' }
+        | { kind: 'headquarters_cannot_be_disabled' }
         | { kind: 'not_found' };
 
       const outcome = await ports.database.withTenantTransaction<PatchOutcome>(
         ctx,
         async (client) => {
+          // SEDE (change `compartilhamento-entre-unidades`, design.md D11):
+          // no máximo uma, e a marcada não é desativada — os compartilhamentos
+          // entre unidades dependem dela. A troca é deliberada em dois passos
+          // (desmarcar, marcar): muda o alcance de todos os compartilhamentos.
+          const { rows: hqRows } = await client.query<{ id: string }>(
+            'SELECT id FROM units WHERE is_headquarters',
+          );
+          const currentHq = hqRows[0]?.id;
+          if (body.isHeadquarters === true && currentHq && currentHq !== unitId) {
+            return { kind: 'headquarters_already_set' };
+          }
+          const staysHeadquarters =
+            body.isHeadquarters === true ||
+            (body.isHeadquarters === undefined && currentHq === unitId);
+          if (deactivating && staysHeadquarters) {
+            return { kind: 'headquarters_cannot_be_disabled' };
+          }
+
           if (deactivating) {
             // D3 (defesa em profundidade): recusa a própria unidade do contexto
             // e a unidade de bootstrap (a mais antiga — o bootstrap cria a
@@ -184,6 +216,10 @@ export function unitsRouter(ports: Ports): Router {
             values.push(body.status);
             setClauses.push(`status = $${values.length}`);
           }
+          if (wantsHeadquarters) {
+            values.push(body.isHeadquarters);
+            setClauses.push(`is_headquarters = $${values.length}`);
+          }
           values.push(unitId);
 
           try {
@@ -194,6 +230,7 @@ export function unitsRouter(ports: Ports): Router {
             const updated = rows[0];
             return updated ? { kind: 'ok', row: updated } : { kind: 'not_found' };
           } catch (err) {
+            if (isHeadquartersViolation(err)) return { kind: 'headquarters_already_set' };
             if (isUniqueViolation(err)) return { kind: 'name_conflict' };
             throw err;
           }
@@ -209,6 +246,12 @@ export function unitsRouter(ports: Ports): Router {
           return;
         case 'cannot_deactivate':
           res.status(409).json({ error: 'cannot deactivate own or bootstrap unit' });
+          return;
+        case 'headquarters_already_set':
+          res.status(409).json({ error: 'headquarters_already_set' });
+          return;
+        case 'headquarters_cannot_be_disabled':
+          res.status(409).json({ error: 'headquarters_cannot_be_disabled' });
           return;
         case 'not_found':
           // RLS escondeu a linha (não deveria para global_admin) ou id inexistente.

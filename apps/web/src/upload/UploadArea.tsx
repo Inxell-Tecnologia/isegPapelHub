@@ -1,21 +1,41 @@
 import { useRef, useState } from 'react';
-import { Alert, App, Button, List, Progress, Space, Typography, Upload } from 'antd';
+import { Alert, App, Button, Form, Input, List, Progress, Space, Typography, Upload } from 'antd';
 import {
-  FolderOpenOutlined,
-  InboxOutlined,
-  ReloadOutlined,
-  UploadOutlined,
-} from '@ant-design/icons';
+  IconeArrastarSoltar,
+  IconeEnviar,
+  IconeEnviarPasta,
+  IconeTentarNovamente,
+} from '../app/icons';
 import type {
   BatchUploadItemRequest,
   BatchUploadUrlRequest,
+  DocumentControlInput,
   StorageQuotaResponse,
 } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
 import { useNarrowMode } from '../app/responsive';
+import {
+  DocumentControlFormItems,
+  toDocumentControlInput,
+  type DocumentControlFormValues,
+} from '../navegacao/DocumentControlFormItems';
+import { descreverRecusaDeControle } from '../navegacao/document-control-errors';
+import {
+  controleDaLinha,
+  linhaDeArquivo,
+  linhaEnviavel,
+  nomeDoArquivo,
+  type LinhaDeCadastro,
+} from './cadastro-em-lote';
+import { TabelaDeCadastro } from './TabelaDeCadastro';
 import { putObject } from './put-object';
 import { deriveRelativePath } from './relative-path';
-import { fetchStorageQuota, useInvalidateFolderContents, useRequestUploadUrls } from './queries';
+import {
+  fetchStorageQuota,
+  useInvalidateFolderContents,
+  useRequestUploadUrl,
+  useRequestUploadUrls,
+} from './queries';
 import {
   fatiarEnvio,
   formatarBytes,
@@ -26,6 +46,8 @@ import {
 
 const QUOTA_ERROR = 'quota exceeded';
 const BATCH_LIMIT_ERROR = 'upload_batch_limit_exceeded';
+/** Recusa **por item** do lote: código em conflito com o acervo ou com o próprio lote. */
+const CODE_CONFLICT_ERROR = 'document_code_conflict';
 
 /**
  * Transferências simultâneas (change `corrige-defeitos-envio-lote`,
@@ -92,6 +114,20 @@ interface FailedItem {
   expiresAt?: string;
   /** Falhas consecutivas de PUT deste item; zerado ao obter URL nova (design.md D5). */
   putFailures: number;
+  /**
+   * Dados de controle, só no envio de **um** documento (Épico 10): o retry
+   * precisa deles para repedir a URL pela rota de publicação, que os exige. O
+   * servidor retoma a própria linha `pending` do mesmo código, então repetir
+   * não vira documento duplicado nem recusa por código em uso.
+   */
+  controle?: DocumentControlInput;
+  /**
+   * `true` só na publicação de **um** documento, que repete pela rota unitária.
+   * Item de lote também carrega `controle` desde a tabela de cadastro, e
+   * repetir um item de lote pela rota unitária o transformaria em publicação de
+   * documento novo — com a exigência de conjunto completo que o lote não tem.
+   */
+  unitario?: boolean;
 }
 
 /** Item admitido na fila de transferência (design.md D4). */
@@ -102,6 +138,9 @@ interface QueuedTransfer {
   fileName: string;
   relativePath?: string;
   expiresAt?: string;
+  /** Presente só na publicação de um documento (Épico 10) — ver `FailedItem.controle`. */
+  controle?: DocumentControlInput;
+  unitario?: boolean;
 }
 
 /**
@@ -121,6 +160,12 @@ type Fase =
       cabem: SelectedFile[];
       deFora: SelectedFile[];
     }
+  /**
+   * Cadastro por arquivo (demanda 2.1; design.md D1). Entra **entre** o
+   * veredito de espaço e o envio: é a confirmação, com a tabela no lugar do
+   * painel "Confirmar envio".
+   */
+  | { tipo: 'cadastro'; linhas: LinhaDeCadastro[] }
   | { tipo: 'enviando' }
   | { tipo: 'concluido' }
   | { tipo: 'pausado'; espaco: StorageQuotaResponse; naoEnviados: number };
@@ -147,12 +192,37 @@ interface UploadAreaProps {
   destinationFolderId: string | null;
 }
 
-function toBatchItem(file: File, relativePath: string | undefined): BatchUploadItemRequest {
+/**
+ * Arquivo pronto para enviar: a seleção, mais o que a tabela de cadastro
+ * acrescentou (change `tabela-de-cadastro-no-envio-em-lote`).
+ *
+ * `fileName` só está presente quando o título foi editado — é o nome com que
+ * gravar, já com a extensão original reanexada (design.md D3). `controle` são
+ * os dados de controle **daquele** item: ausente ou incompleto não recusa, faz
+ * o arquivo nascer pendente de cadastro.
+ */
+interface ItemDeEnvio extends SelectedFile {
+  fileName?: string;
+  controle?: DocumentControlInput;
+}
+
+/** A linha da tabela já é um `ItemDeEnvio`: carrega arquivo, nome e controle. */
+function itemDaLinha(linha: LinhaDeCadastro): ItemDeEnvio {
   return {
-    fileName: file.name,
-    contentType: file.type || 'application/octet-stream',
-    declaredSizeBytes: file.size,
-    relativePath,
+    file: linha.file,
+    relativePath: linha.relativePath,
+    fileName: nomeDoArquivo(linha),
+    controle: controleDaLinha(linha),
+  };
+}
+
+function toBatchItem(item: ItemDeEnvio): BatchUploadItemRequest {
+  return {
+    fileName: item.fileName ?? item.file.name,
+    contentType: item.file.type || 'application/octet-stream',
+    declaredSizeBytes: item.file.size,
+    relativePath: item.relativePath,
+    documentControl: item.controle,
   };
 }
 
@@ -163,6 +233,15 @@ function displayName(item: Pick<FailedItem, 'fileName' | 'relativePath'>): strin
 function describeError(error: string | undefined): string {
   if (error === QUOTA_ERROR) return 'Cota de armazenamento atingida.';
   if (error === 'invalid item') return 'Arquivo inválido.';
+  // Recusa por item do lote (design.md D7): o código conflita com o acervo da
+  // unidade ou com outro arquivo do mesmo envio. Repetir sem mudar o código
+  // falharia igual, então a mensagem diz o que corrigir.
+  if (error === CODE_CONFLICT_ERROR) {
+    return 'Código já usado por outro documento desta unidade ou por outro arquivo deste envio.';
+  }
+  if (error === 'general_file_rejects_control_fields') {
+    return 'Arquivo geral não aceita código, revisão nem data de próxima revisão.';
+  }
   return 'Falha no envio.';
 }
 
@@ -176,6 +255,20 @@ function urlStillFresh(item: Pick<FailedItem, 'uploadUrl' | 'expiresAt'>): boole
   if (!item.uploadUrl || !item.expiresAt) return false;
   const restante = new Date(item.expiresAt).getTime() - Date.now();
   return Number.isFinite(restante) && restante > URL_EXPIRY_MARGIN_MS;
+}
+
+/**
+ * `true` quando a operação é a publicação de **um** documento, e portanto
+ * exige os dados de controle (Épico 10, design.md D7): exatamente um arquivo,
+ * e não vindo de uma pasta.
+ *
+ * `relativePath` é o que distingue as duas coisas: uma pasta com um único
+ * arquivo dentro continua sendo **uma pasta** — a spec dispensa os dados
+ * "quando o envio abrange vários arquivos ou uma pasta", e a hierarquia que o
+ * item carrega é a prova de que ele veio de uma.
+ */
+function ehPublicacaoDeUmDocumento(selecao: SelectedFile[]): boolean {
+  return selecao.length === 1 && !selecao[0]!.relativePath;
 }
 
 /** Devolve o controle ao navegador entre blocos da apuração (design.md D3). */
@@ -215,7 +308,9 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
   const { message, notification } = App.useApp();
   const isNarrow = useNarrowMode();
   const requestUploadUrls = useRequestUploadUrls();
+  const requestUploadUrl = useRequestUploadUrl();
   const invalidate = useInvalidateFolderContents();
+  const [formDeControle] = Form.useForm<DocumentControlFormValues>();
 
   const [fase, setFase] = useState<Fase>({ tipo: 'ocioso' });
   const [progresso, setProgresso] = useState<Progresso>(PROGRESSO_ZERADO);
@@ -327,7 +422,8 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
   }
 
   function startTransfer(transfer: QueuedTransfer) {
-    const { uid, uploadUrl, file, fileName, relativePath, expiresAt } = transfer;
+    const { uid, uploadUrl, file, fileName, relativePath, expiresAt, controle, unitario } =
+      transfer;
     setProgresso((prev) => ({ ...prev, arquivoCorrente: displayName({ fileName, relativePath }) }));
     putObject(uploadUrl, file, {
       onProgress: (percent) => registrarBytes(uid, Math.round((file.size * percent) / 100)),
@@ -368,6 +464,8 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
             putFailures: 1,
             uploadUrl,
             expiresAt,
+            controle,
+            unitario,
           });
         }
         releaseSlot();
@@ -430,7 +528,31 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
       ? { cabem: selecao, deFora: [] as SelectedFile[] }
       : subconjuntoQueCabe(selecao, espaco.availableBytes);
 
+    // A tabela de cadastro é a confirmação do envio de vários arquivos
+    // (design.md D1): o veredito de espaço vem **antes** dela, para ninguém
+    // preencher cinquenta linhas e só então ouvir que a seleção não cabe.
+    if (cabe && !ehPublicacaoDeUmDocumento(selecao)) {
+      abrirCadastro(selecao);
+      return;
+    }
+
     setFase({ tipo: 'veredito', cabe, selecao, espaco, cabem, deFora });
+  }
+
+  /** Abre a tabela com uma linha por arquivo, já com título e sugestão (design.md D4). */
+  function abrirCadastro(selecao: SelectedFile[]) {
+    const linhas = selecao.map((item) => linhaDeArquivo(nextUid(), item.file, item.relativePath));
+    setFase({ tipo: 'cadastro', linhas });
+  }
+
+  /**
+   * Envia **todas** as linhas — completas e incompletas — na mesma operação
+   * (design.md D6). O servidor decide por item quem publica e quem nasce
+   * pendente; a linha sem título é a única que não vai, por não haver pendência
+   * de cadastro que cubra a falta do nome do arquivo (design.md D3).
+   */
+  function publicarCadastro(linhas: LinhaDeCadastro[]) {
+    iniciarEnvio(linhas.filter(linhaEnviavel).map(itemDaLinha));
   }
 
   /**
@@ -439,11 +561,11 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
    * retrato —, e quem o trata é o produtor.
    */
   async function pedirUrlsDaFatia(
-    fatia: SelectedFile[],
+    fatia: ItemDeEnvio[],
   ): Promise<{ transfers: QueuedTransfer[]; recusadosPorCota: number } | null> {
     const body: BatchUploadUrlRequest = {
       destinationFolderId: destinationFolderId ?? undefined,
-      items: fatia.map(({ file, relativePath }) => toBatchItem(file, relativePath)),
+      items: fatia.map((item) => toBatchItem(item)),
     };
 
     let response;
@@ -456,7 +578,9 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
 
     const transfers: QueuedTransfer[] = [];
     let recusadosPorCota = 0;
-    fatia.forEach(({ file, relativePath }, index) => {
+    fatia.forEach((item, index) => {
+      const { file, relativePath, controle } = item;
+      const fileName = item.fileName ?? file.name;
       const result = response!.results[index];
       const uid = nextUid();
       if (result?.ok) {
@@ -464,9 +588,10 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
           uid,
           uploadUrl: result.uploadUrl,
           file,
-          fileName: file.name,
+          fileName,
           relativePath,
           expiresAt: result.expiresAt,
+          controle,
         });
         return;
       }
@@ -475,10 +600,13 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
       registrarFalha({
         uid,
         file,
-        fileName: file.name,
+        fileName,
         relativePath,
         error,
         putFailures: 0,
+        // Preserva o cadastro da linha recusada: corrigir o código e repetir
+        // não pode exigir reinformar tudo (design.md D7).
+        controle,
       });
     });
 
@@ -491,7 +619,7 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
    * pequeno e cada URL recebe o prazo cheio. A divisão é invisível ao
    * usuário — o progresso é um só, do conjunto.
    */
-  function iniciarEnvio(selecionados: SelectedFile[]) {
+  function iniciarEnvio(selecionados: ItemDeEnvio[]) {
     const fatias = fatiarEnvio(selecionados);
     const bytesTotais = somarBytes(selecionados);
 
@@ -573,6 +701,68 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
     void abastecer();
   }
 
+  /**
+   * Publicação de **um** documento (Épico 10, US 10.5): a operação carrega
+   * exatamente um arquivo, então os dados de controle são exigidos e a
+   * requisição vai pela rota de publicação, não pela do lote.
+   *
+   * A URL é pedida **antes** de trocar de fase, de propósito: uma recusa por
+   * código em uso ou por dado faltante devolve a pessoa ao formulário com o
+   * que ela digitou, em vez de a jogar num envio que já se sabe inviável.
+   */
+  async function iniciarEnvioDeUmDocumento(
+    selecionado: SelectedFile,
+    controle: DocumentControlInput,
+  ) {
+    const { file } = selecionado;
+    let resposta;
+    try {
+      resposta = await requestUploadUrl.mutateAsync({
+        fileName: file.name,
+        contentType: file.type || 'application/octet-stream',
+        declaredSizeBytes: file.size,
+        folderId: destinationFolderId ?? undefined,
+        documentControl: controle,
+      });
+    } catch (err) {
+      // Código em uso, dado faltante e permissão insuficiente são avisos
+      // distintos (web-upload: "indicando o que corrigir").
+      message.error(descreverRecusaDeControle(err));
+      return;
+    }
+
+    carregadosRef.current = new Map();
+    bytesEnviadosRef.current = 0;
+    setProgresso({
+      bytesTotais: file.size,
+      bytesEnviados: 0,
+      totalArquivos: 1,
+      concluidos: 0,
+      iniciadoEm: Date.now(),
+    });
+    setFalhas([]);
+    setFalhasVisiveis(false);
+    setFase({ tipo: 'enviando' });
+
+    verificarFimRef.current = () => {
+      if (activeRef.current > 0 || queueRef.current.length > 0) return;
+      verificarFimRef.current = null;
+      setFase({ tipo: 'concluido' });
+    };
+
+    enqueueTransfers([
+      {
+        uid: nextUid(),
+        uploadUrl: resposta.uploadUrl,
+        file,
+        fileName: file.name,
+        expiresAt: resposta.expiresAt,
+        controle,
+        unitario: true,
+      },
+    ]);
+  }
+
   /** Reapresenta o painel detalhado com o espaço **recém-consultado** (design.md D7). */
   async function apresentarPausa(naoEnviados: number) {
     try {
@@ -603,15 +793,58 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
           fileName: item.fileName,
           relativePath: item.relativePath,
           expiresAt: item.expiresAt,
+          controle: item.controle,
         },
       ]);
+      return;
+    }
+
+    // Documento publicado pela rota unitária renova a URL pela mesma rota,
+    // com os mesmos dados de controle (Épico 10): o servidor reconhece o
+    // próprio envio pendente daquele código e o retoma, em vez de recusar
+    // por código em uso ou criar um documento duplicado.
+    if (item.unitario && item.controle) {
+      try {
+        const resposta = await requestUploadUrl.mutateAsync({
+          fileName: item.fileName,
+          contentType: item.file.type || 'application/octet-stream',
+          declaredSizeBytes: item.file.size,
+          folderId: destinationFolderId ?? undefined,
+          documentControl: item.controle,
+        });
+        atualizarFalha(uid, {
+          uploadUrl: resposta.uploadUrl,
+          expiresAt: resposta.expiresAt,
+          putFailures: 0,
+        });
+        enqueueTransfers([
+          {
+            uid,
+            uploadUrl: resposta.uploadUrl,
+            file: item.file,
+            fileName: item.fileName,
+            expiresAt: resposta.expiresAt,
+            controle: item.controle,
+            unitario: true,
+          },
+        ]);
+      } catch (err) {
+        message.error(descreverRecusaDeControle(err));
+      }
       return;
     }
 
     try {
       const response = await requestUploadUrls.mutateAsync({
         destinationFolderId: destinationFolderId ?? undefined,
-        items: [toBatchItem(item.file, item.relativePath)],
+        items: [
+          toBatchItem({
+            file: item.file,
+            relativePath: item.relativePath,
+            fileName: item.fileName,
+            controle: item.controle,
+          }),
+        ],
       });
       const result = response.results[0];
       if (result?.ok) {
@@ -629,6 +862,7 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
             fileName: item.fileName,
             relativePath: item.relativePath,
             expiresAt: result.expiresAt,
+            controle: item.controle,
           },
         ]);
       } else {
@@ -704,7 +938,7 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
           beforeUpload={handleBeforeUpload}
           disabled={emAndamento}
         >
-          <Button icon={<UploadOutlined />} disabled={emAndamento}>
+          <Button icon={<IconeEnviar />} disabled={emAndamento}>
             Enviar arquivos
           </Button>
         </Upload>
@@ -723,7 +957,7 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
           disabled={emAndamento}
         >
           <Button
-            icon={<FolderOpenOutlined />}
+            icon={<IconeEnviarPasta />}
             disabled={emAndamento}
             onClick={(e) => {
               if (isNarrow) {
@@ -764,7 +998,7 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
           style={{ marginTop: 16, maxWidth: 560 }}
         >
           <p className="ant-upload-drag-icon">
-            <InboxOutlined />
+            <IconeArrastarSoltar />
           </p>
           <p className="ant-upload-text">Arraste pastas e arquivos para cá</p>
           <p className="ant-upload-hint">
@@ -783,28 +1017,57 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
         </Space>
       )}
 
-      {fase.tipo === 'veredito' && fase.cabe && (
+      {/* Épico 10, design.md D7: a exigência dos dados de controle liga quando
+          a operação carrega **exatamente um** arquivo, e desliga quando
+          carrega vários ou uma pasta. A consequência é explícita no aceite:
+          arrastar um arquivo pede quatro campos; arrastar dois não pede nada.
+          Ligar pela contagem mantém um caminho só — o explorador tem uma
+          única área de soltar, e a pessoa não escolhe um comando antes de
+          arrastar. */}
+      {fase.tipo === 'veredito' && fase.cabe && ehPublicacaoDeUmDocumento(fase.selecao) && (
         <Alert
           type="info"
           showIcon
           style={{ marginTop: 16, maxWidth: 560 }}
-          message="Confirmar envio"
+          message="Dados do documento"
           description={
-            <Space direction="vertical" size={8}>
-              {/* Um envio pode durar dezenas de minutos: começar sem
-                  confirmar é hostil. Quantidade e volume são fato; estimativa
-                  de duração só depois que houver taxa medida. */}
+            <Space direction="vertical" size={8} style={{ display: 'flex' }}>
               <Typography.Text>
-                {fase.selecao.length} arquivo(s), {formatarBytes(somarBytes(fase.selecao))}.
+                {fase.selecao[0]!.file.name} — {formatarBytes(somarBytes(fase.selecao))}.
               </Typography.Text>
-              <Space>
-                <Button type="primary" onClick={() => iniciarEnvio(fase.selecao)}>
-                  Enviar
-                </Button>
-                <Button onClick={() => setFase({ tipo: 'ocioso' })}>Cancelar</Button>
-              </Space>
+              <Form
+                form={formDeControle}
+                layout="vertical"
+                requiredMark={false}
+                onFinish={(values: DocumentControlFormValues) =>
+                  void iniciarEnvioDeUmDocumento(fase.selecao[0]!, toDocumentControlInput(values))
+                }
+              >
+                <DocumentControlFormItems obrigatorios />
+                <Space>
+                  <Button type="primary" htmlType="submit" loading={requestUploadUrl.isPending}>
+                    Publicar documento
+                  </Button>
+                  <Button onClick={() => setFase({ tipo: 'ocioso' })}>Cancelar</Button>
+                </Space>
+              </Form>
             </Space>
           }
+        />
+      )}
+
+      {/* Demanda 2.1; design.md D1. A tabela **é** a confirmação do envio de
+          vários arquivos: traz a quantidade e o volume que o painel anterior
+          trazia, agora com o cadastro por arquivo. Um envio pode durar dezenas
+          de minutos, então começar sem confirmação explícita continua fora de
+          questão. */}
+      {fase.tipo === 'cadastro' && (
+        <TabelaDeCadastro
+          linhas={fase.linhas}
+          onChange={(linhas) => setFase({ tipo: 'cadastro', linhas })}
+          onConfirmar={() => publicarCadastro(fase.linhas)}
+          onCancelar={() => setFase({ tipo: 'ocioso' })}
+          enviando={requestUploadUrls.isPending}
         />
       )}
 
@@ -819,7 +1082,16 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
           )}
           <Space style={{ marginTop: 8 }} wrap>
             {fase.cabem.length > 0 && (
-              <Button type="primary" onClick={() => iniciarEnvio(fase.cabem)}>
+              <Button
+                type="primary"
+                onClick={() =>
+                  // Cadastrar linha que não será enviada é trabalho perdido por
+                  // construção: a tabela recebe só o subconjunto que cabe.
+                  ehPublicacaoDeUmDocumento(fase.cabem)
+                    ? iniciarEnvio(fase.cabem)
+                    : abrirCadastro(fase.cabem)
+                }
+              >
                 Enviar só o que cabe ({fase.cabem.length} de {fase.selecao.length})
               </Button>
             )}
@@ -911,7 +1183,7 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
                     <Button
                       key="retry"
                       size="small"
-                      icon={<ReloadOutlined />}
+                      icon={<IconeTentarNovamente />}
                       onClick={() => retryItem(item.uid)}
                     >
                       Repetir
@@ -921,7 +1193,27 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
                   <List.Item.Meta
                     title={displayName(item)}
                     description={
-                      <Typography.Text type="danger">{describeError(item.error)}</Typography.Text>
+                      <Space direction="vertical" size={4} style={{ display: 'flex' }}>
+                        <Typography.Text type="danger">{describeError(item.error)}</Typography.Text>
+                        {/* design.md D7: perder o cadastro da linha junto com a
+                            recusa é o desfecho que faz a pessoa desistir da
+                            tabela. Só o código precisa mudar; o resto do
+                            cadastro continua em `item.controle`. */}
+                        {item.error === CODE_CONFLICT_ERROR && (
+                          <Input
+                            size="small"
+                            aria-label={`Novo código de ${item.fileName}`}
+                            placeholder="Novo código"
+                            maxLength={60}
+                            defaultValue={item.controle?.documentCode ?? ''}
+                            onChange={(e) =>
+                              atualizarFalha(item.uid, {
+                                controle: { ...item.controle, documentCode: e.target.value },
+                              })
+                            }
+                          />
+                        )}
+                      </Space>
                     }
                   />
                 </List.Item>

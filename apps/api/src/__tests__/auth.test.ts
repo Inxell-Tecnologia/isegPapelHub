@@ -71,7 +71,17 @@ describe('Autenticação: /auth/login, /auth/logout, /auth/me', () => {
       .send({ email: 'ativo@test.dev', password: 'correct-password' });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ id: activeUserId, unitId, role: 'collaborator' });
+    expect(res.body).toEqual({
+      id: activeUserId,
+      unitId,
+      role: 'collaborator',
+      fullName: 'Pessoa Ativa',
+      unitName: 'Unidade Auth',
+      jobTitle: '',
+      sectorName: '',
+      tourCompleted: false,
+      readingOversight: null,
+    });
 
     const setCookie = res.headers['set-cookie'];
     expect(setCookie).toBeDefined();
@@ -118,9 +128,186 @@ describe('Autenticação: /auth/login, /auth/logout, /auth/me', () => {
       .set('Cookie', await sessionCookieFor(ports, activeUserId));
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ id: activeUserId, unitId, role: 'collaborator' });
+    expect(res.body).toEqual({
+      id: activeUserId,
+      unitId,
+      role: 'collaborator',
+      fullName: 'Pessoa Ativa',
+      unitName: 'Unidade Auth',
+      jobTitle: '',
+      sectorName: '',
+      tourCompleted: false,
+      readingOversight: null,
+    });
     expect(res.body.password).toBeUndefined();
     expect(res.body.passwordHash).toBeUndefined();
+  });
+
+  /**
+   * Identidade com nome, unidade, função e setor (changes `shell-e-inicio` e
+   * `funcao-e-setor-na-identidade`, capability `autenticacao`; US 11.1). O
+   * requisito existe porque o shell apresentava os dois primeiros caracteres
+   * do identificador interno como identidade da pessoa; função e setor entram
+   * pela mesma porta, e pelo mesmo motivo de origem — a releitura por
+   * requisição, nunca o token.
+   */
+  describe('Identidade devolvida à interface carrega nome, unidade, função e setor (US 11.1)', () => {
+    it('o login devolve a identidade na mesma forma de /auth/me, com nome e unidade', async () => {
+      const app = createApp(ports);
+      const res = await request(app)
+        .post('/auth/login')
+        .send({ email: 'ativo@test.dev', password: 'correct-password' });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        id: activeUserId,
+        unitId,
+        role: 'collaborator',
+        fullName: 'Pessoa Ativa',
+        unitName: 'Unidade Auth',
+        jobTitle: '',
+        sectorName: '',
+        tourCompleted: false,
+        readingOversight: null,
+      });
+    });
+
+    it('nome alterado no cadastro aparece na requisição seguinte, sem novo login (design.md D3)', async () => {
+      const app = createApp(ports);
+      const cookie = await sessionCookieFor(ports, activeUserId);
+
+      const antes = await request(app).get('/auth/me').set('Cookie', cookie);
+      expect(antes.body.fullName).toBe('Pessoa Ativa');
+
+      await withSystemBypass(pool, (client) =>
+        client.query('UPDATE users SET full_name = $1 WHERE id = $2', [
+          'Pessoa Renomeada',
+          activeUserId,
+        ]),
+      );
+
+      // Mesma sessão, nenhum novo login: a releitura por requisição é o que
+      // faz o nome novo chegar já aqui.
+      const depois = await request(app).get('/auth/me').set('Cookie', cookie);
+      expect(depois.status).toBe(200);
+      expect(depois.body.fullName).toBe('Pessoa Renomeada');
+
+      await withSystemBypass(pool, (client) =>
+        client.query('UPDATE users SET full_name = $1 WHERE id = $2', [
+          'Pessoa Ativa',
+          activeUserId,
+        ]),
+      );
+    });
+
+    it('conta sem nome cadastrado devolve o nome vazio, sem recorrer ao identificador', async () => {
+      const semNomeId = await withSystemBypass(pool, async (client) => {
+        const { rows } = await client.query<{ id: string }>(
+          `INSERT INTO users (unit_id, email, password_hash, role, full_name, status)
+           VALUES ($1, 'sem-nome@test.dev', 'x', 'collaborator', NULL, 'active')
+           RETURNING id`,
+          [unitId],
+        );
+        return rows[0]!.id;
+      });
+
+      const app = createApp(ports);
+      const res = await request(app)
+        .get('/auth/me')
+        .set('Cookie', await sessionCookieFor(ports, semNomeId));
+
+      expect(res.status).toBe(200);
+      expect(res.body.fullName).toBe('');
+      expect(res.body.unitName).toBe('Unidade Auth');
+      // O vazio nunca é substituído por fragmento do identificador interno.
+      expect(res.body.fullName).not.toContain(semNomeId.slice(0, 2));
+    });
+
+    it('função e setor do cadastro chegam à identidade', async () => {
+      const setorId = await withSystemBypass(pool, async (client) => {
+        const { rows } = await client.query<{ id: string }>(
+          `INSERT INTO sectors (unit_id, name) VALUES ($1, 'Governança') RETURNING id`,
+          [unitId],
+        );
+        return rows[0]!.id;
+      });
+      await withSystemBypass(pool, (client) =>
+        client.query('UPDATE users SET job_title = $1, sector_id = $2 WHERE id = $3', [
+          'Gerente de Governança',
+          setorId,
+          activeUserId,
+        ]),
+      );
+
+      const app = createApp(ports);
+      const res = await request(app)
+        .get('/auth/me')
+        .set('Cookie', await sessionCookieFor(ports, activeUserId));
+
+      expect(res.status).toBe(200);
+      expect(res.body.jobTitle).toBe('Gerente de Governança');
+      expect(res.body.sectorName).toBe('Governança');
+      // O papel segue na identidade: a interface decide o que apresentar, o
+      // servidor não esconde o dado de autorização.
+      expect(res.body.role).toBe('collaborator');
+
+      // E o login devolve a mesma forma, pela mesma leitura que autenticou.
+      const login = await request(app)
+        .post('/auth/login')
+        .send({ email: 'ativo@test.dev', password: 'correct-password' });
+      expect(login.body.jobTitle).toBe('Gerente de Governança');
+      expect(login.body.sectorName).toBe('Governança');
+
+      await withSystemBypass(pool, (client) =>
+        client.query('UPDATE users SET job_title = NULL, sector_id = NULL WHERE id = $1', [
+          activeUserId,
+        ]),
+      );
+      await withSystemBypass(pool, (client) =>
+        client.query('DELETE FROM sectors WHERE id = $1', [setorId]),
+      );
+    });
+
+    it('função corrigida no cadastro aparece na requisição seguinte, sem novo login', async () => {
+      const app = createApp(ports);
+      const cookie = await sessionCookieFor(ports, activeUserId);
+
+      const antes = await request(app).get('/auth/me').set('Cookie', cookie);
+      expect(antes.body.jobTitle).toBe('');
+
+      await withSystemBypass(pool, (client) =>
+        client.query('UPDATE users SET job_title = $1 WHERE id = $2', [
+          'Gerente de Governança',
+          activeUserId,
+        ]),
+      );
+
+      // É esta a queixa do cliente que a fatia resolve: a tela mostrava
+      // "Colaborador" para a gerente de Governança. Com o cargo preenchido, a
+      // requisição seguinte já o carrega — sem novo login.
+      const depois = await request(app).get('/auth/me').set('Cookie', cookie);
+      expect(depois.status).toBe(200);
+      expect(depois.body.jobTitle).toBe('Gerente de Governança');
+
+      await withSystemBypass(pool, (client) =>
+        client.query('UPDATE users SET job_title = NULL WHERE id = $1', [activeUserId]),
+      );
+    });
+
+    it('conta sem função e sem setor devolve os dois campos vazios, sem omiti-los', async () => {
+      const app = createApp(ports);
+      const res = await request(app)
+        .get('/auth/me')
+        .set('Cookie', await sessionCookieFor(ports, activeUserId));
+
+      expect(res.status).toBe(200);
+      // Presentes e vazios — não ausentes. É o que mantém a forma da resposta
+      // estável, independentemente do preenchimento do cadastro.
+      expect(Object.keys(res.body)).toContain('jobTitle');
+      expect(Object.keys(res.body)).toContain('sectorName');
+      expect(res.body.jobTitle).toBe('');
+      expect(res.body.sectorName).toBe('');
+    });
   });
 
   it('GET /auth/me sem sessão é rejeitado', async () => {
@@ -327,8 +514,8 @@ describe('Autenticação: /auth/login, /auth/logout, /auth/me', () => {
     });
   });
 
-  describe('GET /auth/public-config (change rebranding-doc7-setes; manualUrl pela change acesso-ao-manual-no-shell, corrige-alcance-do-manual)', () => {
-    it('responde 200 sem cookie de sessão, com apenas appName, clientName e manualUrl (design.md D4, D3 de acesso-ao-manual-no-shell)', async () => {
+  describe('GET /auth/public-config (change rebranding-doc7-setes; manualUrl pela change acesso-ao-manual-no-shell, corrige-alcance-do-manual; supportContact pela change identidade-visual-isetes)', () => {
+    it('responde 200 sem cookie de sessão, com apenas appName, clientName, manualUrl e supportContact (design.md D4, D3 de acesso-ao-manual-no-shell, D8 de identidade-visual-isetes)', async () => {
       const app = createApp(ports);
       const res = await request(app).get('/auth/public-config');
 
@@ -344,13 +531,56 @@ describe('Autenticação: /auth/login, /auth/logout, /auth/me', () => {
       // tautológico apontado na proposal). A trava desta rota é o contrato:
       // exatamente estas três chaves, nenhum outro dado de configuração.
       // Alteração deliberada de contrato (design.md D3) — manter a asserção
-      // por chaves exatas, nunca afrouxar para `toMatchObject`.
+      // por chaves exatas, nunca afrouxar para `toMatchObject`. `supportContact`
+      // é o quarto e último valor da allowlist nominal (change
+      // identidade-visual-isetes, design.md D8): um quinto exige modificar o
+      // requisito de `identidade-visual`, não é extensão natural do contrato.
       expect(res.body).toEqual({
         appName: 'PapelHub',
         clientName: config.appClientName,
         manualUrl: CANONICAL_MANUAL_URL,
+        supportContact: config.appSupportContact,
       });
-      expect(Object.keys(res.body)).toEqual(['appName', 'clientName', 'manualUrl']);
+      expect(Object.keys(res.body)).toEqual([
+        'appName',
+        'clientName',
+        'manualUrl',
+        'supportContact',
+      ]);
+    });
+
+    // Os dois casos normatizados pelo requisito "Contato do suporte é
+    // configurado por implantação" (tasks 4.3). A variável é lida no
+    // carregamento de `config`, então o teste manipula o valor resolvido —
+    // é o mesmo caminho que o Cloud Run percorre ao injetar a env var.
+    it('devolve o contato do suporte configurado pela implantação', async () => {
+      const original = config.appSupportContact;
+      config.appSupportContact = 'suporte@setes.org.br';
+      try {
+        const res = await request(createApp(ports)).get('/auth/public-config');
+
+        expect(res.status).toBe(200);
+        expect(res.body.supportContact).toBe('suporte@setes.org.br');
+      } finally {
+        config.appSupportContact = original;
+      }
+    });
+
+    it('contato ausente é devolvido vazio, mantendo a forma da resposta estável', async () => {
+      const original = config.appSupportContact;
+      config.appSupportContact = '';
+      try {
+        const res = await request(createApp(ports)).get('/auth/public-config');
+
+        expect(res.status).toBe(200);
+        expect(res.body.supportContact).toBe('');
+        // Vazio é **ausência de valor**, nunca ausência da chave: a forma da
+        // resposta não muda, para o consumidor não precisar distinguir os
+        // dois casos.
+        expect(Object.keys(res.body)).toContain('supportContact');
+      } finally {
+        config.appSupportContact = original;
+      }
     });
 
     it('APP_MANUAL_URL inválida (esquema não http/https) derruba createApp no arranque, nomeando a variável', () => {
@@ -389,6 +619,53 @@ describe('Autenticação: /auth/login, /auth/logout, /auth/me', () => {
     it('sem sessão retorna 401', async () => {
       const app = createApp(ports);
       const res = await request(app).get('/auth/profile');
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('memória do tour guiado (POST /auth/tour-completed, change tour-guiado)', () => {
+    it('grava na própria conta, reflete em /auth/me e preserva a primeira data (design.md D4)', async () => {
+      const app = createApp(ports);
+      const cookie = await sessionCookieFor(ports, activeUserId);
+      await withSystemBypass(pool, (c) =>
+        c.query('UPDATE users SET tour_completed_at = NULL WHERE unit_id = $1', [unitId]),
+      );
+
+      expect((await request(app).get('/auth/me').set('Cookie', cookie)).body.tourCompleted).toBe(
+        false,
+      );
+      expect((await request(app).post('/auth/tour-completed').set('Cookie', cookie)).status).toBe(
+        204,
+      );
+      expect((await request(app).get('/auth/me').set('Cookie', cookie)).body.tourCompleted).toBe(
+        true,
+      );
+
+      const primeira = await withSystemBypass(pool, (c) =>
+        c.query<{ t: string }>('SELECT tour_completed_at AS t FROM users WHERE id = $1', [
+          activeUserId,
+        ]),
+      );
+      await request(app).post('/auth/tour-completed').set('Cookie', cookie);
+      const segunda = await withSystemBypass(pool, (c) =>
+        c.query<{ t: string }>('SELECT tour_completed_at AS t FROM users WHERE id = $1', [
+          activeUserId,
+        ]),
+      );
+      expect(String(segunda.rows[0]!.t)).toBe(String(primeira.rows[0]!.t));
+
+      // Só a própria conta: nenhuma outra pessoa da unidade foi marcada.
+      const outras = await withSystemBypass(pool, (c) =>
+        c.query<{ n: string }>(
+          'SELECT count(*) AS n FROM users WHERE unit_id = $1 AND id <> $2 AND tour_completed_at IS NOT NULL',
+          [unitId, activeUserId],
+        ),
+      );
+      expect(Number(outras.rows[0]!.n)).toBe(0);
+    });
+
+    it('sem sessão retorna 401', async () => {
+      const res = await request(createApp(ports)).post('/auth/tour-completed');
       expect(res.status).toBe(401);
     });
   });

@@ -4,6 +4,7 @@ import {
   App,
   Button,
   Checkbox,
+  Collapse,
   DatePicker,
   Divider,
   Empty,
@@ -12,17 +13,18 @@ import {
   Popconfirm,
   Select,
   Space,
-  Tag,
   Typography,
 } from 'antd';
 import type { Dayjs } from 'dayjs';
 import type { GrantResponse, GrantSubjectsLimitExceededResponse } from '@gdoc/shared';
 import { GrantResourceType, Permission } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
+import { RotuloDeEstado } from '../app/RotuloDeEstado';
 import { useSession } from '../auth/session-context';
 import { useAuthorOptions } from '../busca/queries';
 import { formatDate } from '../navegacao/format';
 import { useCreateGrant, useGrants, useRevokeGrant } from './queries';
+import { CompartilharComOutraUnidade } from './CompartilharComOutraUnidade';
 
 interface PermissoesModalProps {
   resourceType: GrantResourceType;
@@ -125,12 +127,26 @@ export function PermissoesModal({
     .map((subjectId) => ({ subjectId, grants: grantsByPerson.get(subjectId) ?? [] }))
     .filter(({ grants }) => grants.length > 0);
 
+  // Concessão comum só a pessoas da unidade do recurso (change
+  // `compartilhamento-entre-unidades`, design.md D10): para o administrador
+  // global, `GET /users` traz todas as unidades, e escolher alguém de fora era
+  // exatamente o que produzia a concessão sem efeito. O recurso aberto no
+  // explorador é sempre da unidade da sessão. O servidor recusa de todo modo
+  // (422 `cross_unit_subject`).
+  const sameUnitOptions = (authorOptions.data ?? []).filter(
+    (option) => !option.unitId || option.unitId === identity?.unitId,
+  );
+
   // design.md D6: teto excedido tem aviso próprio; demais recusas mantêm a
   // mensagem neutra que não distingue 403 de 404 (fail-closed do servidor).
   function handleMutationError(err: unknown) {
     if (err instanceof ApiError) {
       if (isGrantSubjectsLimitExceeded(err.details)) {
         message.error('Muitos colaboradores selecionados. Reduza a seleção e tente novamente.');
+        return;
+      }
+      if (err.message === 'cross_unit_subject') {
+        message.error("Este colaborador é de outra unidade. Use 'Compartilhar com outra unidade'.");
         return;
       }
       message.error('Não foi possível concluir a operação de permissões.');
@@ -195,7 +211,7 @@ export function PermissoesModal({
             placeholder="Selecione um ou mais colaboradores"
             loading={authorOptions.isLoading}
             disabled={authorOptions.isError}
-            options={authorOptions.data ?? []}
+            options={sameUnitOptions.map(({ value, label }) => ({ value, label }))}
             optionFilterProp="label"
             maxTagCount="responsive"
           />
@@ -261,10 +277,12 @@ export function PermissoesModal({
               <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {grants.map((grant) => (
                   <Space key={grant.id}>
-                    <Tag>{VERB_LABEL[grant.permission]}</Tag>
-                    <Tag color={grant.expired ? 'red' : grant.expiresAt ? 'orange' : 'default'}>
+                    <RotuloDeEstado>{VERB_LABEL[grant.permission]}</RotuloDeEstado>
+                    <RotuloDeEstado
+                      tom={grant.expired ? 'negativo' : grant.expiresAt ? 'alerta' : 'neutro'}
+                    >
                       {expiryLabel(grant)}
-                    </Tag>
+                    </RotuloDeEstado>
                     <Popconfirm
                       title="Revogar permissão"
                       description={`Remover "${VERB_LABEL[grant.permission]}" deste colaborador sobre este recurso?`}
@@ -283,6 +301,29 @@ export function PermissoesModal({
           ))
         )}
       </div>
+
+      <Divider />
+
+      {/* Recolhido por padrão e desmontado enquanto fechado (change
+          `compartilhamento-entre-unidades`): a concessão comum continua sendo
+          a tarefa principal do diálogo, e as consultas de destino e de
+          compartilhamentos só disparam quando o administrador o abre. */}
+      <Collapse
+        destroyInactivePanel
+        items={[
+          {
+            key: 'outra-unidade',
+            label: 'Compartilhar com outra unidade',
+            children: (
+              <CompartilharComOutraUnidade
+                resourceType={resourceType}
+                resourceId={resourceId}
+                open={open}
+              />
+            ),
+          },
+        ]}
+      />
     </Modal>
   );
 }
