@@ -1,17 +1,19 @@
 import { Router } from 'express';
+import { favoriteIdsAmong } from './favorites.js';
 import type { Ports } from '../ports/index.js';
 import type { TenantContext } from '../ports/database-port.js';
 import { AuditAction, GrantResourceType, Permission } from '@gdoc/shared';
 import type {
   CreateFolderRequest,
+  DocumentCodeInUseResponse,
   FolderCycleResponse,
   FolderDownloadManifestEntry,
   FolderDownloadManifestLimitExceededResponse,
   FolderDownloadManifestResponse,
   FolderNameConflictResponse,
+  FolderListItemResponse,
   FolderResponse,
   FolderRestoreResponse,
-  FileSummaryResponse,
   MoveBatchItemResult,
   MoveBatchLimitExceededResponse,
   MoveBatchRequest,
@@ -33,17 +35,18 @@ import {
   type SubtreeManifest,
 } from '../lib/folder-tree.js';
 import { canReorganize, hasAccess, isAdminOfUnit, visibleResourceClause } from '../lib/access.js';
-
-interface FileSummaryRow {
-  id: string;
-  owner_id: string;
-  folder_id: string | null;
-  file_name: string;
-  content_type: string | null;
-  size_bytes: string | null;
-  status: string;
-  created_at: string;
-}
+import {
+  buildVisitBreadcrumb,
+  listVisitContents,
+  withSharedResource,
+} from '../lib/cross-unit-share.js';
+import {
+  fileSummaryColumns,
+  nonObsoleteClause,
+  visibleRegistrationClause,
+  toFileSummaryResponse,
+  type FileSummaryRow,
+} from '../lib/document-control.js';
 
 function toFolderResponse(row: FolderRow): FolderResponse {
   return {
@@ -56,17 +59,11 @@ function toFolderResponse(row: FolderRow): FolderResponse {
   };
 }
 
-function toFileSummaryResponse(row: FileSummaryRow): FileSummaryResponse {
-  return {
-    id: row.id,
-    ownerId: row.owner_id,
-    folderId: row.folder_id,
-    fileName: row.file_name,
-    contentType: row.content_type,
-    sizeBytes: row.size_bytes === null ? null : Number(row.size_bytes),
-    status: row.status,
-    createdAt: new Date(row.created_at).toISOString(),
-  };
+/** Subpasta da listagem já com a contagem filtrada (design.md D1/D3 de `contagem-de-documentos-nas-pastas`). */
+type ListedFolderRow = FolderRow & { document_count: number };
+
+function toFolderListItemResponse(row: ListedFolderRow): FolderListItemResponse {
+  return { ...toFolderResponse(row), documentCount: row.document_count };
 }
 
 const MAX_BREADCRUMB_DEPTH = 1000;
@@ -111,7 +108,7 @@ async function listContents(
   client: PoolClient,
   ctx: TenantContext,
   folderId: string | null,
-): Promise<{ folders: FolderRow[]; files: FileSummaryRow[] }> {
+): Promise<{ folders: ListedFolderRow[]; files: FileSummaryRow[] }> {
   // Admin da unidade (design.md D2): o fragmento de visibilidade vira `TRUE`
   // ou um literal de `unit_id`, sem referenciar `ownerIdParam` — por isso o
   // placeholder do dono só entra nos parâmetros quando não-admin, senão o
@@ -132,14 +129,80 @@ async function listContents(
     params,
   );
 
+  // Dois cortes restritivos, ambos subtração e nunca concessão:
+  // `nonObsoleteClause` (Épico 10, US 10.7, design.md D6) tira o documento
+  // obsoleto de quem não é admin da unidade, e `visibleRegistrationClause`
+  // (US 10.9) tira o arquivo pendente de cadastro de quem não o enviou nem
+  // administra a unidade. A situação de cada item vem derivada no próprio
+  // `SELECT`, pelo relógio do banco (`fileSummaryColumns`).
   const folderClause = folderId === null ? 'folder_id IS NULL' : `folder_id = ${anchorClause}`;
   const { rows: files } = await client.query<FileSummaryRow>(
-    `SELECT id, owner_id, folder_id, file_name, content_type, size_bytes, status, created_at
-     FROM files WHERE ${visibleResourceClause(GrantResourceType.FILE, ownerPlaceholder, ctx)} AND ${folderClause} ORDER BY file_name`,
+    `SELECT ${fileSummaryColumns(ctx, ownerPlaceholder)}
+     FROM files WHERE ${visibleResourceClause(GrantResourceType.FILE, ownerPlaceholder, ctx)}
+       AND ${nonObsoleteClause(ctx)} AND ${visibleRegistrationClause(ctx, ownerPlaceholder)}
+       AND ${folderClause} ORDER BY file_name`,
     params,
   );
 
-  return { folders, files };
+  // Contagem de documentos na **subárvore alcançável** de cada subpasta
+  // listada (change `contagem-de-documentos-na-subarvore`, design.md D1/D2;
+  // US 11.1, cenário 3; `docs/demanda_cliente_3.md`, item 7). Uma consulta só:
+  //
+  // - Raízes: **só** os ids que a cláusula de pastas acabou de liberar — não
+  //   existe contagem para pasta que a pessoa não pode abrir.
+  // - Descida (D1): o passo recursivo só atravessa subpasta que passa em
+  //   `visibleResourceClause(FOLDER)` — a mesma regra de "pode abrir" da
+  //   listagem. Subpasta sem acesso (ou na lixeira) é podada **com toda a
+  //   descendência**, como no manifesto de download de pasta: o número nunca
+  //   fala de conteúdo num lugar que a pessoa não alcança navegando.
+  // - Em cada pasta alcançada conta-se o mesmo recorte da consulta de arquivos
+  //   acima (fragmentos e placeholder do dono idênticos): sem herança da pasta,
+  //   obsoleto e pendente de cadastro como na listagem. Vale, nível a nível,
+  //   `documentCount(X) = files(X) + Σ documentCount(S)` sobre as subpastas S
+  //   que `GET /folders/X/contents` lista — é o que o teste afirma (D3).
+  // - Ciclo (D2): `UNION` sobre `(raiz_id, pasta_id)` descarta tupla repetida,
+  //   então a recursão termina mesmo com `parent_id` cíclico, e cada pasta
+  //   entra uma vez por raiz — sem contar arquivo em dobro.
+  // - Os fragmentos usam colunas sem qualificação; por isso entram em
+  //   subconsultas sobre a própria tabela (`folders`/`files`), onde resolvem
+  //   sem ambiguidade, em vez de reescritos com alias.
+  // - A vigência das concessões é a do relógio do Postgres, em cada nível, e o
+  //   ramo `global_admin` dos fragmentos fixa `unit_id` na própria unidade — o
+  //   bypass de RLS não vira descida nem soma em outra unidade.
+  const counts = new Map<string, number>();
+  if (folders.length > 0) {
+    // Só o placeholder do dono (quando não-admin) é reaproveitado; a âncora
+    // da pasta corrente não entra — o driver recusaria um `$n` sem uso.
+    const countParams: unknown[] = admin ? [] : [ctx.userId];
+    countParams.push(folders.map((f) => f.id));
+    const { rows } = await client.query<{ folder_id: string; n: number }>(
+      `WITH RECURSIVE alcance (raiz_id, pasta_id) AS (
+         SELECT id, id FROM folders WHERE id = ANY($${countParams.length}::uuid[])
+         UNION
+         SELECT a.raiz_id, f.id
+         FROM alcance a
+         JOIN (
+           SELECT id, parent_id FROM folders
+           WHERE ${visibleResourceClause(GrantResourceType.FOLDER, ownerPlaceholder, ctx)}
+         ) f ON f.parent_id = a.pasta_id
+       )
+       SELECT a.raiz_id AS folder_id, count(*)::int AS n
+       FROM alcance a
+       JOIN (
+         SELECT folder_id FROM files
+         WHERE ${visibleResourceClause(GrantResourceType.FILE, ownerPlaceholder, ctx)}
+           AND ${nonObsoleteClause(ctx)} AND ${visibleRegistrationClause(ctx, ownerPlaceholder)}
+       ) v ON v.folder_id = a.pasta_id
+       GROUP BY a.raiz_id`,
+      countParams,
+    );
+    for (const row of rows) counts.set(row.folder_id, row.n);
+  }
+
+  return {
+    folders: folders.map((f) => ({ ...f, document_count: counts.get(f.id) ?? 0 })),
+    files,
+  };
 }
 
 async function recordFileAudits(
@@ -293,15 +356,30 @@ export function foldersRouter(ports: Ports): Router {
   router.get('/folders/root/contents', async (req, res, next) => {
     try {
       const ctx = req.tenantContext!;
-      const { folders, files } = await ports.database.withTenantTransaction(ctx, (client) =>
-        listContents(client, ctx, null),
+      const { folders, files, favoritos } = await ports.database.withTenantTransaction(
+        ctx,
+        async (client) => {
+          const conteudo = await listContents(client, ctx, null);
+          const favoritos = await favoriteIdsAmong(
+            client,
+            ctx,
+            conteudo.folders.map((f) => f.id),
+            conteudo.files.map((f) => f.id),
+          );
+          return { ...conteudo, favoritos };
+        },
       );
 
       res.json({
         folder: null,
         breadcrumb: [],
-        folders: folders.map(toFolderResponse),
+        folders: folders.map(toFolderListItemResponse),
         files: files.map(toFileSummaryResponse),
+        // A raiz da unidade não é recurso concedível (design.md D9, US 3.3):
+        // enviar para ela é livre a qualquer pessoa autenticada, então não há
+        // `view`/`upload` a resolver aqui.
+        canUpload: true,
+        ...favoritos,
       });
     } catch (err) {
       next(err);
@@ -331,10 +409,63 @@ export function foldersRouter(ports: Ports): Router {
 
         const breadcrumb = await buildBreadcrumb(client, folder);
         const { folders, files } = await listContents(client, ctx, folder.id);
-        return { status: 200 as const, folder, breadcrumb, folders, files };
+        // Veredito de `upload` sobre a pasta corrente, resolvido **aqui**, na
+        // mesma transação tenant e pela mesma `hasAccess` que a rota de envio
+        // usa (change `identidade-visual-isetes`, design.md D10). A SPA não
+        // infere permissão no cliente — a capability `web-navegacao` proíbe —,
+        // e sem este veredito a orientação de pasta vazia esconderia a ação de
+        // quem tem a concessão `upload` sobre pasta de outra pessoa.
+        const canUpload = await hasAccess(
+          client,
+          ctx,
+          GrantResourceType.FOLDER,
+          folder.id,
+          Permission.UPLOAD,
+        );
+        // Favoritos entre os itens já listados (change `favoritos`, design.md
+        // D5): restrito aos ids que a listagem acabou de liberar.
+        const favoritos = await favoriteIdsAmong(
+          client,
+          ctx,
+          folders.map((f) => f.id),
+          files.map((f) => f.id),
+        );
+        return { status: 200 as const, folder, breadcrumb, folders, files, canUpload, favoritos };
       });
 
       if (outcome.status !== 200) {
+        // Segundo caminho (change `compartilhamento-entre-unidades`,
+        // design.md D6): pasta coberta por compartilhamento entre unidades —
+        // navegação somente leitura, trilha a partir da raiz compartilhada.
+        // Sem compartilhamento, a mesma recusa de antes.
+        const shared = await withSharedResource(
+          ports,
+          ctx,
+          GrantResourceType.FOLDER,
+          req.params.id,
+          Permission.VIEW,
+          async (scope, resource) => {
+            if (resource.type !== GrantResourceType.FOLDER) return null;
+            const breadcrumb = await buildVisitBreadcrumb(scope, ctx, resource.row);
+            const { folders, files } = await listVisitContents(scope, resource.row.id);
+            return {
+              folder: toFolderResponse(resource.row),
+              breadcrumb: breadcrumb.map(toFolderResponse),
+              folders: folders.map(toFolderListItemResponse),
+              files: files.map(toFileSummaryResponse),
+              canUpload: false,
+              favoriteFolderIds: [],
+              favoriteFileIds: [],
+              readOnly: true,
+              sharedFrom: { unitId: scope.originUnitId, unitName: scope.originUnitName },
+              canDownload: await scope.covers(Permission.DOWNLOAD),
+            };
+          },
+        );
+        if (shared?.value) {
+          res.json(shared.value);
+          return;
+        }
         res.status(outcome.status).json({ error: 'forbidden' });
         return;
       }
@@ -342,8 +473,10 @@ export function foldersRouter(ports: Ports): Router {
       res.json({
         folder: toFolderResponse(outcome.folder),
         breadcrumb: outcome.breadcrumb.map(toFolderResponse),
-        folders: outcome.folders.map(toFolderResponse),
+        folders: outcome.folders.map(toFolderListItemResponse),
         files: outcome.files.map(toFileSummaryResponse),
+        canUpload: outcome.canUpload,
+        ...outcome.favoritos,
       });
     } catch (err) {
       next(err);
@@ -747,6 +880,41 @@ export function foldersRouter(ports: Ports): Router {
         );
         if (!allowed) return { ok: false as const };
 
+        // Épico 10 (design.md D5 de `controle-documental`): restaurar a pasta
+        // ressuscita os documentos da subárvore, e o código de um deles pode
+        // ter sido reusado nesse intervalo. O índice único recusaria a
+        // escrita com um 23505 cru; a checagem aqui transforma isso na mesma
+        // recusa nomeada do restore de arquivo, dizendo qual documento ocupa
+        // o código. Liberar o duplicado quebraria a unicidade; bloquear o
+        // reuso enquanto houver documento na lixeira tornaria um código
+        // irrecuperável por até 30 dias sem que ninguém entenda por quê.
+        const { rows: conflitos } = await client.query<{
+          document_code: string;
+          occupant_id: string;
+          occupant_name: string;
+        }>(
+          `SELECT d.document_code, o.id AS occupant_id, o.file_name AS occupant_name
+           FROM files d
+           JOIN files o
+             ON o.unit_id = d.unit_id
+            AND lower(o.document_code) = lower(d.document_code)
+            AND o.deleted_at IS NULL
+           WHERE d.trash_root_id = $1 AND d.document_code IS NOT NULL
+           ORDER BY d.file_name
+           LIMIT 1`,
+          [folder.id],
+        );
+        const conflito = conflitos[0];
+        if (conflito) {
+          return {
+            ok: false as const,
+            codeInUse: {
+              code: conflito.document_code,
+              occupiedBy: { id: conflito.occupant_id, fileName: conflito.occupant_name },
+            },
+          };
+        }
+
         // `trash_root_id = raiz` agrupa a pasta e toda a subárvore excluída
         // junto (design.md D4) — restaurar é só limpar a marcação de quem
         // tem esse agrupador, sem walk recursivo (design.md D5).
@@ -768,6 +936,16 @@ export function foldersRouter(ports: Ports): Router {
       });
 
       if (!outcome.ok) {
+        if ('codeInUse' in outcome && outcome.codeInUse) {
+          const { code, occupiedBy } = outcome.codeInUse;
+          const body: DocumentCodeInUseResponse = {
+            error: 'document_code_in_use',
+            code,
+            occupiedBy,
+          };
+          res.status(409).json(body);
+          return;
+        }
         res.status(403).json({ error: 'forbidden' });
         return;
       }

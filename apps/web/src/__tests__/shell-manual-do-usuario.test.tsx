@@ -1,19 +1,25 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { UserRole } from '@gdoc/shared';
-import { mockFetch } from './mock-fetch';
+import { mockFetch, ROTAS_DA_TELA_INICIAL } from './mock-fetch';
 import { renderApp } from './render-app';
 
-const MANUAL_URL = 'https://carlossalesnaturaltec.github.io/GDoc/';
+const MANUAL_URL = 'https://inxell-tecnologia.github.io/isegPapelHub/';
 
 /**
- * Acesso ao manual como último item da navegação (change
- * `responsividade-mobile-tablet`, design.md D2/D3 — reverte D6/D8 de
- * `acesso-ao-manual-no-shell`, que o colocava em `<Menu>` próprio ao pé) —
- * item presente/ausente conforme `publicConfig.manualUrl`, sempre com
- * `href`/`target`/`rel` corretos, sem participar de `selectedKeys` e com
- * nome acessível anunciando a saída da aplicação — agora a **única**
- * portadora dessa distinção, sem a separação visual de antes.
+ * Acesso ao manual na navegação (change `responsividade-mobile-tablet`,
+ * design.md D2/D3 — reverte D6/D8 de `acesso-ao-manual-no-shell`, que o
+ * colocava em `<Menu>` próprio ao pé) — item presente/ausente conforme
+ * `publicConfig.manualUrl`, sempre com `href`/`target`/`rel` corretos, sem
+ * participar de `selectedKeys` e com nome acessível anunciando a saída da
+ * aplicação.
+ *
+ * A change `menu-lateral-e-barra-superior` o reúne no grupo **AJUDA**, de modo
+ * que o nome acessível deixa de ser a **única** portadora da distinção — o
+ * rótulo do grupo acrescenta a visual. O nome acessível continua obrigatório:
+ * afrouxá-lo seria regressão para quem não enxerga a tela. Ele segue sendo o
+ * último item da navegação, agora por consequência de AJUDA vir depois de
+ * NAVEGAÇÃO.
  *
  * `manualUrl` vazia não é mais um estado alcançável por configuração (change
  * corrige-alcance-do-manual, design.md D3): a API sempre resolve para o
@@ -22,9 +28,10 @@ const MANUAL_URL = 'https://carlossalesnaturaltec.github.io/GDoc/';
  * de `GET /auth/public-config` indisponível (`DEFAULT_PUBLIC_CONFIG`) — os
  * dois casos abaixo cobrem essa degradação, não mais "não configurado".
  */
-describe('Acesso ao manual como último item da navegação (responsividade-mobile-tablet)', () => {
+describe('Acesso ao manual no grupo AJUDA da navegação (responsividade-mobile-tablet)', () => {
   it('item presente com href, target e rel corretos quando manualUrl está configurada', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
@@ -34,7 +41,7 @@ describe('Acesso ao manual como último item da navegação (responsividade-mobi
         body: { appName: 'PapelHub', clientName: '', manualUrl: MANUAL_URL },
       },
     });
-    renderApp(['/']);
+    renderApp(['/recentes']);
 
     const link = await screen.findByRole('link', {
       name: 'Manual do usuário (abre em nova aba, fora da aplicação)',
@@ -46,6 +53,7 @@ describe('Acesso ao manual como último item da navegação (responsividade-mobi
 
   it('item ausente quando manualUrl chega vazia (degradação de configuração, não mais estado alcançável em produção)', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
@@ -55,28 +63,30 @@ describe('Acesso ao manual como último item da navegação (responsividade-mobi
         body: { appName: 'PapelHub', clientName: '', manualUrl: '' },
       },
     });
-    renderApp(['/']);
+    renderApp(['/recentes']);
 
-    await screen.findByRole('img', { name: 'PapelHub' });
+    await screen.findByText('PapelHub');
     expect(screen.queryByRole('link', { name: /Manual do usuário/ })).not.toBeInTheDocument();
   });
 
   it('item ausente quando a configuração pública falha', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
       },
       'GET /auth/public-config': { status: 500 },
     });
-    renderApp(['/']);
+    renderApp(['/recentes']);
 
-    await screen.findByRole('img', { name: 'PapelHub' });
+    await screen.findByText('PapelHub');
     expect(screen.queryByRole('link', { name: /Manual do usuário/ })).not.toBeInTheDocument();
   });
 
   it('não varia por papel: presente também para unit_admin', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.UNIT_ADMIN },
@@ -86,7 +96,7 @@ describe('Acesso ao manual como último item da navegação (responsividade-mobi
         body: { appName: 'PapelHub', clientName: '', manualUrl: MANUAL_URL },
       },
     });
-    renderApp(['/']);
+    renderApp(['/recentes']);
 
     expect(
       await screen.findByRole('link', {
@@ -97,6 +107,7 @@ describe('Acesso ao manual como último item da navegação (responsividade-mobi
 
   it('nunca recebe marcação de seleção, em qualquer rota', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
@@ -115,8 +126,9 @@ describe('Acesso ao manual como último item da navegação (responsividade-mobi
     expect(manualMenuItem).not.toHaveClass('ant-menu-item-selected');
   });
 
-  it('ocupa a última posição da navegação, depois de todos os destinos internos (design.md D3)', async () => {
+  it('fica no grupo AJUDA, depois de todos os destinos internos e antes do tour (design.md D3)', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
@@ -126,7 +138,7 @@ describe('Acesso ao manual como último item da navegação (responsividade-mobi
         body: { appName: 'PapelHub', clientName: '', manualUrl: MANUAL_URL },
       },
     });
-    renderApp(['/']);
+    renderApp(['/recentes']);
 
     await screen.findByRole('link', {
       name: 'Manual do usuário (abre em nova aba, fora da aplicação)',
@@ -134,6 +146,7 @@ describe('Acesso ao manual como último item da navegação (responsividade-mobi
     const labels = Array.from(document.querySelectorAll('.ant-layout-sider .ant-menu-item')).map(
       (el) => el.textContent?.trim(),
     );
-    expect(labels[labels.length - 1]).toBe('Manual do usuário');
+    // O tour guiado (change `tour-guiado`) fecha o grupo AJUDA, depois do manual.
+    expect(labels.slice(-2)).toEqual(['Manual do usuário', 'Tour guiado']);
   });
 });

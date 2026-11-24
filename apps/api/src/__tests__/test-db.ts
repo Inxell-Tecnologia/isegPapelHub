@@ -4,6 +4,7 @@ import { runMigrations } from '../db/migrate.js';
 import { PgDatabasePort } from '../adapters/pg-database-port.js';
 import type { Ports } from '../ports/index.js';
 import { SESSION_COOKIE_NAME } from '../lib/session-cookie.js';
+import { DocumentType, type DocumentControlInput } from '@gdoc/shared';
 
 export async function setupTestDatabase() {
   const pool = new Pool({ connectionString: config.databaseUrl });
@@ -80,4 +81,36 @@ export async function seedTwoUnits(pool: Pool) {
       globalAdmin: users[2]!.id,
     };
   });
+}
+
+/**
+ * Dados de controle mínimos para publicar **um** documento por
+ * `POST /files/upload-url` (Épico 10, change `controle-documental`): a rota
+ * exige tipo, código, revisão, **responsável** e data de próxima revisão, e o
+ * código é único por unidade entre os não excluídos.
+ *
+ * O responsável entrou no conjunto exigido com a change
+ * `arquivo-geral-e-pendente-de-cadastro` (design.md D5), por força da tabela
+ * 2.2 da demanda do cliente — passaram a ser cinco campos, não quatro.
+ *
+ * O contador garante código distinto a cada chamada — cada arquivo de teste
+ * trunca o banco no `beforeAll`, então a sequência nunca colide entre eles.
+ * Os testes que **são** sobre o controle documental declaram os próprios
+ * valores; este helper existe para os que só precisam de um arquivo publicado
+ * e não querem saber do Épico 10.
+ */
+let sequenciaDeCodigo = 0;
+
+export function controleDeTeste(
+  overrides: Partial<DocumentControlInput> = {},
+): DocumentControlInput {
+  sequenciaDeCodigo += 1;
+  return {
+    documentType: DocumentType.PROTOCOL,
+    documentCode: `TST-${sequenciaDeCodigo}`,
+    documentRevision: 1,
+    responsibleSector: 'Governança',
+    nextReviewAt: '2099-12-31',
+    ...overrides,
+  };
 }

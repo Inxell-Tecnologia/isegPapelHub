@@ -16,6 +16,19 @@ export interface FolderResponse {
 }
 
 /**
+ * Subpasta como aparece na listagem de conteúdo (`FolderContentsResponse.folders`),
+ * com a contagem de documentos que o solicitante pode abrir **na pasta e nas
+ * subpastas que ele alcança** — subpasta sem acesso fica de fora com toda a
+ * descendência (change `contagem-de-documentos-na-subarvore`, design.md D1/D4;
+ * antes, `contagem-de-documentos-nas-pastas`; US 11.1, cenário 3). A API desta versão sempre envia o campo; ele é opcional no
+ * contrato pela mesma razão de `favoriteFolderIds` — uma API anterior não o
+ * envia, e ausência é "contagem desconhecida" (a SPA omite a linha), nunca zero.
+ */
+export interface FolderListItemResponse extends FolderResponse {
+  documentCount?: number;
+}
+
+/**
  * `POST /files/:id/move` e `POST /folders/:id/move` (US 2.3, design.md D1).
  * `destinationFolderId` é sempre **presente**, nunca opcional: `null` SHALL
  * significar a raiz da unidade, e o servidor precisa distinguir esse caso de
@@ -104,8 +117,51 @@ export interface FolderContentsResponse {
   folder: FolderResponse | null;
   /** Da raiz até a pasta corrente; vazio na raiz. */
   breadcrumb: FolderResponse[];
-  folders: FolderResponse[];
+  folders: FolderListItemResponse[];
   files: FileSummaryResponse[];
+  /**
+   * Veredito do verbo `upload` sobre a pasta corrente, **resolvido pelo
+   * servidor** (change `identidade-visual-isetes`, design.md D10).
+   *
+   * Existe porque o requisito "Pasta sem conteúdo orienta em vez de
+   * apresentar tabela vazia" exige que a ação oferecida respeite "a
+   * permissão já resolvida pelo servidor", e a capability `web-navegacao`
+   * **proíbe** a SPA de inferir permissão no cliente. Sem este campo as duas
+   * regras seriam inconciliáveis: o dono e o admin da unidade são deriváveis
+   * do DTO, mas quem tem a concessão `upload` sobre pasta de outra pessoa
+   * não é — e ficaria sem a ação que o servidor lhe autoriza.
+   *
+   * Não é linha de defesa: o 403 da rota de envio continua sendo a
+   * autorização real. Serve só para a interface não oferecer o que o
+   * servidor recusaria, nem esconder o que ele permitiria. Na raiz da
+   * unidade é sempre `true` — a raiz não é recurso concedível, e enviar para
+   * ela é livre a qualquer pessoa autenticada.
+   */
+  canUpload: boolean;
+  /**
+   * Ids das pastas e dos arquivos **desta listagem** que são favoritos de quem
+   * consulta (change `favoritos`, design.md D5) — para o explorador oferecer
+   * "Favoritar" ou "Remover dos favoritos" sem cruzar a página com a lista
+   * inteira. Lido na mesma transação, restrito aos ids já listados: não amplia
+   * nada. Opcionais no contrato porque uma API anterior a esta change não os
+   * envia — ausência é "nada é favorito", nunca erro.
+   */
+  favoriteFolderIds?: string[];
+  favoriteFileIds?: string[];
+  /**
+   * Pasta alcançada por **compartilhamento entre unidades** (change
+   * `compartilhamento-entre-unidades`, design.md D6): navegação somente
+   * leitura. Ausente/`false` em toda listagem da própria unidade.
+   */
+  readOnly?: boolean;
+  /** Unidade de origem do conteúdo quando `readOnly`; ausente nos demais casos. */
+  sharedFrom?: { unitId: string; unitName: string } | null;
+  /**
+   * Veredito do verbo `download` sobre o conteúdo compartilhado, resolvido
+   * pelo servidor (só quando `readOnly`): a SPA oferece "Baixar" apenas se
+   * verdadeiro, sem inferir permissão no cliente.
+   */
+  canDownload?: boolean;
 }
 
 /** Um arquivo do manifesto de download de pasta (design.md D1/D7 de `download-pasta-zip`). */

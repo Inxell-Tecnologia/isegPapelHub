@@ -2,7 +2,22 @@
 
 **Não consigo ver um arquivo que sei que existe.**
 Você provavelmente não recebeu permissão para ele, ou ele pertence a outra unidade.
-Peça a um administrador que conceda o acesso.
+Peça a um administrador que conceda o acesso. Se foi **você** quem o enviou e ele não
+aparece para mais ninguém, veja a pergunta sobre **Pendente de cadastro**, abaixo.
+
+**Enviei vários arquivos e eles ficaram "Pendente de cadastro". Por quê?**
+Porque a linha daquele arquivo na tabela de cadastro ficou sem algum dado obrigatório
+— tipo, código, revisão, responsável ou próxima revisão. Nada foi perdido: o arquivo
+está na pasta, visível para você e para a gestão da unidade, com um aviso no sino.
+Complete o cadastro pela ação **Dados de controle** na listagem e ele passa a circular
+com as permissões já concedidas. Para cadastrar muitos de uma vez na hora do envio,
+use **Aplicar a todos** na tabela (ver
+[Enviar arquivos](../colaborador/enviar.md#aplicar-a-todos)).
+
+**A tabela de cadastro não deixa publicar e fala de código repetido.**
+Dois arquivos do mesmo envio declararam o mesmo código, e o código é único na sua
+unidade. As duas linhas são apontadas: ajuste uma delas. O código é o único campo que
+o **Aplicar a todos** não preenche, justamente por ser individual de cada documento.
 
 **Excluí um arquivo por engano. E agora?**
 Vá à **Lixeira** e **restaure** — desde que dentro do prazo de retenção (ver
@@ -46,3 +61,10 @@ você fez a troca.
 "Colaboradores" e "Painel" são exclusivos de administradores, e "Unidades" é exclusivo do
 administrador global. Se você precisa deles, converse com a área administrativa sobre
 o seu perfil.
+
+**Concedi acesso a alguém de outra unidade e não funciona.**
+A concessão comum (o formulário principal de **Permissões**) vale só dentro da
+unidade do item. Para liberar a alguém de outra unidade, use **Compartilhar com
+outra unidade**, no mesmo diálogo — ver
+[Compartilhar com outra unidade](../administrador/permissoes.md#compartilhar-com-outra-unidade).
+Esse compartilhamento sempre envolve a SEDE e é somente leitura.

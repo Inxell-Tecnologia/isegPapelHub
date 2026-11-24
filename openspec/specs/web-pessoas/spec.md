@@ -54,10 +54,16 @@ Referência: PRD US 1.1, RF #1/#2/#3; design.md D1/D2.
 
 A página SHALL oferecer uma ação **"Nova pessoa"** que abre um formulário e, ao
 confirmar, chama **`POST /users`** com nome, e-mail, **senha inicial**, e os
-campos opcionais telefone, função/cargo, área de trabalho, observação e papel. Em
+campos opcionais telefone, função/cargo, **setor**, observação e papel. Em
 sucesso, a pessoa passa a poder fazer login com as credenciais definidas; a SPA
 SHALL fechar o formulário e refletir a nova pessoa na listagem (invalidando a
 consulta de `GET /users`).
+
+O **setor** SHALL ser oferecido como **lista fechada** dos setores da unidade de
+destino — nunca campo de texto livre —, com a opção explícita de **não informar
+setor**. A lista SHALL acompanhar a unidade escolhida no formulário: trocar a
+unidade SHALL repor a lista e SHALL descartar um setor já escolhido que não
+pertença à unidade nova, para que não se envie vínculo cross-unit.
 
 A senha inicial SHALL respeitar o tamanho mínimo da política de senha: a SPA SHALL
 sinalizar localmente o requisito não atendido antes de enviar, como conveniência de
@@ -73,16 +79,28 @@ A seleção da unidade SHALL depender do papel do administrador logado:
   servidor força `ctx.unitId`, mantendo o comportamento atual).
 
 O servidor permanece o guardião: ainda que um `unit_admin` forjasse `unitId`, o
-cadastro é forçado à sua própria unidade.
+cadastro é forçado à sua própria unidade — e o mesmo vale para o setor, recusado
+fail-closed quando não pertence à unidade de destino.
 
 Referência: PRD US 1.1 (cenário 1); design.md (gestao-de-unidades) D7; design.md
-(troca-de-senha) D8.
+(troca-de-senha) D8; `docs/respostas_a1_funcao_e_setor.txt`, respostas 5 (a) e 6 (a).
 
 #### Scenario: Cadastro válido por global_admin com seletor de unidade
 - **WHEN** um `global_admin` preenche nome, e-mail ainda não utilizado, senha, os
   demais dados e **seleciona uma unidade ativa**, e confirma
 - **THEN** a SPA chama `POST /users` enviando o `unitId` escolhido, fecha o
   formulário e a nova pessoa aparece na listagem vinculada àquela unidade
+
+#### Scenario: Setor é escolhido de lista, não digitado
+- **WHEN** o administrador abre o formulário de "Nova pessoa"
+- **THEN** o setor é apresentado como lista dos setores da unidade de destino,
+  com a opção de deixar sem setor, e não como campo de digitação livre
+
+#### Scenario: Trocar a unidade repõe a lista de setores
+- **WHEN** um `global_admin` escolhe um setor e depois troca a unidade do
+  formulário
+- **THEN** a lista passa a ser a da unidade nova e o setor anterior deixa de
+  estar escolhido, de modo que nenhum vínculo cross-unit é enviado
 
 #### Scenario: Cadastro por unit_admin não mostra seletor de unidade
 - **WHEN** um `unit_admin` abre o formulário de "Nova pessoa"
@@ -112,27 +130,6 @@ Referência: PRD US 1.1 (cenário 2); design.md D6.
   outra conta e `POST /users` retorna 409
 - **THEN** a SPA exibe "e-mail já está em uso" e mantém o formulário aberto com os
   demais campos preenchidos
-
-### Requirement: Edição de perfil, papel e status da pessoa
-
-A página SHALL oferecer, por linha, uma ação **"Editar"** que abre o mesmo
-formulário pré-preenchido e, ao confirmar, chama **`PATCH /users/:id`** com os
-campos de perfil (nome, telefone, função, área, observação), o **papel** e o
-**status**. O e-mail NÃO SHALL ser editável (o endpoint não o altera) e o
-formulário de edição NÃO SHALL conter campo de senha (o endpoint não aceita
-`password`). Em sucesso, a SPA SHALL refletir as alterações na listagem
-(invalidando `GET /users`).
-
-Referência: PRD US 1.1; design.md D3/D7.
-
-#### Scenario: Edição altera os dados da pessoa
-- **WHEN** um administrador edita nome/função/papel/status de uma pessoa e confirma
-- **THEN** a SPA chama `PATCH /users/:id` e a listagem reflete os novos valores
-
-#### Scenario: Edição não expõe troca de senha nem de e-mail
-- **WHEN** o administrador abre o formulário de edição de uma pessoa
-- **THEN** o formulário não apresenta campo de senha e o e-mail aparece como
-  somente-leitura
 
 ### Requirement: Ativar e desativar conta sem exclusão
 
@@ -322,3 +319,158 @@ liberar espaço, sem impedir a confirmação — a decisão é do administrador.
   pessoa
 - **THEN** a SPA avisa que a pessoa ficará bloqueada para novos envios e
   substituições, e ainda assim permite confirmar
+
+### Requirement: Manutenção da lista de setores alcançável pela gestão de pessoas
+
+A página de gestão de pessoas SHALL oferecer, à administração, uma superfície
+para **manter a lista de setores** da unidade — consultar, cadastrar, renomear e
+remover — alcançável da própria página, sem exigir item de navegação próprio.
+Para `unit_admin` a superfície SHALL operar sobre a própria unidade, sem seletor;
+para `global_admin` SHALL permitir escolher a unidade. A SPA NÃO SHALL ser a
+linha de defesa: toda recusa de alcance SHALL vir do servidor e SHALL ser
+apresentada com aviso neutro.
+
+#### Scenario: Administração alcança a manutenção de setores da página de pessoas
+- **WHEN** um administrador abre a página de gestão de pessoas
+- **THEN** encontra, na própria página, o acesso à lista de setores da unidade,
+  com as ações de cadastrar, renomear e remover
+
+#### Scenario: Setor cadastrado passa a ser oferecido no formulário de pessoa
+- **WHEN** o administrador cadastra um setor novo e volta ao formulário de pessoa
+- **THEN** o setor novo aparece na lista oferecida, sem exigir recarregar a
+  aplicação
+
+#### Scenario: Remoção de setor em uso é apresentada como impedimento, não como falha
+- **WHEN** o administrador tenta remover um setor que ainda tem pessoas
+  vinculadas e o servidor recusa
+- **THEN** a SPA informa que há pessoas naquele setor e mantém a lista intacta,
+  sem mensagem genérica de erro
+
+#### Scenario: Colaborador não alcança a manutenção de setores
+- **WHEN** uma pessoa com papel `collaborator` tenta alcançar a página de gestão
+  de pessoas
+- **THEN** é barrada pela guarda de rota, antes de qualquer chamada — e portanto
+  não alcança a manutenção de setores
+
+### Requirement: Formulário e listagem apresentam o acompanhamento de leituras
+
+O formulário de cadastro e edição de pessoa SHALL oferecer o campo de
+acompanhamento de leituras, com as opções "Não acompanha", "Gestor do setor",
+"Gestor da unidade" e — apenas para o administrador global — "Gestor de todas
+as unidades". A listagem SHALL apresentar o alcance de cada pessoa pelo mesmo
+rótulo. A recusa por falta de setor SHALL ser apresentada com a explicação, sem
+perder o que foi preenchido. Referência: PRD US 12.1; capability
+`nomenclatura-interface` ("Gestor" reservado a este papel).
+
+#### Scenario: Administrador da unidade não vê a opção de todas as unidades
+- **WHEN** um administrador da unidade abre o campo de acompanhamento
+- **THEN** encontra "Não acompanha", "Gestor do setor" e "Gestor da unidade", e
+  não encontra "Gestor de todas as unidades"
+
+#### Scenario: Listagem mostra o alcance
+- **WHEN** a listagem apresenta uma pessoa marcada como gestora do setor
+- **THEN** a linha dela exibe "Gestor do setor"
+
+#### Scenario: Recusa por falta de setor é explicada
+- **WHEN** o servidor recusa a marcação de gestor do setor por falta de setor
+- **THEN** o formulário explica que é preciso escolher um setor, e o
+  preenchimento é preservado
+
+### Requirement: Busca de colaborador na listagem
+
+A página de gestão de pessoas SHALL oferecer um campo de busca que filtra a
+listagem pelo texto digitado, casando por trecho com o nome, o e-mail, a
+função/cargo e o setor de cada pessoa e, para o administrador global, também
+com o nome da unidade. A comparação SHALL ignorar maiúsculas/minúsculas e
+acentos. Termo vazio SHALL exibir a listagem completa. A busca SHALL recortar
+apenas o que a SPA já recebeu de `GET /users` e NÃO SHALL ampliar o alcance da
+listagem — o servidor permanece o único guardião. Busca sem resultado SHALL
+exibir a mensagem "Nenhum colaborador encontrado", distinta do aviso de falha
+de carregamento. Referência: PRD US 1.1; change `busca-de-colaboradores`,
+design.md D1–D3.
+
+#### Scenario: Busca por trecho do nome, sem acento
+- **WHEN** o administrador digita "joao" e a listagem contém "João Pereira" e
+  "Maria Souza"
+- **THEN** a tabela mostra apenas "João Pereira"
+
+#### Scenario: Busca por e-mail, função ou setor
+- **WHEN** o administrador digita um trecho do e-mail, da função/cargo ou do
+  nome do setor de uma pessoa
+- **THEN** essa pessoa aparece no resultado
+
+#### Scenario: Administrador global busca pela unidade
+- **WHEN** o administrador global digita o nome de uma unidade
+- **THEN** a tabela mostra as pessoas daquela unidade
+
+#### Scenario: Limpar a busca devolve a listagem completa
+- **WHEN** o administrador limpa o campo de busca
+- **THEN** a tabela volta a exibir todas as pessoas do seu alcance
+
+#### Scenario: Busca sem resultado
+- **WHEN** o termo digitado não casa com nenhuma pessoa
+- **THEN** a tabela fica vazia com a mensagem "Nenhum colaborador encontrado"
+
+#### Scenario: Mudar o termo volta à primeira página
+- **WHEN** o administrador está numa página posterior da tabela e altera o termo
+  de busca
+- **THEN** a tabela passa a exibir a primeira página do resultado
+
+#### Scenario: Busca não dispara nova consulta ao servidor
+- **WHEN** o administrador digita no campo de busca
+- **THEN** nenhuma nova requisição a `GET /users` é feita por causa da busca
+
+### Requirement: Edição de perfil, e-mail, papel e status da pessoa
+
+A página SHALL oferecer, por linha, a ação **"Editar"**, que abre o formulário pré-preenchido e, ao confirmar, chama **`PATCH /users/:id`** com nome, **e-mail**, telefone, função, setor, observação, papel e status. O setor SHALL vir da lista fechada da unidade **da pessoa editada**, com opção de ficar sem setor. O formulário NÃO SHALL conter campo de senha. Em sucesso, a SPA SHALL invalidar `GET /users`.
+
+Referência: PRD US 1.1; design.md (web-pessoas) D3/D7; change `edicao-email-pessoa`.
+
+#### Scenario: Edição altera os dados da pessoa
+- **WHEN** um administrador edita nome/função/papel/status de uma pessoa e confirma
+- **THEN** a SPA chama `PATCH /users/:id` e a listagem reflete os novos valores
+
+#### Scenario: Edição troca ou limpa o setor
+- **WHEN** um administrador escolhe outro setor da unidade da pessoa, ou limpa a
+  escolha, e confirma
+- **THEN** a SPA envia a troca ou a remoção do vínculo, e a listagem reflete o
+  setor resultante
+
+#### Scenario: Edição troca o e-mail
+- **WHEN** um administrador altera o e-mail de uma pessoa e confirma
+- **THEN** a SPA envia o novo e-mail em `PATCH /users/:id` e a listagem reflete o
+  novo e-mail
+
+#### Scenario: E-mail em formato inválido não é enviado
+- **WHEN** o administrador deixa o e-mail vazio ou em formato inválido na edição
+- **THEN** o formulário sinaliza o campo e não chama `PATCH /users/:id`
+
+#### Scenario: Edição não expõe troca de senha
+- **WHEN** o administrador abre o formulário de edição de uma pessoa
+- **THEN** o formulário não apresenta campo de senha
+
+### Requirement: E-mail em uso na edição sinalizado no campo
+
+A SPA SHALL tratar o **409** de e-mail em uso devolvido por `PATCH /users/:id` como no cadastro: mensagem "e-mail já está em uso" no campo de e-mail, formulário de edição mantido aberto com o que foi digitado. Os demais 409 da edição (setor inválido, gestor de setor sem setor) SHALL continuar com o tratamento próprio de cada um.
+
+#### Scenario: Troca para e-mail já usado
+- **WHEN** o administrador troca o e-mail de uma pessoa por um que já pertence a
+  outra conta e `PATCH /users/:id` retorna 409 de e-mail em uso
+- **THEN** a SPA exibe "e-mail já está em uso" no campo de e-mail e mantém o
+  formulário aberto com os demais campos preenchidos
+
+#### Scenario: Outro 409 da edição não é confundido com e-mail em uso
+- **WHEN** `PATCH /users/:id` retorna 409 por setor inválido
+- **THEN** a SPA exibe o tratamento de setor, e não a mensagem de e-mail em uso
+
+### Requirement: Aviso de efeito da troca de e-mail no login
+
+A SPA SHALL avisar, no formulário de edição, quando o e-mail digitado difere do atual, que a pessoa passará a entrar com o novo e-mail e que o administrador deve comunicá-la, pois o sistema não envia aviso. O aviso NÃO SHALL aparecer quando o e-mail não foi alterado.
+
+#### Scenario: Aviso ao alterar o e-mail
+- **WHEN** o administrador altera o conteúdo do campo de e-mail na edição
+- **THEN** o formulário exibe o aviso de que o login passará a ser o novo e-mail
+
+#### Scenario: Sem aviso com o e-mail inalterado
+- **WHEN** o administrador abre a edição e não altera o e-mail
+- **THEN** o aviso não é exibido

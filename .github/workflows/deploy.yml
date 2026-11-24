@@ -9,14 +9,30 @@ on:
     branches: [main]
     types: [completed]
 
+  # Disparo manual (change correcoes-herdadas-do-fork). O caminho normal é o
+  # `workflow_run` acima; este existe porque o evento pode SE PERDER, e aí não
+  # haveria saída. Caso típico: o GitHub desabilita os workflows de um fork
+  # recém-criado (implantação por cliente), então o push na `main` acontece com
+  # os workflows bloqueados — e habilitá-los depois **não** reexecuta o evento
+  # perdido; a implantação fica presa na imagem placeholder do Cloud Run, com o
+  # Actions silencioso (runbook, Armadilha 4). Também serve para reimplantar a
+  # `main` corrente sem inventar um commit.
+  workflow_dispatch:
+
 concurrency:
   group: deploy-${{ github.workflow }}
   cancel-in-progress: false
 
+env:
+  # Commit implantado: o do run de CI que disparou este workflow, ou o ref do
+  # disparo manual. Fonte única — antes `head_sha` aparecia em sete pontos e
+  # qualquer gatilho novo exigiria tocar todos.
+  TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
 jobs:
   changes:
     name: Detect merge with no effect on production
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
       no_prod_effect: ${{ steps.classify.outputs.no_prod_effect }}
@@ -24,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ env.TARGET_SHA }}
           fetch-depth: 0
 
       # Gate "sem efeito em produção" (design.md D10 do change
@@ -40,7 +56,16 @@ jobs:
       - name: Classify merge as having no effect on production, or not
         id: classify
         run: |
-          SHA="${{ github.event.workflow_run.head_sha }}"
+          # Disparo manual é pedido explícito de implantar: o gate existe para
+          # poupar build de um merge sem efeito em produção, não para recusar
+          # uma implantação que alguém pediu de propósito.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Disparo manual — implantação pedida explicitamente; o gate não se aplica."
+            echo "no_prod_effect=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SHA="${TARGET_SHA}"
 
           if ! git rev-parse "${SHA}^1" >/dev/null 2>&1; then
             echo "Sem pai único para $SHA (commit inicial ou histórico insuficiente) — tratando como COM efeito em produção (fail-safe)."
@@ -77,7 +102,10 @@ jobs:
   build-push-deploy:
     name: Build, push and deploy
     needs: changes
-    if: github.event.workflow_run.conclusion == 'success' && needs.changes.outputs.no_prod_effect == 'false'
+    if: >-
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.workflow_run.conclusion == 'success') &&
+      needs.changes.outputs.no_prod_effect == 'false'
     runs-on: ubuntu-latest
 
     # Sem chave de service account: autenticação por Workload Identity
@@ -93,7 +121,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ env.TARGET_SHA }}
 
       - id: auth
         uses: google-github-actions/auth@v2
@@ -110,13 +138,13 @@ jobs:
         run: |
           docker build \
             -f apps/api/Dockerfile \
-            -t "${IMAGE}:${{ github.event.workflow_run.head_sha }}" \
+            -t "${IMAGE}:${TARGET_SHA}" \
             -t "${IMAGE}:latest" \
             .
 
       - name: Push image
         run: |
-          docker push "${IMAGE}:${{ github.event.workflow_run.head_sha }}"
+          docker push "${IMAGE}:${TARGET_SHA}"
           docker push "${IMAGE}:latest"
 
       # Migra o schema ANTES de trocar o tráfego (design.md D2): a revisão
@@ -129,7 +157,7 @@ jobs:
           gcloud run jobs update "${{ vars.GCP_MIGRATE_JOB }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" \
             --region "${{ vars.GCP_REGION }}" \
-            --image "${IMAGE}:${{ github.event.workflow_run.head_sha }}" \
+            --image "${IMAGE}:${TARGET_SHA}" \
             --quiet
 
       - name: Run database migrations
@@ -139,42 +167,44 @@ jobs:
             --region "${{ vars.GCP_REGION }}" \
             --wait
 
-      # bootstrap/trash_purge/notify_expiring_grants não são executados pelo
-      # pipeline (o primeiro é manual, sob demanda do operador; os outros dois
-      # rodam pelo próprio Cloud Scheduler) — mas sem manter a imagem deles em
-      # dia aqui, ficam presos para sempre na imagem placeholder do primeiro
-      # `terraform apply` (`us-docker.pkg.dev/cloudrun/container/hello`, que
-      # nem tem Node), e qualquer execução (manual ou agendada) falha com
-      # "Application failed to start" sem log nenhum da aplicação — foi
-      # exatamente o que aconteceu com o Job de bootstrap antes desta mudança.
-      - name: Update bootstrap job image
-        run: |
-          gcloud run jobs update "${{ vars.GCP_BOOTSTRAP_JOB }}" \
-            --project "${{ vars.GCP_PROJECT_ID }}" \
-            --region "${{ vars.GCP_REGION }}" \
-            --image "${IMAGE}:${{ github.event.workflow_run.head_sha }}" \
-            --quiet
-
-      - name: Update trash purge job image
-        run: |
-          gcloud run jobs update "${{ vars.GCP_TRASH_PURGE_JOB }}" \
-            --project "${{ vars.GCP_PROJECT_ID }}" \
-            --region "${{ vars.GCP_REGION }}" \
-            --image "${IMAGE}:${{ github.event.workflow_run.head_sha }}" \
-            --quiet
-
-      - name: Update notify expiring grants job image
-        run: |
-          gcloud run jobs update "${{ vars.GCP_NOTIFY_GRANTS_JOB }}" \
-            --project "${{ vars.GCP_PROJECT_ID }}" \
-            --region "${{ vars.GCP_REGION }}" \
-            --image "${IMAGE}:${{ github.event.workflow_run.head_sha }}" \
-            --quiet
-
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy "${{ vars.GCP_CLOUD_RUN_SERVICE }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" \
             --region "${{ vars.GCP_REGION }}" \
-            --image "${IMAGE}:${{ github.event.workflow_run.head_sha }}" \
+            --image "${IMAGE}:${TARGET_SHA}" \
             --quiet
+
+      # Alinha à imagem recém-implantada os demais Jobs que reusam a imagem da
+      # aplicação — bootstrap e os agendados (change
+      # deploy-atualiza-jobs-agendados). Antes, só o de migração avançava, e os
+      # outros ficavam na imagem com que nasceram até um `gcloud` manual — o
+      # que quebra o bootstrap (runbook, Fase 4) e deixa Job novo na imagem
+      # placeholder.
+      #
+      # DEPOIS do deploy (design.md D3): falha aqui não impede o serviço de
+      # receber a correção; deixa o workflow vermelho, nomeando o Job. Só
+      # ATUALIZA — nunca executa: o trash-purge apaga dados definitivamente e os
+      # de aviso mandam notificações; eles rodam no horário deles.
+      #
+      # A lista vem do output `deploy_updated_job_names` do Terraform, origem
+      # única das permissões por Job (infra/terraform/locals.tf). Vazia = erro,
+      # não sucesso silencioso (design.md D4).
+      - name: Update scheduled and bootstrap job images
+        env:
+          JOBS: ${{ vars.GCP_DEPLOY_UPDATED_JOBS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${JOBS// /}" ]; then
+            echo "::error::GCP_DEPLOY_UPDATED_JOBS vazia: preencha a variável de repositório com o output \`terraform output -raw deploy_updated_job_names\`."
+            exit 1
+          fi
+          for JOB in $JOBS; do
+            echo "Atualizando a imagem do Job ${JOB} para ${IMAGE}:${TARGET_SHA}"
+            gcloud run jobs update "$JOB" \
+              --project "${{ vars.GCP_PROJECT_ID }}" \
+              --region "${{ vars.GCP_REGION }}" \
+              --image "${IMAGE}:${TARGET_SHA}" \
+              --quiet \
+              || { echo "::error::Falha ao atualizar a imagem do Job ${JOB}."; exit 1; }
+          done

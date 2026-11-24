@@ -8,7 +8,8 @@ interface AuditEventRow {
   created_at: string;
   id: string;
   full_name: string | null;
-  email: string;
+  email: string | null;
+  actor_unit_name: string | null;
 }
 
 /**
@@ -19,7 +20,14 @@ const AUDIT_QUERY_LIMIT = 500;
 
 function toAuditQueryEventResponse(row: AuditEventRow): AuditQueryEventResponse {
   return {
-    actor: { id: row.id, name: row.full_name, email: row.email },
+    // `unitName` só nos eventos vindos de outra unidade — o contrato dos
+    // demais permanece exatamente o de antes.
+    actor: {
+      id: row.id,
+      name: row.full_name,
+      email: row.email,
+      ...(row.actor_unit_name ? { unitName: row.actor_unit_name } : {}),
+    },
     action: row.action,
     createdAt: new Date(row.created_at).toISOString(),
   };
@@ -44,9 +52,18 @@ export function auditRouter(ports: Ports): Router {
         if (!allowed) return null;
 
         const { rows } = await client.query<AuditEventRow>(
-          `SELECT ae.action, ae.created_at, u.id, u.full_name, u.email
+          // `LEFT JOIN` + retrato (change `compartilhamento-entre-unidades`,
+          // design.md D9): quem acessou vindo de outra unidade é invisível à
+          // RLS de `users` daqui — com `JOIN` interno o evento sumiria. O
+          // retrato (`actor_name`/`actor_unit_name`) só existe nesses eventos,
+          // e neles o e-mail nunca é exposto, mesmo ao `global_admin` (cujo
+          // bypass enxergaria a linha da pessoa).
+          `SELECT ae.action, ae.created_at, ae.user_id AS id,
+                  COALESCE(ae.actor_name, u.full_name) AS full_name,
+                  CASE WHEN ae.actor_unit_name IS NULL THEN u.email END AS email,
+                  ae.actor_unit_name
            FROM audit_events ae
-           JOIN users u ON u.id = ae.user_id
+           LEFT JOIN users u ON u.id = ae.user_id
            WHERE ae.file_id = $1 AND ae.action IN ('view', 'download')
            ORDER BY ae.created_at DESC
            LIMIT ${AUDIT_QUERY_LIMIT}`,

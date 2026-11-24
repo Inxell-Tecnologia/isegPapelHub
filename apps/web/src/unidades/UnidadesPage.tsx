@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { App, Button, Popconfirm, Result, Space, Spin, Table, Tag } from 'antd';
+import { App, Button, Popconfirm, Result, Space, Spin, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined } from '@ant-design/icons';
+import { IconeNovo } from '../app/icons';
+import { RotuloDeEstado } from '../app/RotuloDeEstado';
 import type { UnitResponse } from '@gdoc/shared';
 import { UnitStatus } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
@@ -19,6 +20,13 @@ const DEACTIVATE_ERROR_MESSAGE: Record<string, string> = {
     'A unidade ainda tem colaboradores vinculados e não pode ser desativada. Remova ou desative os colaboradores antes.',
   'cannot deactivate own or bootstrap unit':
     'Esta unidade não pode ser desativada (é a sua unidade ou a unidade inicial do sistema).',
+  headquarters_cannot_be_disabled:
+    'A SEDE não pode ser desativada. Desmarque-a como SEDE antes, se for o caso.',
+};
+
+/** Mensagens da marcação de SEDE (change `compartilhamento-entre-unidades`, design.md D11). */
+const HEADQUARTERS_ERROR_MESSAGE: Record<string, string> = {
+  headquarters_already_set: 'Já existe uma SEDE. Desmarque a atual antes de marcar outra unidade.',
 };
 
 /**
@@ -65,15 +73,48 @@ export function UnidadesPage() {
     }
   }
 
+  // Só uma SEDE (design.md D11): enquanto houver uma, a ação "Marcar como
+  // SEDE" fica indisponível nas demais, com a orientação no próprio botão.
+  const currentHeadquarters = (data ?? []).find((unit) => unit.isHeadquarters);
+
+  async function handleToggleHeadquarters(unit: UnitResponse) {
+    try {
+      await updateUnit.mutateAsync({
+        id: unit.id,
+        body: { isHeadquarters: !unit.isHeadquarters },
+      });
+      message.success(
+        unit.isHeadquarters ? `${unit.name} deixou de ser a SEDE.` : `${unit.name} agora é a SEDE.`,
+      );
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        message.error(
+          HEADQUARTERS_ERROR_MESSAGE[err.message] ?? 'Não foi possível alterar a SEDE.',
+        );
+        return;
+      }
+      message.error('Não foi possível concluir a ação. Tente novamente.');
+    }
+  }
+
   const columns: ColumnsType<UnitResponse> = [
-    { title: 'Nome', key: 'name', dataIndex: 'name' },
+    {
+      title: 'Nome',
+      key: 'name',
+      render: (_, unit) => (
+        <Space size={8}>
+          <span>{unit.name}</span>
+          {unit.isHeadquarters && <RotuloDeEstado tom="positivo">SEDE</RotuloDeEstado>}
+        </Space>
+      ),
+    },
     {
       title: 'Status',
       key: 'status',
       render: (_, unit) => (
-        <Tag color={unit.status === UnitStatus.ACTIVE ? 'green' : 'default'}>
+        <RotuloDeEstado tom={unit.status === UnitStatus.ACTIVE ? 'positivo' : 'neutro'}>
           {STATUS_LABEL[unit.status]}
-        </Tag>
+        </RotuloDeEstado>
       ),
     },
     {
@@ -86,7 +127,41 @@ export function UnidadesPage() {
             <Button size="small" onClick={() => openRename(unit)}>
               Renomear
             </Button>
-            {isActive ? (
+            {unit.isHeadquarters ? (
+              <Popconfirm
+                title="Desmarcar SEDE"
+                description="Os compartilhamentos entre unidades dependem da SEDE e deixam de valer enquanto não houver uma. Nada é apagado: marcar de novo devolve o acesso."
+                okText="Sim, desmarcar"
+                cancelText="Cancelar"
+                onConfirm={() => handleToggleHeadquarters(unit)}
+              >
+                <Button size="small">Desmarcar SEDE</Button>
+              </Popconfirm>
+            ) : (
+              isActive && (
+                <Tooltip
+                  title={
+                    currentHeadquarters
+                      ? `A SEDE atual é ${currentHeadquarters.name}. Desmarque-a antes de marcar outra unidade.`
+                      : undefined
+                  }
+                >
+                  <Popconfirm
+                    title="Marcar como SEDE"
+                    description="A SEDE pode compartilhar pastas e documentos com as demais unidades, e as unidades podem compartilhar com ela, somente para visualizar e baixar."
+                    okText="Sim, marcar"
+                    cancelText="Cancelar"
+                    disabled={Boolean(currentHeadquarters)}
+                    onConfirm={() => handleToggleHeadquarters(unit)}
+                  >
+                    <Button size="small" disabled={Boolean(currentHeadquarters)}>
+                      Marcar como SEDE
+                    </Button>
+                  </Popconfirm>
+                </Tooltip>
+              )
+            )}
+            {unit.isHeadquarters ? null : isActive ? (
               <Popconfirm
                 title="Desativar unidade"
                 description="Só é possível desativar uma unidade sem colaboradores vinculados. A ação é reversível."
@@ -126,7 +201,7 @@ export function UnidadesPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+        <Button type="primary" icon={<IconeNovo />} onClick={openCreate}>
           Nova unidade
         </Button>
       </div>

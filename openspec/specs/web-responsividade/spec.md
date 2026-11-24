@@ -30,7 +30,13 @@ já entregue, sem alteração de comportamento.
 O limiar SHALL ser posicionado de modo que um tablet em orientação retrato
 receba a forma estreita, entregando a largura integral da tela ao conteúdo.
 
-Referência: design.md D1 do change `responsividade-mobile-tablet`.
+O veredito do ponto de ruptura SHALL valer desde a **primeira** composição da
+interface: nenhuma tela SHALL ser montada na forma que não será apresentada para
+só então se corrigir. A forma correta NÃO SHALL depender de trabalho posterior à
+montagem — nem para chegar à tela, nem para ser observada por teste.
+
+Referência: design.md D1 do change `responsividade-mobile-tablet`; design.md D1
+do change `modo-estreito-no-primeiro-render`.
 
 #### Scenario: Tablet em retrato recebe a forma estreita
 - **WHEN** uma pessoa abre a aplicação num tablet em orientação retrato
@@ -46,6 +52,17 @@ Referência: design.md D1 do change `responsividade-mobile-tablet`.
 - **WHEN** o valor do limiar precisa ser alterado
 - **THEN** a alteração acontece em um único ponto do código e passa a valer para
   toda a aplicação, sem exigir ajuste tela a tela
+
+#### Scenario: A primeira composição já está na forma correta
+- **WHEN** uma tela responsiva é composta numa largura abaixo do limiar
+- **THEN** a forma estreita vale nessa primeira composição, sem que a forma larga
+  seja montada antes e descartada em seguida
+
+#### Scenario: Verificar a forma estreita não exige espera
+- **WHEN** uma verificação automatizada compõe uma tela numa largura abaixo do
+  limiar e consulta de imediato o que foi composto
+- **THEN** encontra a forma estreita, sem precisar aguardar uma segunda
+  composição para que o veredito do limiar valha
 
 ### Requirement: Nenhuma tela produz rolagem horizontal do documento
 

@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { GrantResourceType, Permission, UserRole } from '@gdoc/shared';
+import { DocumentLifecycleState, GrantResourceType, Permission, UserRole } from '@gdoc/shared';
 import type { TenantContext } from '../ports/database-port.js';
 
 /**
@@ -20,6 +20,13 @@ import type { TenantContext } from '../ports/database-port.js';
  * deliberada é `hasAccess({ includeTrash: true })`, usada só pelas rotas de
  * `restore` (que precisam localizar o próprio recurso excluído) — nunca
  * combinar `includeTrash` com uma rota de conteúdo vivo.
+ *
+ * Épico 10 (controle documental, change `controle-documental`, design.md D6):
+ * documento declarado **obsoleto** resolve como inexistente para quem não é
+ * admin da unidade — ver `hasAccess` abaixo, e `nonObsoleteClause` em
+ * `lib/document-control.ts` para o mesmo corte na listagem e na busca. A
+ * exceção é restritiva por desenho: toda regra nova aqui só pode subtrair
+ * alcance, nunca conceder.
  */
 
 export function resourceTable(resourceType: GrantResourceType): 'folders' | 'files' {
@@ -52,6 +59,16 @@ export function isAdminOfUnit(ctx: TenantContext, resourceUnitId: string): boole
  * banco**, não do processo, para o corte ser consistente entre instâncias.
  * Os ramos de posse e de admin da unidade não têm prazo — só concessão
  * expira.
+ *
+ * Épico 10 (change `controle-documental`, design.md D6): documento declarado
+ * **obsoleto** resolve como inexistente para quem não é administrador da
+ * unidade dele — inclusive para o próprio dono, porque "sai de circulação"
+ * vale para toda pessoa que não é gestão (US 10.7). É a primeira exceção
+ * desta função, e é **restritiva**: subtrai alcance e nunca concede, então
+ * por construção não abre furo de isolamento e preserva o caráter
+ * fail-closed. Vive aqui, e não como filtro em cada rota, porque três rotas
+ * replicando a mesma condição é precisamente como furos nascem — uma rota
+ * nova esqueceria o filtro.
  */
 export async function hasAccess(
   client: PoolClient,
@@ -66,14 +83,74 @@ export async function hasAccess(
   // lixeira — sem a opção, o filtro padrão de `deleted_at IS NULL` faria o
   // próprio item a restaurar resolver como inexistente.
   const deletedFilter = options.includeTrash ? '' : 'AND deleted_at IS NULL';
-  const { rows } = await client.query<{ owner_id: string; unit_id: string }>(
-    `SELECT owner_id, unit_id FROM ${resourceTable(resourceType)} WHERE id = $1 ${deletedFilter}`,
+  // `lifecycle_state` e `awaiting_registration` só existem em `files`: pasta
+  // não tem ciclo de vida documental nem cadastro, e pedir as colunas em
+  // `folders` quebraria a query.
+  const documentColumns =
+    resourceType === GrantResourceType.FILE
+      ? ', lifecycle_state, awaiting_registration, document_revision'
+      : '';
+  const { rows } = await client.query<{
+    owner_id: string;
+    unit_id: string;
+    lifecycle_state?: string | null;
+    awaiting_registration?: boolean | null;
+    document_revision?: number | null;
+  }>(
+    `SELECT owner_id, unit_id${documentColumns} FROM ${resourceTable(resourceType)} WHERE id = $1 ${deletedFilter}`,
     [resourceId],
   );
   const resource = rows[0];
   if (!resource) return false;
+  // Antes de qualquer ramo de concessão: a regra do obsoleto é subtração, e
+  // a recusa é indistinguível de recurso inexistente — o mesmo tratamento
+  // que a função já dá a "não existe" e a "não é seu".
+  if (
+    resource.lifecycle_state === DocumentLifecycleState.OBSOLETE &&
+    !isAdminOfUnit(ctx, resource.unit_id)
+  ) {
+    return false;
+  }
+  // US 10.9 (change `arquivo-geral-e-pendente-de-cadastro`, design.md D3):
+  // segunda exceção restritiva desta função. O arquivo pendente de cadastro
+  // resolve como inexistente para quem não o enviou nem administra a unidade
+  // dele.
+  //
+  // Difere do obsoleto por preservar o remetente: quem enviou precisa alcançar
+  // o arquivo para completar os dados. A condição é avaliada **antes** dos
+  // ramos de concessão, de modo que uma concessão vigente não vence a
+  // pendência — subtração, nunca concessão.
+  if (
+    resource.awaiting_registration === true &&
+    resource.owner_id !== ctx.userId &&
+    !isAdminOfUnit(ctx, resource.unit_id)
+  ) {
+    return false;
+  }
   if (resource.owner_id === ctx.userId) return true;
   if (isAdminOfUnit(ctx, resource.unit_id)) return true;
+
+  // Destinatário de leitura obrigatória (change `leitura-obrigatoria`,
+  // design.md D6): **só `view`**, **só arquivo**, **só a revisão vigente** que
+  // foi marcada. Sem este ramo quase ninguém do público leria um documento
+  // alheio — o acesso aqui é dono/admin/concessão, sem herança.
+  //
+  // Vem **depois** das subtrações (obsoleto, pendente de cadastro), que
+  // continuam vencendo; e a atribuição é comparada à unidade do recurso, além
+  // da RLS. Não alcança `download`/`rename`/`delete`, nem a listagem e a busca
+  // (os fragmentos SQL de alcance abaixo não mudam). Revisão nova sem nova
+  // marcação retira a liberação, porque a campanha é da revisão anterior.
+  if (permission === Permission.VIEW && resourceType === GrantResourceType.FILE) {
+    const { rows: leitura } = await client.query(
+      `SELECT 1 FROM reading_assignments a
+       JOIN reading_campaigns c ON c.id = a.campaign_id
+       WHERE a.user_id = $1 AND c.file_id = $2 AND a.unit_id = $3
+         AND c.document_revision IS NOT DISTINCT FROM $4::int
+       LIMIT 1`,
+      [ctx.userId, resourceId, resource.unit_id, resource.document_revision ?? null],
+    );
+    if (leitura.length > 0) return true;
+  }
 
   const { rows: grantRows } = await client.query(
     `SELECT 1 FROM grants

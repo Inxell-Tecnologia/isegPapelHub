@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import type { Pool } from 'pg';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createApp } from '../app.js';
 import { PgDatabasePort } from '../adapters/pg-database-port.js';
 import { InAppNotificationPort } from '../adapters/in-app-notification-port.js';
@@ -12,6 +13,7 @@ import { Argon2AuthPort } from '../adapters/argon2-auth-port.js';
 import { InMemoryStoragePort } from './in-memory-storage-port.js';
 import { setupTestDatabase } from './test-db.js';
 import type { Ports } from '../ports/index.js';
+import { API_PREFIXES } from '../lib/api-prefixes.js';
 
 describe('Serving da SPA (apps/web/dist) pela API — deploy-frontend-gcp', () => {
   let pool: Pool;
@@ -102,6 +104,39 @@ describe('Serving da SPA (apps/web/dist) pela API — deploy-frontend-gcp', () =
       expect(res.text).not.toContain('SPA');
     });
 
+    it('GET /reading/mine sem sessão responde como API (401), não index.html (change leitura-obrigatoria)', async () => {
+      const app = createApp(ports, { webDistDir });
+      const res = await request(app).get('/reading/mine');
+      expect(res.status).toBe(401);
+      expect(res.text).not.toContain('SPA');
+    });
+
+    it('GET /favorites sem sessão responde como API (401), não index.html (change favoritos)', async () => {
+      // Prefixo de topo novo (design.md D6): as três listas mudaram juntas.
+      const app = createApp(ports, { webDistDir });
+      const res = await request(app).get('/favorites');
+      expect(res.status).toBe(401);
+      expect(res.text).not.toContain('SPA');
+    });
+
+    it('GET /sectors sem sessão responde como API (401), não index.html (change funcao-e-setor-na-identidade)', async () => {
+      // Prefixo de topo **novo**: é o caso em que as três pontas
+      // (api-prefixes.ts, vite.config.ts, locals.tf) precisam ter mudado
+      // juntas. Sem `/sectors` em `API_PREFIXES`, esta requisição cairia no
+      // fallback de index.html e a SPA receberia HTML onde espera JSON.
+      const app = createApp(ports, { webDistDir });
+      const res = await request(app).get('/sectors');
+      expect(res.status).toBe(401);
+      expect(res.text).not.toContain('SPA');
+    });
+
+    it('GET /sectors/rota-inexistente devolve resposta da API, nunca HTML', async () => {
+      const app = createApp(ports, { webDistDir });
+      const res = await request(app).get('/sectors/rota-inexistente');
+      expect(res.status).not.toBe(200);
+      expect(res.text).not.toContain('SPA');
+    });
+
     it('POST /caminho-desconhecido devolve 404 sem HTML da SPA', async () => {
       const app = createApp(ports, { webDistDir });
       const res = await request(app).post('/caminho-desconhecido');
@@ -129,6 +164,43 @@ describe('Serving da SPA (apps/web/dist) pela API — deploy-frontend-gcp', () =
 
     it('webDistDir apontando para diretório inexistente faz createApp lançar erro', () => {
       expect(() => createApp(ports, { webDistDir: join(webDistDir, 'nao-existe') })).toThrow();
+    });
+  });
+  /**
+   * A sincronia das três pontas era, até aqui, disciplina de quem edita: o
+   * `CLAUDE.md` manda mantê-las juntas e os testes conferiam prefixo por
+   * prefixo, um caso por change. Um prefixo acrescentado só na API passaria —
+   * em dev o proxy do Vite não encaminharia, e em produção o url-map mandaria
+   * a requisição para o bucket da SPA. Aqui a lista é comparada inteira, de
+   * modo que o esquecimento falha no lugar onde foi cometido.
+   *
+   * `/internal` é a exceção documentada (push do Pub/Sub): existe só na ponta
+   * da API, sem equivalente no proxy de dev nem no url-map.
+   */
+  describe('paridade das três pontas de prefixo de API', () => {
+    const SOMENTE_NA_API = ['/internal'];
+    const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+
+    function prefixosDe(arquivo: string, abertura: string): string[] {
+      const texto = readFileSync(join(repoRoot, arquivo), 'utf-8');
+      const inicio = texto.indexOf(abertura);
+      expect(inicio).toBeGreaterThan(-1);
+      const fim = texto.indexOf(']', inicio);
+      return [...texto.slice(inicio, fim).matchAll(/['"](\/[a-z-]+)['"]/g)].map((m) => m[1]!);
+    }
+
+    it('vite.config.ts cobre os mesmos prefixos que a API, menos /internal', () => {
+      const esperado = API_PREFIXES.filter((p) => !SOMENTE_NA_API.includes(p));
+      expect(prefixosDe('apps/web/vite.config.ts', 'API_PROXY_PREFIXES = [').sort()).toEqual(
+        [...esperado].sort(),
+      );
+    });
+
+    it('locals.tf cobre os mesmos prefixos que a API, menos /internal', () => {
+      const esperado = API_PREFIXES.filter((p) => !SOMENTE_NA_API.includes(p));
+      expect(prefixosDe('infra/terraform/locals.tf', 'api_proxy_prefixes = [').sort()).toEqual(
+        [...esperado].sort(),
+      );
     });
   });
 });

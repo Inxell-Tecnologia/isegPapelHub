@@ -9,7 +9,10 @@ import { renderApp } from './render-app';
 const IDENTITY = { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR };
 
 function contents(overrides: Partial<FolderContentsResponse> = {}): FolderContentsResponse {
-  return { folder: null, breadcrumb: [], folders: [], files: [], ...overrides };
+  // `canUpload` vem resolvido pelo servidor (design.md D10 de
+  // `identidade-visual-isetes`); o padrão aqui é a pessoa poder enviar, que é
+  // o caso do dono da pasta — os casos de recusa o sobrescrevem.
+  return { folder: null, breadcrumb: [], folders: [], files: [], canUpload: true, ...overrides };
 }
 
 function manifest(
@@ -106,6 +109,10 @@ describe('Download de pasta (web-navegacao, download-pasta-zip)', () => {
         );
       if (path === '/folders/root/contents')
         return new Response(JSON.stringify(contents()), { status: 200 });
+      // Contador do menu (change `superficies-de-pendencia`): consulta da
+      // API, não byte do storage.
+      if (path === '/reading/mine')
+        return new Response(JSON.stringify({ items: [] }), { status: 200 });
       if (path === '/folders/root/download-manifest' && method === 'POST') {
         return new Response(JSON.stringify(manifest({ totalFiles: 3, allowedFiles: 0 })), {
           status: 200,

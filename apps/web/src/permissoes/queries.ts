@@ -1,7 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CreateGrantRequest, GrantListResponse, GrantResourceType } from '@gdoc/shared';
+import type {
+  CreateCrossUnitGrantRequest,
+  CreateGrantRequest,
+  CrossUnitDestinationListResponse,
+  CrossUnitGrantListResponse,
+  CrossUnitRecipientListResponse,
+  GrantListResponse,
+  GrantResourceType,
+} from '@gdoc/shared';
 import { apiClient } from '../lib/api-client';
-import { grantListResponseSchema } from '../lib/schemas';
+import {
+  crossUnitDestinationListResponseSchema,
+  crossUnitGrantListResponseSchema,
+  crossUnitRecipientListResponseSchema,
+  grantListResponseSchema,
+} from '../lib/schemas';
 
 const GRANTS_KEY = 'grants';
 
@@ -45,5 +58,80 @@ export function useRevokeGrant(resourceType: GrantResourceType, resourceId: stri
     mutationFn: (grantId: string) => apiClient.delete<void>(`/grants/${grantId}`),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: grantsQueryKey(resourceType, resourceId) }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Compartilhamento entre unidades (PRD US 5.2, change
+// `compartilhamento-entre-unidades`, design.md D7/D8).
+
+const CROSS_UNIT_KEY = 'cross-unit-grants';
+
+function crossUnitQueryKey(resourceType: GrantResourceType, resourceId: string) {
+  return [CROSS_UNIT_KEY, resourceType, resourceId] as const;
+}
+
+/** `GET /grants/cross-unit` — compartilhamentos do recurso (só a origem os vê). */
+export function useCrossUnitGrants(
+  resourceType: GrantResourceType,
+  resourceId: string,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: crossUnitQueryKey(resourceType, resourceId),
+    enabled,
+    queryFn: async () => {
+      const raw = await apiClient.get<CrossUnitGrantListResponse>(
+        `/grants/cross-unit?resourceType=${resourceType}&resourceId=${resourceId}`,
+      );
+      return crossUnitGrantListResponseSchema.parse(raw);
+    },
+  });
+}
+
+/** `GET /grants/cross-unit/destinations` — unidades permitidas como destino. */
+export function useCrossUnitDestinations(enabled = true) {
+  return useQuery({
+    queryKey: [CROSS_UNIT_KEY, 'destinations'],
+    enabled,
+    queryFn: async () => {
+      const raw = await apiClient.get<CrossUnitDestinationListResponse>(
+        '/grants/cross-unit/destinations',
+      );
+      return crossUnitDestinationListResponseSchema.parse(raw);
+    },
+  });
+}
+
+/** `GET /grants/cross-unit/recipients?unitId=` — pessoas ativas do destino escolhido. */
+export function useCrossUnitRecipients(unitId: string | undefined) {
+  return useQuery({
+    queryKey: [CROSS_UNIT_KEY, 'recipients', unitId],
+    enabled: Boolean(unitId),
+    queryFn: async () => {
+      const raw = await apiClient.get<CrossUnitRecipientListResponse>(
+        `/grants/cross-unit/recipients?unitId=${unitId}`,
+      );
+      return crossUnitRecipientListResponseSchema.parse(raw);
+    },
+  });
+}
+
+export function useCreateCrossUnitGrant(resourceType: GrantResourceType, resourceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateCrossUnitGrantRequest) =>
+      apiClient.post<CrossUnitGrantListResponse>('/grants/cross-unit', body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: crossUnitQueryKey(resourceType, resourceId) }),
+  });
+}
+
+export function useRevokeCrossUnitGrant(resourceType: GrantResourceType, resourceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (grantId: string) => apiClient.delete<void>(`/grants/cross-unit/${grantId}`),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: crossUnitQueryKey(resourceType, resourceId) }),
   });
 }

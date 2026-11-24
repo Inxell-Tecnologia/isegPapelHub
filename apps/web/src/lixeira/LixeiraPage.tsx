@@ -1,6 +1,8 @@
-import { App, Button, Empty, Popconfirm, Result, Space, Spin, Table, Tag } from 'antd';
+import { App, Button, Empty, Popconfirm, Result, Space, Spin, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { DeleteOutlined, FileOutlined, FolderOutlined, UndoOutlined } from '@ant-design/icons';
+import { IconeArquivo, IconeExcluir, IconePasta, IconeRestaurar } from '../app/icons';
+import { RotuloDeEstado } from '../app/RotuloDeEstado';
+import type { TomDeEstado } from '../app/theme';
 import type { FileRestoreResponse, TrashEntryResponse } from '@gdoc/shared';
 import { GrantResourceType } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
@@ -20,10 +22,11 @@ function daysRemaining(expiresAt: string): number {
 }
 
 /** Cor do `Tag` por faixa de urgência (design.md D4): ≤3 dias vermelho, ≤7 laranja, senão neutro. */
-function daysRemainingColor(days: number): string | undefined {
-  if (days <= 3) return 'red';
-  if (days <= 7) return 'orange';
-  return undefined;
+/** Tom semântico do prazo restante — o tom carrega a urgência, a cor vem dos tokens. */
+function daysRemainingTom(days: number): TomDeEstado {
+  if (days <= 3) return 'negativo';
+  if (days <= 7) return 'alerta';
+  return 'neutro';
 }
 
 /**
@@ -115,7 +118,7 @@ export function LixeiraPage() {
       key: 'type',
       width: 56,
       render: (_, entry) =>
-        entry.type === GrantResourceType.FOLDER ? <FolderOutlined /> : <FileOutlined />,
+        entry.type === GrantResourceType.FOLDER ? <IconePasta /> : <IconeArquivo />,
     },
     { title: 'Nome', key: 'name', dataIndex: 'name' },
     { title: 'Tipo', key: 'typeLabel', render: (_, entry) => TYPE_LABEL[entry.type] },
@@ -129,7 +132,7 @@ export function LixeiraPage() {
       key: 'daysRemaining',
       render: (_, entry) => {
         const days = daysRemaining(entry.expiresAt);
-        return <Tag color={daysRemainingColor(days)}>{days} dia(s)</Tag>;
+        return <RotuloDeEstado tom={daysRemainingTom(days)}>{days} dia(s)</RotuloDeEstado>;
       },
     },
     {
@@ -143,7 +146,7 @@ export function LixeiraPage() {
           cancelText="Cancelar"
           onConfirm={() => handleRestore(entry)}
         >
-          <Button size="small" icon={<UndoOutlined />}>
+          <Button size="small" icon={<IconeRestaurar />}>
             Restaurar
           </Button>
         </Popconfirm>
@@ -187,7 +190,7 @@ export function LixeiraPage() {
           cancelText="Cancelar"
           onConfirm={handlePurge}
         >
-          <Button danger icon={<DeleteOutlined />} loading={purgeTrash.isPending}>
+          <Button danger icon={<IconeExcluir />} loading={purgeTrash.isPending}>
             Esvaziar lixeira
           </Button>
         </Popconfirm>

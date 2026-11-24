@@ -111,9 +111,19 @@ export async function reconcileFinalize(
         // Só agora o ponteiro vivo passa a apontar para o objeto novo, que enfim
         // existe; `pending_object_path` é limpo. Se a substituição tivesse sido
         // abandonada, nada disto rodaria e o `object_path` original continuaria válido.
+        //
+        // É também aqui — e não na emissão da URL — que a revisão avança
+        // (US 10.6, design.md D8 de `controle-documental`): a substituição se
+        // consuma com a promoção do ponteiro, e adiantar o número mostraria
+        // `Rev. 02` sobre um conteúdo que ainda é o da `Rev. 01`. `NULL + 1`
+        // é `NULL` em SQL, o que dá de graça a regra de D8: documento **sem**
+        // revisão registrada continua sem revisão — substituir não inaugura
+        // numeração. Código, tipo, responsável e data de próxima revisão não
+        // são tocados, logo seguem preservados.
         await client.query(
           `UPDATE files SET object_path = pending_object_path, pending_object_path = NULL,
-             size_bytes = $1, status = $2 WHERE id = $3`,
+             size_bytes = $1, status = $2, document_revision = document_revision + 1
+           WHERE id = $3`,
           [sizeBytes, overQuota ? 'over_quota' : 'active', file.id],
         );
         await client.query(

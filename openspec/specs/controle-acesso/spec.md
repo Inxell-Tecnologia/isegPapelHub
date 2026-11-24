@@ -230,3 +230,50 @@ design.md D1 do change `expiracao-permissoes`.
 - **WHEN** uma pessoa lista o conteúdo de uma pasta onde havia um item que foi
   excluído
 - **THEN** o item excluído não aparece na listagem, mesmo para o admin da unidade
+
+### Requirement: Destinatário de leitura obrigatória visualiza a revisão marcada
+
+A pessoa que integra o público de uma leitura obrigatória SHALL poder
+**visualizar** o documento enquanto a revisão vigente for a revisão marcada,
+mesmo sem ser dona, administradora ou ter concessão. Essa liberação NÃO SHALL
+alcançar baixar, alterar ou excluir; NÃO SHALL fazer o documento aparecer na
+listagem de pasta nem na busca; NÃO SHALL vencer as regras restritivas
+existentes (documento obsoleto, pendente de cadastro, lixeira); e NÃO SHALL
+atravessar unidades. Substituído o documento por nova revisão sem nova
+marcação, a liberação SHALL deixar de valer. Referência: PRD US 12.3; design.md
+D6 do change `leitura-obrigatoria`.
+
+#### Scenario: Destinatário visualiza documento alheio
+- **WHEN** um colaborador do público de uma leitura obrigatória pede a
+  visualização do documento, sem outra permissão sobre ele
+- **THEN** a visualização é concedida
+
+#### Scenario: A leitura obrigatória não libera baixar
+- **WHEN** o mesmo colaborador pede o download do documento
+- **THEN** o download é recusado
+
+#### Scenario: Nova revisão sem marcação retira a liberação
+- **WHEN** o documento é substituído e a revisão nova não é marcada
+- **THEN** o colaborador deixa de visualizá-lo
+
+#### Scenario: Liberação não aparece na navegação
+- **WHEN** o colaborador lista a pasta do documento ou busca pelo nome dele
+- **THEN** o documento não aparece por causa da leitura obrigatória
+
+### Requirement: Acompanhamento de todas as unidades não abre conteúdo de outra unidade
+
+A pessoa com acompanhamento de leituras de **todas as unidades** SHALL alcançar,
+das outras unidades, somente a situação nominal de leitura obrigatória — nome,
+unidade e setor das pessoas, documento, revisão, prazo, situação e data da
+ciência. Ela NÃO SHALL, por esse alcance, visualizar, baixar, listar ou
+auditar arquivo de outra unidade, nem obter o estado de leitura de um arquivo
+dela, e essas recusas SHALL ser indistinguíveis das de recurso inexistente.
+Referência: PRD US 12.6; `docs/respostas_d1_d3_d5_decisoes_estruturais.txt`,
+respostas 7(a) e 8.
+
+#### Scenario: Governança vê quem leu, mas não abre o documento
+- **WHEN** a pessoa com acompanhamento de todas as unidades consulta o relatório
+  de uma marcação de outra unidade e depois pede a visualização, o download, a
+  auditoria ou o estado de leitura do arquivo marcado
+- **THEN** vê o relatório nominal, e os quatro pedidos são recusados como se o
+  arquivo não existisse

@@ -1,22 +1,30 @@
 site_name: Manual do Usuário — PapelHub
 site_description: Manual funcional do PapelHub — como usar o sistema no dia a dia.
-site_url: https://carlossalesnaturaltec.github.io/GDoc/
+site_url: https://inxell-tecnologia.github.io/isegPapelHub/
 docs_dir: docs
 strict: true
 
 theme:
   name: material
   language: pt-BR
-  logo: assets/logo-papelhub.png
-  favicon: assets/logo-papelhub.png
+  # Símbolo negativo sobre o cabeçalho verde-petróleo; colorido na aba do
+  # navegador (change sync-upstream-identidade-iseg, design.md D4).
+  logo: assets/iseg-simbolo-negativo.png
+  favicon: assets/iseg-simbolo-cor.png
+  # Paleta "custom": as cores da marca vêm de stylesheets/marca.css, derivadas
+  # da logo do ISEG — as mesmas da aplicação (app/theme.ts).
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Modo escuro
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Modo claro
@@ -26,6 +34,15 @@ theme:
     - search.suggest
     - content.action.edit
 
+extra_css:
+  - stylesheets/marca.css
+
+# Caixas de aviso (`!!! note`, `!!! warning`…): 34 delas em 13 páginas eram
+# renderizadas como texto literal, porque a extensão nunca foi habilitada
+# (change correcoes-herdadas-do-fork).
+markdown_extensions:
+  - admonition
+
 nav:
   - Início: index.md
   - Primeiro acesso: primeiro-acesso.md
@@ -33,9 +50,13 @@ nav:
   - Colaborador:
       - Navegar e criar pastas: colaborador/navegar-e-criar.md
       - Enviar arquivos: colaborador/enviar.md
+      - Controle documental: colaborador/controle-documental.md
       - Visualizar e baixar: colaborador/visualizar-e-baixar.md
       - Mover, renomear e excluir: colaborador/renomear-e-excluir.md
       - Buscar e filtrar: colaborador/buscar.md
+      - Favoritos: colaborador/favoritos.md
+      - Leitura obrigatória: colaborador/leitura-obrigatoria.md
+      - Compartilhados comigo: colaborador/compartilhados-comigo.md
       - Auditoria: colaborador/auditoria.md
       - Minha conta: colaborador/minha-conta.md
   - Administrador:

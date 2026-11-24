@@ -7,7 +7,13 @@ import { InAppNotificationPort } from '../adapters/in-app-notification-port.js';
 import { EnvSecretsPort } from '../adapters/env-secrets-port.js';
 import { Argon2AuthPort } from '../adapters/argon2-auth-port.js';
 import { InMemoryStoragePort } from './in-memory-storage-port.js';
-import { setupTestDatabase, seedTwoUnits, withSystemBypass, sessionCookieFor } from './test-db.js';
+import {
+  setupTestDatabase,
+  seedTwoUnits,
+  withSystemBypass,
+  sessionCookieFor,
+  controleDeTeste,
+} from './test-db.js';
 import type { Ports } from '../ports/index.js';
 import { runPurge } from '../jobs/purge-trash.js';
 
@@ -74,7 +80,13 @@ describe('Lixeira e retenção (Épico 6, US 6.1)', () => {
     const res = await request(createApp(ports))
       .post('/files/upload-url')
       .set('Cookie', cookie)
-      .send({ fileName, contentType: 'text/plain', declaredSizeBytes: 5, folderId });
+      .send({
+        fileName,
+        contentType: 'text/plain',
+        declaredSizeBytes: 5,
+        folderId,
+        documentControl: controleDeTeste(),
+      });
     expect(res.status).toBe(200);
     const { rows } = await withSystemBypass(pool, (client) =>
       client.query<{ id: string }>('SELECT id FROM files WHERE object_path = $1', [

@@ -242,3 +242,73 @@ demais itens. Referência: PRD US 4.3, cenário 2; design.md D1, D7 do change
 - **WHEN** a emissão de um aviso falha durante a execução
 - **THEN** os demais avisos continuam sendo processados e o sumário registra a
   falha
+
+### Requirement: Arquivo que fica pendente de cadastro avisa quem o enviou
+
+O sistema SHALL notificar quem enviou um arquivo que ficou pendente de cadastro,
+no canal da própria pessoa, identificando o arquivo a completar. O evento de
+origem SHALL ser o **arquivo**, de modo que o mesmo arquivo não gere aviso
+repetido. A falha ao notificar NÃO SHALL impedir a conclusão do envio.
+Referência: PRD US 10.9.
+
+#### Scenario: Quem enviou é avisado do arquivo a completar
+- **WHEN** um arquivo é enviado sem os dados de controle exigidos e fica pendente
+  de cadastro
+- **THEN** quem o enviou recebe, no seu canal de notificações, um aviso que
+  identifica o arquivo cujos dados faltam
+
+#### Scenario: Repetir a transferência do mesmo arquivo não duplica o aviso
+- **WHEN** a transferência de um arquivo que ficou pendente de cadastro é
+  repetida, ou a emissão de URL para ele é solicitada outra vez
+- **THEN** nenhum aviso novo é criado para o mesmo arquivo e o aviso existente é
+  preservado
+
+#### Scenario: Cada arquivo pendente de um lote gera o seu próprio aviso
+- **WHEN** um lote é enviado e vários dos seus arquivos ficam pendentes de
+  cadastro
+- **THEN** quem enviou é avisado de cada arquivo pendente, sem que os avisos de
+  um lote se confundam entre si
+
+#### Scenario: Arquivo publicado com os dados completos não gera aviso
+- **WHEN** um arquivo é enviado com todos os dados de controle exigidos, ou
+  declarado Arquivo geral
+- **THEN** nenhum aviso de pendência de cadastro é criado
+
+#### Scenario: Falha ao avisar não impede o envio
+- **WHEN** a emissão do aviso de pendência de cadastro falha
+- **THEN** o envio do arquivo conclui normalmente e o arquivo permanece pendente
+  de cadastro
+
+#### Scenario: Aviso não atravessa unidade
+- **WHEN** um arquivo de uma unidade fica pendente de cadastro
+- **THEN** o aviso alcança apenas quem o enviou, no canal da sua própria
+  unidade, sem ser alcançável por pessoa de outra unidade
+
+### Requirement: Leitura obrigatória avisa pelo canal de notificação
+
+O canal de notificação SHALL carregar três assuntos de leitura obrigatória:
+**nova leitura**, à pessoa do público; **leitura atrasada**, ao leitor; e
+**atraso da equipe**, ao gestor. Cada um SHALL ter o seu evento de origem —
+a atribuição; a atribuição e o prazo; a marcação e o prazo, respectivamente —
+de modo que reemitir não duplique. O sino SHALL apresentar os três; os dois
+do leitor SHALL levar à lista das próprias leituras, e o do gestor SHALL levar
+ao relatório de acompanhamento da marcação. Referência: PRD US 12.5 e 12.6;
+demanda do cliente nº 2, seções 3.2 (etapas 2 e 4) e 3.5 (Sino).
+
+#### Scenario: Sino apresenta a nova leitura com acesso à lista
+- **WHEN** a pessoa abre o sino com um aviso de nova leitura obrigatória
+- **THEN** lê o documento e o prazo, e encontra o acesso às próprias leituras
+
+#### Scenario: Reexecutar não reavisa
+- **WHEN** a rotina de avisos de leitura roda duas vezes no mesmo dia, ou em
+  dias seguidos, sobre a mesma leitura atrasada
+- **THEN** o leitor tem um único aviso de atraso dela
+
+#### Scenario: Aviso de leitura não atravessa unidade
+- **WHEN** a rotina avisa leituras de duas unidades
+- **THEN** cada aviso fica na unidade da leitura, e nenhuma pessoa recebe aviso
+  sobre pessoa de outra unidade
+
+#### Scenario: Aviso ao gestor leva ao relatório da marcação
+- **WHEN** o gestor aciona o aviso de atraso da equipe
+- **THEN** abre o acompanhamento no relatório daquela marcação

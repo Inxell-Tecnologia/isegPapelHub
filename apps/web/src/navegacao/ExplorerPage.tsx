@@ -1,10 +1,12 @@
 import type { Key, ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   App,
   Breadcrumb,
   Button,
   Dropdown,
+  Empty,
   List,
   Popconfirm,
   Result,
@@ -16,30 +18,44 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  AuditOutlined,
-  CloudDownloadOutlined,
-  DeleteOutlined,
-  DownloadOutlined,
-  EditOutlined,
-  EyeOutlined,
-  FileOutlined,
-  FolderAddOutlined,
-  FolderOutlined,
-  LockOutlined,
-  MoreOutlined,
-  SwapOutlined,
-} from '@ant-design/icons';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+  IconeArquivo,
+  IconeAuditoria,
+  IconeBaixar,
+  IconeBaixarVarios,
+  IconeControleDocumental,
+  IconeExcluir,
+  IconeFavorito,
+  IconeLeituraObrigatoria,
+  IconeMaisAcoes,
+  IconeMover,
+  IconeNovaPasta,
+  IconePasta,
+  IconePermissoes,
+  IconeEnviar,
+  IconeRenomear,
+  IconeVisualizar,
+} from '../app/icons';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { FileSummaryResponse, FolderResponse, MoveBatchItemResult } from '@gdoc/shared';
 import { GrantResourceType, MOVE_BATCH_MAX_ITEMS_DEFAULT, UserRole } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
 import { useSession } from '../auth/session-context';
 import { useNarrowMode } from '../app/responsive';
+import { EtiquetaDeSituacao } from '../app/EtiquetaDeSituacao';
+import { RotuloDeTipoDocumental } from '../app/RotuloDeTipoDocumental';
+import { AUSENTE, formatarDataDeRevisao, formatarRevisao } from '../shell/document-control-labels';
+import { DocumentControlModal } from './DocumentControlModal';
 import { AuditoriaModal } from '../auditoria/AuditoriaModal';
 import { PermissoesModal } from '../permissoes/PermissoesModal';
 import { PreviewModal } from '../visualizacao/PreviewModal';
 import { useDownloadFile } from '../visualizacao/useDownloadFile';
 import { UploadArea } from '../upload/UploadArea';
+import { PARAM_PEDIDO_DE_ENVIO } from './pedido-de-envio';
+import { PARAM_PEDIDO_DE_NOVA_PASTA } from './pedido-de-nova-pasta';
+import { paleta } from '../app/theme';
+import { useToggleFavorite } from '../favoritos/queries';
+import { MarcarLeituraModal } from '../leitura/MarcarLeituraModal';
+import { mensagemDeFalhaAoFavoritar } from '../favoritos/acao-de-favorito';
 import { DownloadFolderModal } from './DownloadFolderModal';
 import {
   useCreateFolder,
@@ -148,7 +164,7 @@ function GroupedActions({ actions }: { actions: ReactNode[] }) {
         </Space>
       )}
     >
-      <Button size="small" icon={<MoreOutlined />} aria-label="Mais ações" />
+      <Button size="small" icon={<IconeMaisAcoes />} aria-label="Mais ações" />
     </Dropdown>
   );
 }
@@ -186,6 +202,13 @@ export function ExplorerPage() {
     identity?.role === UserRole.UNIT_ADMIN || identity?.role === UserRole.GLOBAL_ADMIN;
 
   const { data, isLoading, isError, error } = useFolderContents(currentFolderId);
+  // Pasta compartilhada por outra unidade (change
+  // `compartilhamento-entre-unidades`, design.md D6, spec `web-navegacao`):
+  // navegação somente leitura. O veredito vem do servidor (`readOnly`,
+  // `canDownload`) — a SPA não o infere, e o servidor recusaria a escrita de
+  // todo modo.
+  const somenteLeitura = data?.readOnly === true;
+  const podeBaixarCompartilhado = data?.canDownload === true;
   const createFolder = useCreateFolder();
   const renameFile = useRenameFile();
   const renameFolder = useRenameFolder();
@@ -195,6 +218,7 @@ export function ExplorerPage() {
   const moveFoldersBatch = useMoveFoldersBatch();
   const deleteFile = useDeleteFile();
   const deleteFolder = useDeleteFolder();
+  const alternarFavorito = useToggleFavorite();
 
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [renamingItem, setRenamingItem] = useState<RenamingItem | null>(null);
@@ -202,8 +226,80 @@ export function ExplorerPage() {
   const [previewingFile, setPreviewingFile] = useState<FileSummaryResponse | null>(null);
   const [managingResource, setManagingResource] = useState<ManagingResource | null>(null);
   const [auditingFile, setAuditingFile] = useState<FileSummaryResponse | null>(null);
+  const [editingControlFile, setEditingControlFile] = useState<FileSummaryResponse | null>(null);
+  // Leitura obrigatória (change `leitura-obrigatoria`): arquivo cujo
+  // formulário de marcação está aberto.
+  const [markingReadingFile, setMarkingReadingFile] = useState<FileSummaryResponse | null>(null);
   const [downloadingFolder, setDownloadingFolder] = useState<DownloadingFolder | null>(null);
   const { download, isPending: downloading } = useDownloadFile();
+
+  // A ação da orientação de pasta vazia não duplica a área de envio: leva a
+  // ela. Duas superfícies de envio na mesma tela confundiriam qual é a
+  // verdadeira, e a área já carrega a pré-checagem de espaço, o fatiamento e
+  // o relato de falha por item — nada disso se reimplementa num botão.
+  const areaDeEnvioRef = useRef<HTMLDivElement>(null);
+  function focarAreaDeEnvio() {
+    const gatilho = areaDeEnvioRef.current?.querySelector('button');
+    gatilho?.scrollIntoView?.({ block: 'nearest' });
+    gatilho?.focus();
+  }
+
+  // Pedido de envio vindo do endereço (change `cartoes-de-atalho-acionaveis`,
+  // design.md D5): o atalho "Enviar documentos" da tela inicial conduz ao
+  // envio em si, e não a uma tela onde o envio ainda precise ser localizado.
+  //
+  // A condição é `data?.canUpload`, não o papel: quem decide se há envio
+  // naquela pasta é o servidor, e o veredito chega no DTO de conteúdo. Até ele
+  // chegar nada acontece; sem permissão nada acontece nunca — é assim que um
+  // atalho apresentado não conduz a uma recusa (`tela-inicial`, cenário
+  // "O atalho de envio não conduz a uma recusa"). O cliente não antecipa
+  // permissão aqui, como não antecipa em nenhum outro ponto da tela.
+  //
+  // Chegado o veredito, o parâmetro sai do endereço **substituindo** a entrada
+  // de histórico — tenha o pedido sido atendido ou não. Sem isso, recarregar a
+  // tela ou voltar a ela roubaria o foco de quem já está trabalhando na pasta,
+  // e um endereço guardado nos favoritos carregaria para sempre um pedido que
+  // fazia sentido uma única vez. Sair também na recusa é o que impede um
+  // pedido de ficar latente: a verificação na app mostrou o parâmetro
+  // sobrevivendo numa pasta sem envio permitido, de onde uma revalidação que
+  // trocasse `canUpload` faria o foco saltar para a área de envio muito depois
+  // do clique que o pediu.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pedidoDeEnvio = searchParams.get(PARAM_PEDIDO_DE_ENVIO) !== null;
+  const vereditoDeEnvio = data?.canUpload;
+  useEffect(() => {
+    if (!pedidoDeEnvio || vereditoDeEnvio === undefined) return;
+    if (vereditoDeEnvio) focarAreaDeEnvio();
+    setSearchParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual);
+        proximo.delete(PARAM_PEDIDO_DE_ENVIO);
+        return proximo;
+      },
+      { replace: true },
+    );
+  }, [pedidoDeEnvio, vereditoDeEnvio, setSearchParams]);
+
+  // Pedido de nova pasta (change `conteudo-da-tela-inicio`, design.md D5):
+  // mesmo ciclo do pedido de envio — espera o conteúdo chegar, é atendido uma
+  // vez e sai do endereço substituindo a entrada de histórico. Só a **raiz**
+  // atende: ali criar pasta é livre a qualquer pessoa autenticada; numa
+  // subpasta a regra é do servidor, e o cliente não a antecipa — o pedido é
+  // descartado sem abrir nada.
+  const pedidoDeNovaPasta = searchParams.get(PARAM_PEDIDO_DE_NOVA_PASTA) !== null;
+  const conteudoChegou = data !== undefined;
+  useEffect(() => {
+    if (!pedidoDeNovaPasta || !conteudoChegou) return;
+    if (currentFolderId === null) setNewFolderOpen(true);
+    setSearchParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual);
+        proximo.delete(PARAM_PEDIDO_DE_NOVA_PASTA);
+        return proximo;
+      },
+      { replace: true },
+    );
+  }, [pedidoDeNovaPasta, conteudoChegou, currentFolderId, setSearchParams]);
 
   // Seleção múltipla (US 2.4, design.md D3 do change `mover-itens-em-lote`):
   // escopada à pasta corrente, esvaziada ao navegar — entrar em subpasta,
@@ -238,6 +334,67 @@ export function ExplorerPage() {
       return;
     }
     handlePermissionError(err);
+  }
+
+  // Favoritos (change `favoritos`, design.md D5): a indicação vem do servidor,
+  // na própria listagem — a SPA não cruza a página com a lista inteira.
+  const pastasFavoritas = new Set(data?.favoriteFolderIds ?? []);
+  const arquivosFavoritos = new Set(data?.favoriteFileIds ?? []);
+
+  async function handleToggleFavorite(
+    resourceType: GrantResourceType,
+    resourceId: string,
+    favorite: boolean,
+  ) {
+    try {
+      await alternarFavorito.mutateAsync({ resourceType, resourceId, favorite });
+      message.success(favorite ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.');
+    } catch (err) {
+      message.error(mensagemDeFalhaAoFavoritar(err));
+    }
+  }
+
+  /** Ação de favorito do item: o rótulo diz o estado, sem depender de cor. */
+  function botaoDeFavorito(resourceType: GrantResourceType, resourceId: string, favorito: boolean) {
+    return (
+      <Button
+        key="favorito"
+        size="small"
+        icon={<IconeFavorito />}
+        loading={alternarFavorito.isPending}
+        onClick={() => handleToggleFavorite(resourceType, resourceId, !favorito)}
+      >
+        {favorito ? 'Remover dos favoritos' : 'Favoritar'}
+      </Button>
+    );
+  }
+
+  /** Marca de favorito junto ao nome — texto acessível, cor só como redundância. */
+  function marcaDeFavorito(favorito: boolean) {
+    if (!favorito) return null;
+    return (
+      <span role="img" aria-label="Favorito" title="Favorito" style={{ color: paleta.verdeAcao }}>
+        <IconeFavorito />
+      </span>
+    );
+  }
+
+  // Documento de leitura obrigatória (change `superficies-de-pendencia`,
+  // design.md D4): o veredito vem da listagem (`requiredReading`), e ausência
+  // é "não apresentar". Mesma forma da marca de favorito — nome acessível e
+  // dica com o mesmo texto, a informação nunca só no desenho.
+  function marcaDeLeituraObrigatoria(marcado: boolean | undefined) {
+    if (!marcado) return null;
+    return (
+      <span
+        role="img"
+        aria-label="Leitura obrigatória"
+        title="Leitura obrigatória"
+        style={{ color: paleta.azulLink }}
+      >
+        <IconeLeituraObrigatoria />
+      </span>
+    );
   }
 
   async function handleCreateFolder(name: string) {
@@ -419,10 +576,12 @@ export function ExplorerPage() {
   const breadcrumbItems = useMemo(() => {
     if (!data) return [];
     if (data.folder === null) {
-      return [{ title: 'Arquivos' }];
+      return [{ title: 'Documentos' }];
     }
     return [
-      { title: <Link to="/pastas">Arquivos</Link> },
+      data.readOnly
+        ? { title: <Link to="/compartilhados">Compartilhados comigo</Link> }
+        : { title: <Link to="/pastas">Documentos</Link> },
       ...data.breadcrumb.map((crumb) => ({
         key: crumb.id,
         title: <Link to={`/pastas/${crumb.id}`}>{crumb.name}</Link>,
@@ -436,25 +595,40 @@ export function ExplorerPage() {
       title: 'Tipo',
       key: 'type',
       width: 56,
-      render: (_, row) => (row.kind === 'folder' ? <FolderOutlined /> : <FileOutlined />),
+      render: (_, row) => (row.kind === 'folder' ? <IconePasta /> : <IconeArquivo />),
     },
     {
       title: 'Nome',
       key: 'name',
       render: (_, row) =>
         row.kind === 'folder' ? (
-          <Link to={`/pastas/${row.folder.id}`}>{row.folder.name}</Link>
-        ) : (
-          <Space>
-            <Button
-              type="link"
-              style={{ padding: 0, height: 'auto' }}
-              onClick={() => setPreviewingFile(row.file)}
-            >
-              {row.file.fileName}
-            </Button>
-            {row.file.status !== 'active' && <Tag>{row.file.status}</Tag>}
+          <Space size={4}>
+            <Link to={`/pastas/${row.folder.id}`}>{row.folder.name}</Link>
+            {marcaDeFavorito(pastasFavoritas.has(row.folder.id))}
           </Space>
+        ) : (
+          <div>
+            <Space>
+              {/* US 10.1 cenário 1: a sigla do tipo vem **junto ao nome**, e é
+                  texto — a cor acompanha, nunca substitui (cenário 2). */}
+              {row.file.documentType && <RotuloDeTipoDocumental tipo={row.file.documentType} />}
+              <Button
+                type="link"
+                style={{ padding: 0, height: 'auto' }}
+                onClick={() => setPreviewingFile(row.file)}
+              >
+                {row.file.fileName}
+              </Button>
+              {marcaDeFavorito(arquivosFavoritos.has(row.file.id))}
+              {marcaDeLeituraObrigatoria(row.file.requiredReading)}
+              {row.file.status !== 'active' && <Tag>{row.file.status}</Tag>}
+            </Space>
+            {row.file.documentCode && (
+              <div>
+                <Typography.Text type="secondary">{row.file.documentCode}</Typography.Text>
+              </div>
+            )}
+          </div>
         ),
     },
     {
@@ -468,26 +642,67 @@ export function ExplorerPage() {
       render: (_, row) =>
         formatDate(row.kind === 'folder' ? row.folder.createdAt : row.file.createdAt),
     },
+    // US 10.3 e US 10.4: revisão, responsável, prazo e situação por linha.
+    // Dado ausente aparece como ausência explícita (`AUSENTE`), nunca como
+    // valor presumido — um `Rev. 01` inventado afirmaria um controle que
+    // nunca existiu.
+    {
+      title: 'Revisão',
+      key: 'revision',
+      render: (_, row) =>
+        row.kind === 'file' ? formatarRevisao(row.file.documentRevision) : AUSENTE,
+    },
+    {
+      title: 'Responsável',
+      key: 'responsible',
+      render: (_, row) => (row.kind === 'file' ? (row.file.responsibleSector ?? AUSENTE) : AUSENTE),
+    },
+    {
+      title: 'Próxima revisão',
+      key: 'nextReview',
+      render: (_, row) =>
+        row.kind === 'file' ? formatarDataDeRevisao(row.file.nextReviewAt) : AUSENTE,
+    },
+    {
+      title: 'Situação',
+      key: 'documentStatus',
+      render: (_, row) =>
+        row.kind === 'file' ? (
+          // A situação é a que o **servidor** apurou (web-navegacao): a SPA
+          // não a recalcula a partir da data e do relógio do dispositivo —
+          // dois navegadores com relógios diferentes mostrariam vereditos
+          // diferentes sobre o mesmo documento.
+          <EtiquetaDeSituacao file={row.file} />
+        ) : (
+          AUSENTE
+        ),
+    },
     {
       title: 'Ações',
       key: 'actions',
       render: (_, row) => {
+        if (row.kind === 'folder' && somenteLeitura) return null;
         if (row.kind === 'folder') {
           const folderActions: ReactNode[] = [
             <Button
               key="baixar"
               size="small"
-              icon={<DownloadOutlined />}
+              icon={<IconeBaixar />}
               onClick={() =>
                 handleOpenDownloadFolder({ folderId: row.folder.id, folderName: row.folder.name })
               }
             >
               Baixar pasta
             </Button>,
+            botaoDeFavorito(
+              GrantResourceType.FOLDER,
+              row.folder.id,
+              pastasFavoritas.has(row.folder.id),
+            ),
             <Button
               key="renomear"
               size="small"
-              icon={<EditOutlined />}
+              icon={<IconeRenomear />}
               onClick={() =>
                 setRenamingItem({ id: row.folder.id, name: row.folder.name, kind: 'folder' })
               }
@@ -497,7 +712,7 @@ export function ExplorerPage() {
             <Button
               key="mover"
               size="small"
-              icon={<SwapOutlined />}
+              icon={<IconeMover />}
               onClick={() =>
                 setMovingItems([{ id: row.folder.id, name: row.folder.name, kind: 'folder' }])
               }
@@ -509,7 +724,7 @@ export function ExplorerPage() {
                   <Button
                     key="permissoes"
                     size="small"
-                    icon={<LockOutlined />}
+                    icon={<IconePermissoes />}
                     onClick={() =>
                       setManagingResource({
                         resourceType: GrantResourceType.FOLDER,
@@ -530,7 +745,7 @@ export function ExplorerPage() {
               cancelText="Cancelar"
               onConfirm={() => handleDeleteChildFolder(row.folder.id)}
             >
-              <Button danger size="small" icon={<DeleteOutlined />}>
+              <Button danger size="small" icon={<IconeExcluir />}>
                 Excluir
               </Button>
             </Popconfirm>,
@@ -546,20 +761,45 @@ export function ExplorerPage() {
           );
         }
 
+        if (somenteLeitura) {
+          return (
+            <Space>
+              <Button
+                size="small"
+                icon={<IconeVisualizar />}
+                onClick={() => setPreviewingFile(row.file)}
+              >
+                Visualizar
+              </Button>
+              {podeBaixarCompartilhado && (
+                <Button
+                  size="small"
+                  icon={<IconeBaixarVarios />}
+                  loading={downloading}
+                  onClick={() => download(row.file.id)}
+                >
+                  Baixar
+                </Button>
+              )}
+            </Space>
+          );
+        }
+
         const secondaryActions: ReactNode[] = [
           <Button
             key="baixar"
             size="small"
-            icon={<CloudDownloadOutlined />}
+            icon={<IconeBaixarVarios />}
             loading={downloading}
             onClick={() => download(row.file.id)}
           >
             Baixar
           </Button>,
+          botaoDeFavorito(GrantResourceType.FILE, row.file.id, arquivosFavoritos.has(row.file.id)),
           <Button
             key="renomear"
             size="small"
-            icon={<EditOutlined />}
+            icon={<IconeRenomear />}
             onClick={() =>
               setRenamingItem({ id: row.file.id, name: row.file.fileName, kind: 'file' })
             }
@@ -569,7 +809,7 @@ export function ExplorerPage() {
           <Button
             key="mover"
             size="small"
-            icon={<SwapOutlined />}
+            icon={<IconeMover />}
             onClick={() =>
               setMovingItems([{ id: row.file.id, name: row.file.fileName, kind: 'file' }])
             }
@@ -581,7 +821,7 @@ export function ExplorerPage() {
                 <Button
                   key="permissoes"
                   size="small"
-                  icon={<LockOutlined />}
+                  icon={<IconePermissoes />}
                   onClick={() =>
                     setManagingResource({
                       resourceType: GrantResourceType.FILE,
@@ -602,10 +842,37 @@ export function ExplorerPage() {
                 <Button
                   key="auditoria"
                   size="small"
-                  icon={<AuditOutlined />}
+                  icon={<IconeAuditoria />}
                   onClick={() => setAuditingFile(row.file)}
                 >
                   Auditoria
+                </Button>,
+              ]
+            : []),
+          // US 10.5: a ação é oferecida **só** a quem o servidor autorizaria
+          // (`canEditControl`, resolvido na própria listagem). A SPA não
+          // infere permissão — ausência do veredito é "não oferecer".
+          ...(row.file.canEditControl
+            ? [
+                <Button
+                  key="controle"
+                  size="small"
+                  icon={<IconeControleDocumental />}
+                  onClick={() => setEditingControlFile(row.file)}
+                >
+                  Dados de controle
+                </Button>,
+                // Leitura obrigatória (change `leitura-obrigatoria`, design.md
+                // D4): o mesmo veredito que governa os dados de controle — quem
+                // edita o documento decide marcá-lo. Elegibilidade e público,
+                // o formulário pergunta ao servidor.
+                <Button
+                  key="leitura"
+                  size="small"
+                  icon={<IconeLeituraObrigatoria />}
+                  onClick={() => setMarkingReadingFile(row.file)}
+                >
+                  Leitura obrigatória
                 </Button>,
               ]
             : []),
@@ -617,7 +884,7 @@ export function ExplorerPage() {
             cancelText="Cancelar"
             onConfirm={() => handleDeleteFile(row.file.id)}
           >
-            <Button danger size="small" icon={<DeleteOutlined />}>
+            <Button danger size="small" icon={<IconeExcluir />}>
               Excluir
             </Button>
           </Popconfirm>,
@@ -628,7 +895,11 @@ export function ExplorerPage() {
         // agrupado abaixo do limiar — nenhuma ação é suprimida, só reagrupada.
         return (
           <Space>
-            <Button size="small" icon={<EyeOutlined />} onClick={() => setPreviewingFile(row.file)}>
+            <Button
+              size="small"
+              icon={<IconeVisualizar />}
+              onClick={() => setPreviewingFile(row.file)}
+            >
               Visualizar
             </Button>
             {isNarrow ? <GroupedActions actions={secondaryActions} /> : secondaryActions}
@@ -673,40 +944,55 @@ export function ExplorerPage() {
       <div style={{ overflowX: 'auto', marginBottom: 16 }}>
         <Breadcrumb items={breadcrumbItems} style={{ whiteSpace: 'nowrap' }} />
       </div>
-      <Space wrap style={{ marginBottom: 16 }}>
-        <Button type="primary" icon={<FolderAddOutlined />} onClick={() => setNewFolderOpen(true)}>
-          Nova pasta
-        </Button>
-        {/* Oferecida uniformemente, inclusive na raiz da unidade — a recusa
+      {somenteLeitura && data.sharedFrom && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={`Compartilhada pela unidade ${data.sharedFrom.unitName}`}
+          description="Somente leitura: você pode visualizar os documentos e, quando permitido, baixá-los."
+        />
+      )}
+      {!somenteLeitura && (
+        <Space wrap style={{ marginBottom: 16 }}>
+          <Button type="primary" icon={<IconeNovaPasta />} onClick={() => setNewFolderOpen(true)}>
+            Nova pasta
+          </Button>
+          {/* Oferecida uniformemente, inclusive na raiz da unidade — a recusa
             por limite é que ensina o teto, não a ausência da ação
             (design.md D9). Abaixo do limiar, a recusa é por dispositivo
             (design.md D5 de `responsividade-mobile-tablet`). */}
-        <Button
-          icon={<DownloadOutlined />}
-          onClick={() =>
-            handleOpenDownloadFolder({
-              folderId: currentFolderId,
-              folderName: data.folder?.name ?? 'Arquivos',
-            })
-          }
-        >
-          Baixar esta pasta
-        </Button>
-        {data.folder !== null && (
-          <Popconfirm
-            title="Excluir esta pasta"
-            description="A pasta e seu conteúdo vão para a lixeira."
-            okText="Sim, excluir"
-            cancelText="Cancelar"
-            onConfirm={handleDeleteCurrentFolder}
+          <Button
+            icon={<IconeBaixar />}
+            onClick={() =>
+              handleOpenDownloadFolder({
+                folderId: currentFolderId,
+                folderName: data.folder?.name ?? 'Documentos',
+              })
+            }
           >
-            <Button danger icon={<DeleteOutlined />}>
-              Excluir esta pasta
-            </Button>
-          </Popconfirm>
-        )}
-      </Space>
-      <UploadArea destinationFolderId={currentFolderId} />
+            Baixar esta pasta
+          </Button>
+          {data.folder !== null && (
+            <Popconfirm
+              title="Excluir esta pasta"
+              description="A pasta e seu conteúdo vão para a lixeira."
+              okText="Sim, excluir"
+              cancelText="Cancelar"
+              onConfirm={handleDeleteCurrentFolder}
+            >
+              <Button danger icon={<IconeExcluir />}>
+                Excluir esta pasta
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
+      )}
+      {!somenteLeitura && (
+        <div ref={areaDeEnvioRef}>
+          <UploadArea destinationFolderId={currentFolderId} />
+        </div>
+      )}
       {/* Barra de ação em lote (US 2.4, design.md D3/D8 do change
           `mover-itens-em-lote`): visível a partir de um item selecionado,
           alcançável também abaixo do ponto de ruptura — a seleção não é
@@ -719,22 +1005,56 @@ export function ExplorerPage() {
               ? '1 item selecionado'
               : `${selectedItems.length} itens selecionados`}
           </Typography.Text>
-          <Button icon={<SwapOutlined />} onClick={handleOpenBatchMove}>
+          <Button icon={<IconeMover />} onClick={handleOpenBatchMove}>
             Mover selecionados
           </Button>
         </Space>
       )}
-      <Table<Row>
-        rowKey="key"
-        columns={columns}
-        dataSource={rows}
-        pagination={false}
-        scroll={{ x: 'max-content' }}
-        rowSelection={{
-          selectedRowKeys,
-          onChange: (keys) => setSelectedRowKeys(keys),
-        }}
-      />
+      {/* Estado vazio orientado (capability `web-navegacao`, requisito "Pasta
+          sem conteúdo orienta em vez de apresentar tabela vazia"): no lugar da
+          tabela vazia herdada do design system — cabeçalho de colunas sobre
+          nenhuma linha —, a tela diz o que está acontecendo e qual é o próximo
+          passo.
+
+          A ação de envio é oferecida **só** quando o servidor já resolveu que
+          a pessoa pode enviar (`canUpload`, design.md D10). A SPA não infere
+          permissão no cliente: ela reflete o veredito que veio no DTO. */}
+      {rows.length === 0 ? (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={
+            <Typography.Text type="secondary">
+              {somenteLeitura
+                ? 'Não há documentos compartilhados nesta pasta.'
+                : data.canUpload
+                  ? 'Esta pasta ainda não tem documentos. Envie o primeiro para começar.'
+                  : 'Esta pasta ainda não tem documentos.'}
+            </Typography.Text>
+          }
+        >
+          {data.canUpload && (
+            <Button type="primary" icon={<IconeEnviar />} onClick={focarAreaDeEnvio}>
+              Enviar documento
+            </Button>
+          )}
+        </Empty>
+      ) : (
+        <Table<Row>
+          rowKey="key"
+          columns={columns}
+          dataSource={rows}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+          rowSelection={
+            somenteLeitura
+              ? undefined
+              : {
+                  selectedRowKeys,
+                  onChange: (keys) => setSelectedRowKeys(keys),
+                }
+          }
+        />
+      )}
       <NewFolderModal
         open={newFolderOpen}
         submitting={createFolder.isPending}
@@ -761,6 +1081,7 @@ export function ExplorerPage() {
       />
       <PreviewModal file={previewingFile} onClose={() => setPreviewingFile(null)} />
       <AuditoriaModal file={auditingFile} onClose={() => setAuditingFile(null)} />
+      <DocumentControlModal file={editingControlFile} onClose={() => setEditingControlFile(null)} />
       {downloadingFolder && (
         <DownloadFolderModal
           open
@@ -776,6 +1097,7 @@ export function ExplorerPage() {
         open={managingResource !== null}
         onClose={() => setManagingResource(null)}
       />
+      <MarcarLeituraModal file={markingReadingFile} onClose={() => setMarkingReadingFile(null)} />
     </div>
   );
 }

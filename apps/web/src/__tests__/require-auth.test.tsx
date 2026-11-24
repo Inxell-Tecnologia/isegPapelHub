@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it } from 'vitest';
 import { UserRole } from '@gdoc/shared';
-import { mockFetch } from './mock-fetch';
+import { mockFetch, ROTAS_DA_TELA_INICIAL } from './mock-fetch';
 import { renderApp } from './render-app';
 
 describe('Guarda de rota por autenticação', () => {
@@ -15,6 +15,7 @@ describe('Guarda de rota por autenticação', () => {
 
   it('bootstrap de sessão via GET /auth/me entra autenticado sem novo login', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
@@ -22,11 +23,12 @@ describe('Guarda de rota por autenticação', () => {
     });
     renderApp(['/']);
 
-    await screen.findByText('Bem-vindo ao PapelHub');
+    await screen.findByText('Pastas da unidade');
   });
 
   it('logout encerra a sessão e volta ao login', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': {
         status: 200,
         body: { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR },
@@ -35,11 +37,11 @@ describe('Guarda de rota por autenticação', () => {
     });
     renderApp(['/']);
 
-    await screen.findByText('Bem-vindo ao PapelHub');
-    // "Sair" mora no menu de identidade do cabeçalho (change `troca-de-senha`,
-    // design.md D5/D6) — precisa abrir o dropdown antes de clicar no item.
-    await userEvent.click(screen.getByText('Colaborador'));
-    await userEvent.click(await screen.findByText('Sair'));
+    await screen.findByText('Pastas da unidade');
+    // "Sair" é o botão de ícone do cartão do usuário, no rodapé da navegação
+    // (change `identidade-isetes-e-menu-compacto`, design.md D5): alcançado
+    // pelo nome acessível, sem rótulo visível.
+    await userEvent.click(screen.getByRole('button', { name: 'Sair' }));
 
     await screen.findByRole('heading', { name: 'PapelHub' });
   });

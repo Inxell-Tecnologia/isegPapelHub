@@ -41,6 +41,13 @@ para consulta (sem histórico de versões — fora de escopo no PRD). A substitu
 respeitar a cota do dono, considerando a diferença de tamanho entre a versão nova e a
 antiga. Quem não é o dono NÃO SHALL conseguir substituir. Referência: PRD US 2.2.
 
+Quando o arquivo substituído for um documento com revisão registrada, a
+substituição SHALL avançar a revisão em uma unidade, preservando código, tipo,
+responsável e data de próxima revisão. Documento sem revisão registrada SHALL
+permanecer sem revisão — a substituição NÃO SHALL inaugurar numeração por conta
+própria. O avanço da revisão NÃO SHALL tornar a versão anterior consultável.
+Referência: PRD US 10.6.
+
 #### Scenario: Substituição pelo dono preserva o local
 - **WHEN** o dono envia uma nova versão para um arquivo sobre o qual tem permissão
 - **THEN** o arquivo vigente é substituído no mesmo local, a versão anterior deixa de
@@ -56,6 +63,20 @@ antiga. Quem não é o dono NÃO SHALL conseguir substituir. Referência: PRD US
   considerando a diferença para a versão anterior
 - **THEN** a substituição é bloqueada com aviso de cota atingida e o arquivo vigente
   permanece intacto
+
+#### Scenario: Substituição avança a revisão do documento
+- **WHEN** o dono substitui um documento que está registrado na revisão 01
+- **THEN** o documento passa a constar na revisão 02, mantendo código, tipo,
+  responsável e data de próxima revisão
+
+#### Scenario: Documento sem revisão registrada continua sem revisão
+- **WHEN** o dono substitui um arquivo que não tem revisão registrada
+- **THEN** a substituição ocorre normalmente e o arquivo permanece sem revisão
+
+#### Scenario: Avanço de revisão não torna a versão anterior consultável
+- **WHEN** um documento tem sua revisão avançada por substituição
+- **THEN** a versão anterior permanece indisponível para consulta, como em
+  qualquer substituição
 
 ### Requirement: Mover arquivo entre pastas
 

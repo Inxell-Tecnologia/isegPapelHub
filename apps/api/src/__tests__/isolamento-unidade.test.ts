@@ -241,4 +241,50 @@ describe('Épico 5: alcance administrativo por unidade', () => {
     expect(row.rows[0]?.name).toBe('Pasta userB');
     expect(row.rows[0]?.parent_id).toBeNull();
   });
+
+  /**
+   * Épico 10 (US 10.7 cenário 3, design.md D6): a exceção do obsoleto é
+   * restritiva e **não** atravessa a fronteira de unidade. O admin da
+   * unidade passa a enxergar o obsoleto da própria unidade — e continua sem
+   * enxergar o da outra, mesmo o `global_admin`, cujo bypass de RLS a
+   * listagem já trava comparando `unit_id`.
+   */
+  it('Épico 10: obsoleto é visível à gestão da própria unidade e invisível na outra', async () => {
+    const app = createApp(ports);
+    await withSystemBypass(pool, (client) =>
+      client.query("UPDATE files SET lifecycle_state = 'obsolete' WHERE id = ANY($1::uuid[])", [
+        [fileOwnedByUserAId, fileInUnitBId],
+      ]),
+    );
+
+    const daUnidade = await request(app)
+      .get(`/folders/${folderOwnedByUserAId}/contents`)
+      .set('Cookie', await sessionCookieFor(ports, unitAdminAId));
+    expect(daUnidade.status).toBe(200);
+    expect(daUnidade.body.files.map((f: { id: string }) => f.id)).toContain(fileOwnedByUserAId);
+    expect(
+      daUnidade.body.files.find((f: { id: string }) => f.id === fileOwnedByUserAId).documentStatus,
+    ).toBe('obsolete');
+
+    for (const userId of [unitAdminAId, ids.globalAdmin]) {
+      const cookie = await sessionCookieFor(ports, userId);
+      expect(
+        (await request(app).post(`/files/${fileInUnitBId}/view-url`).set('Cookie', cookie)).status,
+      ).toBe(403);
+      const busca = await request(app)
+        .get('/files/search')
+        .query({ q: 'unitB' })
+        .set('Cookie', cookie);
+      expect(busca.status).toBe(200);
+      expect(busca.body.files.map((f: { id: string }) => f.id)).not.toContain(fileInUnitBId);
+    }
+
+    // Deixa o acervo como estava: este arquivo é compartilhado com os demais
+    // casos deste describe.
+    await withSystemBypass(pool, (client) =>
+      client.query('UPDATE files SET lifecycle_state = NULL WHERE id = ANY($1::uuid[])', [
+        [fileOwnedByUserAId, fileInUnitBId],
+      ]),
+    );
+  });
 });

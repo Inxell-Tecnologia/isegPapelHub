@@ -8,7 +8,9 @@ privado, emissão de URLs assinadas com auditoria, isolamento por unidade,
 paridade dev↔prod, segredos, jobs agendados e o pipeline de entrega. Não cobre
 nenhuma feature de produto (login, navegador, permissões de negócio, painel),
 que virão como mudanças próprias.
+
 ## Requirements
+
 ### Requirement: Armazenamento privado por padrão
 
 O sistema SHALL armazenar os bytes dos arquivos em um bucket de object storage
@@ -52,7 +54,6 @@ e registrem um evento de auditoria no momento da emissão.
   evento de acesso ao conteúdo.
 
 ### Requirement: Prazo próprio da URL assinada de envio
-
 
 O sistema SHALL assinar as URLs de envio com um prazo de validade **próprio da
 operação de envio**, configurável por ambiente e independente dos prazos de
@@ -481,3 +482,81 @@ permanecer válidos sem exceção durante e após a troca.
   foi executado
 - **THEN** não existe nenhuma conta utilizável e um acesso direto a objeto do
   bucket sem URL assinada é negado sem retornar bytes ou preview.
+
+### Requirement: Rotina diária de avisos de leitura obrigatória agendada
+
+A infraestrutura de produção SHALL provisionar a rotina diária de avisos de
+leitura obrigatória como job em container com agendador próprio, em horário
+distinto das demais rotinas diárias, e o ambiente de desenvolvimento SHALL
+executá-la sob demanda pelo mesmo código. Referência: PRD US 12.5; design.md
+D4 do change `avisos-e-atrasos`.
+
+#### Scenario: Job e agendador provisionados
+- **WHEN** a infraestrutura de produção é provisionada
+- **THEN** existe um job da rotina de avisos de leitura e um agendador que o
+  dispara diariamente às 03:45, depois do expurgo e dos avisos de concessão
+
+#### Scenario: Execução sob demanda em desenvolvimento
+- **WHEN** alguém executa a rotina pelo script do workspace da API
+- **THEN** ela roda o mesmo código do job de produção e informa quantos avisos
+  emitiu e quantos falharam
+
+### Requirement: Jobs da aplicação acompanham a imagem implantada
+
+A cada implantação, o pipeline SHALL atualizar para a imagem recém-implantada
+todo job em container que reusa a imagem da aplicação — os agendados e o de
+provisionamento do administrador —, depois da troca de tráfego do serviço. O
+pipeline NÃO SHALL executar esses jobs: eles rodam no seu agendamento ou por
+acionamento explícito. Referência: change `deploy-atualiza-jobs-agendados`,
+design.md D3.
+
+#### Scenario: Deploy alinha a imagem dos jobs à do serviço
+- **WHEN** o pipeline implanta uma nova imagem da aplicação
+- **THEN** ao final, cada job que reusa a imagem da aplicação aponta para a mesma
+  imagem que o serviço passou a servir
+
+#### Scenario: Atualização não dispara os jobs
+- **WHEN** o pipeline atualiza a imagem dos jobs
+- **THEN** nenhum deles é executado por causa disso, inclusive o de expurgo da
+  lixeira
+
+#### Scenario: Falha ao atualizar um job é visível sem desfazer o deploy
+- **WHEN** a atualização de um job falha, por permissão ausente ou outro erro
+- **THEN** a execução do pipeline termina em falha, nomeando o job, e o serviço
+  permanece na revisão recém-implantada
+
+### Requirement: Identidade do pipeline tem permissão por recurso sobre os jobs
+
+A identidade do pipeline SHALL ter permissão sobre cada job que atualiza e sobre a
+service account de runtime de cada um, concedida **por recurso**. Ela NÃO SHALL
+receber permissão de alcance de projeto para atualizar ou descobrir jobs.
+Referência: design.md D1 e D2.
+
+#### Scenario: Atualização conclui sem erro de permissão
+- **WHEN** o pipeline atualiza a imagem de um job da lista
+- **THEN** a identidade tem a permissão necessária sobre o job e sobre a service
+  account com que ele roda, e a atualização conclui sem erro de permissão
+
+#### Scenario: Identidade não enxerga jobs fora da lista
+- **WHEN** se inspecionam as permissões da identidade do pipeline
+- **THEN** não há concessão de alcance de projeto sobre jobs, apenas concessões
+  sobre os recursos declarados
+
+### Requirement: Lista de jobs atualizados pelo deploy tem origem única
+
+O conjunto de jobs que o pipeline atualiza SHALL derivar de uma declaração única
+na infraestrutura como código, da qual decorrem também as permissões da
+identidade do pipeline sobre esses jobs. Quando a lista entregue ao pipeline
+estiver ausente ou vazia, o pipeline SHALL falhar com mensagem que nomeie a
+configuração faltante, e NÃO SHALL concluir com sucesso sem atualizar job algum.
+
+#### Scenario: Job novo declarado recebe permissão e entra na lista
+- **WHEN** um job que reusa a imagem da aplicação é acrescentado à declaração
+- **THEN** a identidade do pipeline passa a ter permissão sobre ele e o job
+  aparece na lista exposta para o pipeline, sem outra edição de permissão
+
+#### Scenario: Lista ausente falha alto
+- **WHEN** o pipeline chega ao passo de atualização dos jobs sem a lista
+  configurada
+- **THEN** a execução falha com mensagem que indica qual configuração preencher e
+  de onde obter o valor

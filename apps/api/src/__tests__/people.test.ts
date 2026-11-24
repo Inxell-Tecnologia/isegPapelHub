@@ -84,7 +84,6 @@ describe('Gestão de pessoas: POST/GET/PATCH /users', () => {
         password: 'initial-password',
         phone: '+55 11 90000-0000',
         jobTitle: 'Analista',
-        workArea: 'Financeiro',
         notes: 'observação',
       });
 
@@ -393,6 +392,209 @@ describe('Gestão de pessoas: POST/GET/PATCH /users', () => {
         .post('/auth/login')
         .send({ email: 'reset-efeito@test.dev', password: generatedPassword });
       expect(loginNew.status).toBe(200);
+    });
+  });
+  /**
+   * Setor por referência (change `funcao-e-setor-na-identidade`, capability
+   * `gestao-pessoas`). O campo substitui `workArea`, que era texto livre —
+   * ver o requisito "Cadastro de pessoa pela administração" e
+   * "Edição altera ou remove o vínculo de setor".
+   */
+  describe('setor da pessoa (US 1.1; respostas 5a e 6a do cliente)', () => {
+    async function criaSetor(unitId: string, nome: string): Promise<string> {
+      return withSystemBypass(pool, async (client) => {
+        const { rows } = await client.query<{ id: string }>(
+          `INSERT INTO sectors (unit_id, name) VALUES ($1, $2) RETURNING id`,
+          [unitId, nome],
+        );
+        return rows[0]!.id;
+      });
+    }
+
+    it('cadastro com setor da unidade vincula e devolve o NOME do setor', async () => {
+      const setorId = await criaSetor(unitA, 'Centro Cirúrgico');
+      const app = createApp(ports);
+
+      const res = await request(app)
+        .post('/users')
+        .set('Cookie', await sessionCookieFor(ports, unitAdminAId))
+        .send({
+          fullName: 'Pessoa com Setor',
+          email: 'com-setor@test.dev',
+          password: 'initial-password',
+          sectorId: setorId,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.sectorId).toBe(setorId);
+      // O nome, não o identificador cru: é o que a interface apresenta.
+      expect(res.body.sectorName).toBe('Centro Cirúrgico');
+    });
+
+    it('cadastro sem setor é aceito e devolve os dois campos nulos', async () => {
+      const app = createApp(ports);
+      const res = await request(app)
+        .post('/users')
+        .set('Cookie', await sessionCookieFor(ports, unitAdminAId))
+        .send({
+          fullName: 'Pessoa sem Setor',
+          email: 'sem-setor@test.dev',
+          password: 'initial-password',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.sectorId).toBeNull();
+      expect(res.body.sectorName).toBeNull();
+    });
+
+    it('setor de OUTRA unidade recusa o cadastro, sem criar conta', async () => {
+      const setorDaB = await criaSetor(unitB, 'Setor da B');
+      const app = createApp(ports);
+
+      const res = await request(app)
+        .post('/users')
+        .set('Cookie', await sessionCookieFor(ports, unitAdminAId))
+        .send({
+          fullName: 'Não Deve Existir',
+          email: 'nao-deve-existir@test.dev',
+          password: 'initial-password',
+          sectorId: setorDaB,
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body).toEqual({ error: 'invalid_sector' });
+
+      // Fail-closed: a resposta é a mesma de um setor inexistente.
+      const inexistente = await request(app)
+        .post('/users')
+        .set('Cookie', await sessionCookieFor(ports, unitAdminAId))
+        .send({
+          fullName: 'Também Não',
+          email: 'tambem-nao@test.dev',
+          password: 'initial-password',
+          sectorId: '00000000-0000-0000-0000-000000000000',
+        });
+      expect(inexistente.status).toBe(409);
+      expect(inexistente.body).toEqual(res.body);
+
+      const criadas = await withSystemBypass(pool, (client) =>
+        client
+          .query(
+            "SELECT count(*)::int AS n FROM users WHERE email IN ('nao-deve-existir@test.dev', 'tambem-nao@test.dev')",
+          )
+          .then((r) => r.rows[0]!.n),
+      );
+      expect(criadas).toBe(0);
+    });
+
+    it('edição troca o setor da pessoa', async () => {
+      const antes = await criaSetor(unitA, 'Setor Antigo');
+      const depois = await criaSetor(unitA, 'Setor Novo');
+      const app = createApp(ports);
+      const cookie = await sessionCookieFor(ports, unitAdminAId);
+
+      await request(app)
+        .patch(`/users/${collaboratorAId}`)
+        .set('Cookie', cookie)
+        .send({ sectorId: antes });
+
+      const res = await request(app)
+        .patch(`/users/${collaboratorAId}`)
+        .set('Cookie', cookie)
+        .send({ sectorId: depois });
+
+      expect(res.status).toBe(200);
+      expect(res.body.sectorId).toBe(depois);
+      expect(res.body.sectorName).toBe('Setor Novo');
+    });
+
+    it('edição com null remove o vínculo, sem mexer no resto', async () => {
+      const setorId = await criaSetor(unitA, 'Para Remover');
+      const app = createApp(ports);
+      const cookie = await sessionCookieFor(ports, unitAdminAId);
+
+      await request(app)
+        .patch(`/users/${collaboratorA2Id}`)
+        .set('Cookie', cookie)
+        .send({ sectorId: setorId, jobTitle: 'Coordenadora' });
+
+      const res = await request(app)
+        .patch(`/users/${collaboratorA2Id}`)
+        .set('Cookie', cookie)
+        .send({ sectorId: null });
+
+      expect(res.status).toBe(200);
+      expect(res.body.sectorId).toBeNull();
+      expect(res.body.sectorName).toBeNull();
+      // A remoção do vínculo não é "limpar a pessoa": a função segue lá.
+      expect(res.body.jobTitle).toBe('Coordenadora');
+    });
+
+    it('edição SEM o campo preserva o vínculo vigente', async () => {
+      const setorId = await criaSetor(unitA, 'Preservado');
+      const app = createApp(ports);
+      const cookie = await sessionCookieFor(ports, unitAdminAId);
+
+      await request(app)
+        .patch(`/users/${collaboratorAId}`)
+        .set('Cookie', cookie)
+        .send({ sectorId: setorId });
+
+      const res = await request(app)
+        .patch(`/users/${collaboratorAId}`)
+        .set('Cookie', cookie)
+        .send({ phone: '+55 11 91111-1111' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.sectorId).toBe(setorId);
+      expect(res.body.sectorName).toBe('Preservado');
+    });
+
+    it('setor de outra unidade recusa a edição INTEIRA: nenhum campo é aplicado', async () => {
+      const setorDaB = await criaSetor(unitB, 'Outro Setor da B');
+      const app = createApp(ports);
+      const cookie = await sessionCookieFor(ports, unitAdminAId);
+
+      const antes = await request(app)
+        .patch(`/users/${collaboratorAId}`)
+        .set('Cookie', cookie)
+        .send({ jobTitle: 'Antes da Tentativa' });
+      expect(antes.status).toBe(200);
+      const setorVigente = antes.body.sectorId;
+
+      const res = await request(app)
+        .patch(`/users/${collaboratorAId}`)
+        .set('Cookie', cookie)
+        .send({ jobTitle: 'NÃO DEVE SER APLICADO', sectorId: setorDaB });
+
+      expect(res.status).toBe(409);
+      expect(res.body).toEqual({ error: 'invalid_sector' });
+
+      // A recusa é total — e é esta a diferença entre recusar e "aplicar o que
+      // deu": devolver 409 depois de ter gravado a função seria sucesso
+      // parcial disfarçado de erro. O vínculo vigente é lido de `antes`, não
+      // presumido: os casos deste describe compartilham o `beforeAll`.
+      const depois = await request(app)
+        .get('/users')
+        .set('Cookie', cookie)
+        .then((r) => r.body.find((p: { id: string }) => p.id === collaboratorAId));
+      expect(depois.jobTitle).toBe('Antes da Tentativa');
+      expect(depois.sectorId).toBe(setorVigente);
+      expect(depois.sectorId).not.toBe(setorDaB);
+    });
+
+    it('global_admin vincula pessoa de outra unidade a setor DAQUELA unidade', async () => {
+      const setorDaB = await criaSetor(unitB, 'Setor Legítimo da B');
+      const app = createApp(ports);
+
+      const res = await request(app)
+        .patch(`/users/${unitAdminBId}`)
+        .set('Cookie', await sessionCookieFor(ports, globalAdminId))
+        .send({ sectorId: setorDaB });
+
+      // A unidade de referência é a da pessoa EDITADA, não a de quem edita.
+      expect(res.status).toBe(200);
+      expect(res.body.sectorName).toBe('Setor Legítimo da B');
     });
   });
 });

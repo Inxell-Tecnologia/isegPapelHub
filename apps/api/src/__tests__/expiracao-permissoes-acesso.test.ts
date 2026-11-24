@@ -7,7 +7,13 @@ import { InAppNotificationPort } from '../adapters/in-app-notification-port.js';
 import { EnvSecretsPort } from '../adapters/env-secrets-port.js';
 import { Argon2AuthPort } from '../adapters/argon2-auth-port.js';
 import { InMemoryStoragePort } from './in-memory-storage-port.js';
-import { setupTestDatabase, seedTwoUnits, withSystemBypass, sessionCookieFor } from './test-db.js';
+import {
+  setupTestDatabase,
+  seedTwoUnits,
+  withSystemBypass,
+  sessionCookieFor,
+  controleDeTeste,
+} from './test-db.js';
 import type { Ports } from '../ports/index.js';
 
 const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -180,6 +186,7 @@ describe('Corte de acesso por grant vencido (change expiracao-permissoes)', () =
       contentType: 'text/plain',
       declaredSizeBytes: 10,
       folderId: folderUploadExpiredId,
+      documentControl: controleDeTeste(),
     });
     expect(upload.status).toBe(403);
 
@@ -219,6 +226,7 @@ describe('Corte de acesso por grant vencido (change expiracao-permissoes)', () =
       contentType: 'text/plain',
       declaredSizeBytes: 10,
       folderId: folderUploadFutureId,
+      documentControl: controleDeTeste(),
     });
     expect(upload.status).toBe(200);
 

@@ -1,5 +1,10 @@
 import { Pool, type PoolClient } from 'pg';
-import type { DatabasePort, TenantContext } from '../ports/database-port.js';
+import {
+  SHARED_VISITOR_ROLE,
+  type DatabasePort,
+  type SharedVisit,
+  type TenantContext,
+} from '../ports/database-port.js';
 import { config } from '../config.js';
 
 export class PgDatabasePort implements DatabasePort {
@@ -37,6 +42,27 @@ export class PgDatabasePort implements DatabasePort {
       // requisição depois do COMMIT). Ver design.md, Decisão 2.
       await client.query('SELECT set_config($1, $2, true)', ['app.current_unit', ctx.unitId]);
       await client.query('SELECT set_config($1, $2, true)', ['app.user_role', ctx.role]);
+      // Change `compartilhamento-entre-unidades` (design.md D2): a policy de
+      // leitura do destino em `cross_unit_grants` distingue a concessão
+      // pessoal pela pessoa da transação.
+      await client.query('SELECT set_config($1, $2, true)', ['app.current_user_id', ctx.userId]);
+      return fn(client);
+    });
+  }
+
+  async withSharedVisitTransaction<T>(
+    visit: SharedVisit,
+    fn: (client: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    return this.withTransaction(async (client) => {
+      // Mesmo SET LOCAL do contexto comum, com a unidade de **origem** e um
+      // papel sem bypass (design.md D3).
+      await client.query('SELECT set_config($1, $2, true)', [
+        'app.current_unit',
+        visit.originUnitId,
+      ]);
+      await client.query('SELECT set_config($1, $2, true)', ['app.user_role', SHARED_VISITOR_ROLE]);
+      await client.query('SELECT set_config($1, $2, true)', ['app.current_user_id', visit.userId]);
       return fn(client);
     });
   }

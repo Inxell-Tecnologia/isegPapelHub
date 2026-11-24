@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { UnitStatus, UserRole } from '@gdoc/shared';
 import type { UnitResponse } from '@gdoc/shared';
-import { mockFetch } from './mock-fetch';
+import { mockFetch, ROTAS_DA_TELA_INICIAL } from './mock-fetch';
 import { renderApp } from './render-app';
 
 const GLOBAL_ADMIN = { id: 'admin-g', unitId: 'unit-1', role: UserRole.GLOBAL_ADMIN };
@@ -44,6 +44,7 @@ function confirmButton(label: string): HTMLElement {
 describe('Gestão de unidades da SPA (web-unidades)', () => {
   it('global_admin lista as unidades com nome e status; não há ação de exclusão (spec: global_admin lista / não há exclusão permanente)', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': { status: 200, body: GLOBAL_ADMIN },
       'GET /units': {
         status: 200,
@@ -69,13 +70,14 @@ describe('Gestão de unidades da SPA (web-unidades)', () => {
 
   it('unit_admin não acessa a página de unidades (spec: guarda de papel bloqueia a rota)', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': { status: 200, body: UNIT_ADMIN },
     });
 
     renderApp(['/admin/unidades']);
 
     // guarda de papel redireciona para a home; a gestão de unidades nunca renderiza
-    await screen.findByText('Bem-vindo ao PapelHub');
+    await screen.findByText('Pastas da unidade');
     expect(screen.queryByText('Nova unidade')).not.toBeInTheDocument();
     expect(screen.queryByText('Unidades')).not.toBeInTheDocument();
   });
@@ -84,6 +86,7 @@ describe('Gestão de unidades da SPA (web-unidades)', () => {
     const nova = unit({ id: 'u-nova', name: 'Nova Unidade' });
 
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': { status: 200, body: GLOBAL_ADMIN },
       'GET /units': [
         { status: 200, body: [unit({ id: 'u-1', name: 'Administração' })] },
@@ -111,6 +114,7 @@ describe('Gestão de unidades da SPA (web-unidades)', () => {
 
   it('nome duplicado (409) sinaliza no campo e mantém o formulário aberto (spec: nome duplicado é sinalizado sem perder o preenchimento)', async () => {
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': { status: 200, body: GLOBAL_ADMIN },
       'GET /units': { status: 200, body: [unit({ id: 'u-1', name: 'Administração' })] },
       'POST /units': { status: 409, body: { error: 'name already in use' } },
@@ -132,6 +136,7 @@ describe('Gestão de unidades da SPA (web-unidades)', () => {
     const renomeada = unit({ id: 'u-1', name: 'Administração Central' });
 
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': { status: 200, body: GLOBAL_ADMIN },
       'GET /units': [
         { status: 200, body: [unit({ id: 'u-1', name: 'Administração' })] },
@@ -164,6 +169,7 @@ describe('Gestão de unidades da SPA (web-unidades)', () => {
     const inativa = { ...ativa, status: UnitStatus.DISABLED };
 
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': { status: 200, body: GLOBAL_ADMIN },
       'GET /units': [
         { status: 200, body: [ativa] },
@@ -189,6 +195,7 @@ describe('Gestão de unidades da SPA (web-unidades)', () => {
     const ativa = unit({ id: 'u-3', name: 'Unidade Cheia' });
 
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': { status: 200, body: GLOBAL_ADMIN },
       'GET /units': { status: 200, body: [ativa] },
       'PATCH /units/u-3': { status: 409, body: { error: 'unit not empty' } },
@@ -215,6 +222,7 @@ describe('Gestão de unidades da SPA (web-unidades)', () => {
     const ativa = { ...inativa, status: UnitStatus.ACTIVE };
 
     mockFetch({
+      ...ROTAS_DA_TELA_INICIAL,
       'GET /auth/me': { status: 200, body: GLOBAL_ADMIN },
       'GET /units': [
         { status: 200, body: [inativa] },

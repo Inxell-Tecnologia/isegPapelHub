@@ -1,38 +1,21 @@
 import { Router } from 'express';
 import type { Ports } from '../ports/index.js';
 import { GrantResourceType } from '@gdoc/shared';
-import type { SearchFilesResponse, FileSummaryResponse } from '@gdoc/shared';
+import type { SearchFilesResponse } from '@gdoc/shared';
 import { isAdminOfUnit, visibleResourceClause } from '../lib/access.js';
+import {
+  fileSummaryColumns,
+  nonObsoleteClause,
+  visibleRegistrationClause,
+  toFileSummaryResponse,
+  type FileSummaryRow,
+} from '../lib/document-control.js';
 import {
   categoryContentTypeClause,
   isValidFileCategory,
   parseDateBoundary,
   exclusiveDayAfter,
 } from '../lib/search-filters.js';
-
-interface FileSummaryRow {
-  id: string;
-  owner_id: string;
-  folder_id: string | null;
-  file_name: string;
-  content_type: string | null;
-  size_bytes: string | null;
-  status: string;
-  created_at: string;
-}
-
-function toFileSummaryResponse(row: FileSummaryRow): FileSummaryResponse {
-  return {
-    id: row.id,
-    ownerId: row.owner_id,
-    folderId: row.folder_id,
-    fileName: row.file_name,
-    contentType: row.content_type,
-    sizeBytes: row.size_bytes === null ? null : Number(row.size_bytes),
-    status: row.status,
-    createdAt: new Date(row.created_at).toISOString(),
-  };
-}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -102,11 +85,21 @@ export function searchRouter(ports: Ports): Router {
         const params: unknown[] = admin ? [] : [ctx.userId];
         const ownerPlaceholder = admin ? '' : `$${params.length}`;
 
-        let where = visibleResourceClause(GrantResourceType.FILE, ownerPlaceholder, ctx);
+        // Épico 10 (US 10.7, design.md D6) e US 10.9: os mesmos dois cortes
+        // restritivos da listagem — documento obsoleto não é alcançável pela
+        // busca de quem não é admin da unidade, e arquivo pendente de cadastro
+        // não é alcançável por quem não o enviou nem administra a unidade. A
+        // demanda é explícita quanto a este segundo: o pendente "não aparece
+        // para os leitores **nem na busca**".
+        let where = `${visibleResourceClause(GrantResourceType.FILE, ownerPlaceholder, ctx)} AND ${nonObsoleteClause(ctx)} AND ${visibleRegistrationClause(ctx, ownerPlaceholder)}`;
 
         if (q !== undefined) {
+          // US 10.2 cenário 1: o mesmo termo alcança nome **ou** código, sem
+          // distinção de maiúsculas (`ILIKE`), sem abrir exceção alguma às
+          // restrições já normatizadas da busca — permissão e isolamento por
+          // unidade seguem na conjunção acima.
           params.push(q);
-          where += ` AND file_name ILIKE '%' || $${params.length} || '%'`;
+          where += ` AND (file_name ILIKE '%' || $${params.length} || '%' OR document_code ILIKE '%' || $${params.length} || '%')`;
         }
         if (type !== undefined) {
           where += ` AND ${categoryContentTypeClause(type)}`;
@@ -125,7 +118,7 @@ export function searchRouter(ports: Ports): Router {
         }
 
         const { rows } = await client.query<FileSummaryRow>(
-          `SELECT id, owner_id, folder_id, file_name, content_type, size_bytes, status, created_at
+          `SELECT ${fileSummaryColumns(ctx, ownerPlaceholder)}
            FROM files WHERE ${where} ORDER BY created_at DESC LIMIT ${RESULT_LIMIT}`,
           params,
         );

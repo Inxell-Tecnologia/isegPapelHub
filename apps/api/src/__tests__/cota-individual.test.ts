@@ -8,7 +8,13 @@ import { InAppNotificationPort } from '../adapters/in-app-notification-port.js';
 import { EnvSecretsPort } from '../adapters/env-secrets-port.js';
 import { Argon2AuthPort } from '../adapters/argon2-auth-port.js';
 import { InMemoryStoragePort } from './in-memory-storage-port.js';
-import { setupTestDatabase, seedTwoUnits, withSystemBypass, sessionCookieFor } from './test-db.js';
+import {
+  setupTestDatabase,
+  seedTwoUnits,
+  withSystemBypass,
+  sessionCookieFor,
+  controleDeTeste,
+} from './test-db.js';
 import type { Ports } from '../ports/index.js';
 import { config } from '../config.js';
 
@@ -132,6 +138,7 @@ describe('Cota individual por pessoa', () => {
           fileName: 'grande.bin',
           contentType: 'application/octet-stream',
           declaredSizeBytes,
+          documentControl: controleDeTeste(),
         });
     }
 
@@ -344,6 +351,7 @@ describe('Cota individual por pessoa', () => {
         fileName: 'novo.bin',
         contentType: 'application/octet-stream',
         declaredSizeBytes: 10,
+        documentControl: controleDeTeste(),
       };
 
       expect(

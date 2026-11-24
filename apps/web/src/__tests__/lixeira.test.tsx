@@ -3,8 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { UserRole, GrantResourceType } from '@gdoc/shared';
 import type { FileSummaryResponse, TrashEntryResponse } from '@gdoc/shared';
+import { tonsDeEstado } from '../app/theme';
 import { mockFetch } from './mock-fetch';
 import { renderApp } from './render-app';
+
+/** Converte `#rrggbb` para o `rgb(r, g, b)` que o jsdom normaliza em `style.color`. */
+function hexToRgb(hex: string) {
+  const v = hex.replace('#', '');
+  return `rgb(${parseInt(v.slice(0, 2), 16)}, ${parseInt(v.slice(2, 4), 16)}, ${parseInt(v.slice(4, 6), 16)})`;
+}
 
 const IDENTITY = { id: 'user-1', unitId: 'unit-1', role: UserRole.COLLABORATOR };
 
@@ -68,14 +75,20 @@ describe('Lixeira da SPA (web-lixeira)', () => {
     await screen.findByText('urgente.pdf');
     await screen.findByText('tranquilo.pdf');
 
+    // Desde a change `identidade-visual-isetes` o rótulo recebe um **tom
+    // semântico** e tira as cores dos tokens — os presets do design system
+    // reprovavam no piso de contraste (3,37:1 no verde, 3,34:1 no laranja).
+    // A asserção passa a ser sobre o tom aplicado, não sobre a classe do
+    // preset.
     const urgenteRow = screen.getByText('urgente.pdf').closest('tr')!;
-    const urgenteTag = within(urgenteRow).getByText('2 dia(s)');
-    expect(urgenteTag.closest('.ant-tag')).toHaveClass('ant-tag-red');
+    const urgenteTag = within(urgenteRow).getByText('2 dia(s)') as HTMLElement;
+    expect(urgenteTag.style.color).toBe(hexToRgb(tonsDeEstado.negativo.texto));
 
     const tranquiloRow = screen.getByText('tranquilo.pdf').closest('tr')!;
-    const tranquiloTag = within(tranquiloRow).getByText('25 dia(s)');
-    expect(tranquiloTag.closest('.ant-tag')).not.toHaveClass('ant-tag-red');
-    expect(tranquiloTag.closest('.ant-tag')).not.toHaveClass('ant-tag-orange');
+    const tranquiloTag = within(tranquiloRow).getByText('25 dia(s)') as HTMLElement;
+    expect(tranquiloTag.style.color).toBe(hexToRgb(tonsDeEstado.neutro.texto));
+    expect(tranquiloTag.style.color).not.toBe(hexToRgb(tonsDeEstado.negativo.texto));
+    expect(tranquiloTag.style.color).not.toBe(hexToRgb(tonsDeEstado.alerta.texto));
   });
 
   it('lixeira vazia exibe Empty (spec: lixeira vazia)', async () => {

@@ -7,7 +7,13 @@ import { InAppNotificationPort } from '../adapters/in-app-notification-port.js';
 import { EnvSecretsPort } from '../adapters/env-secrets-port.js';
 import { Argon2AuthPort } from '../adapters/argon2-auth-port.js';
 import { InMemoryStoragePort } from './in-memory-storage-port.js';
-import { setupTestDatabase, seedTwoUnits, withSystemBypass, sessionCookieFor } from './test-db.js';
+import {
+  setupTestDatabase,
+  seedTwoUnits,
+  withSystemBypass,
+  sessionCookieFor,
+  controleDeTeste,
+} from './test-db.js';
 import type { Ports } from '../ports/index.js';
 
 interface FolderBody {
@@ -157,6 +163,7 @@ describe('Navegação: pastas aninhadas, trilha e visibilidade só-por-dono', ()
       contentType: 'text/plain',
       declaredSizeBytes: 5,
       folderId: sharedFolderId,
+      documentControl: controleDeTeste(),
     });
     expect(uploadA.status).toBe(200);
 
@@ -177,6 +184,7 @@ describe('Navegação: pastas aninhadas, trilha e visibilidade só-por-dono', ()
       contentType: 'text/plain',
       declaredSizeBytes: 5,
       folderId: sharedFolderId,
+      documentControl: controleDeTeste(),
     });
     expect(uploadA2.status).toBe(200);
 
@@ -187,6 +195,71 @@ describe('Navegação: pastas aninhadas, trilha e visibilidade só-por-dono', ()
     const fileNames = contents.body.files.map((f: { fileName: string }) => f.fileName);
     expect(fileNames).toContain('meu.txt');
     expect(fileNames).not.toContain('dele.txt');
+  });
+
+  // Veredito de `upload` resolvido pelo servidor (change
+  // `identidade-visual-isetes`, design.md D10). A SPA não infere permissão no
+  // cliente — a capability `web-navegacao` proíbe —, então é a resposta de
+  // conteúdo que carrega o veredito. O caso decisivo é o terceiro: quem tem a
+  // concessão `upload` sobre pasta de outra pessoa não é dono nem admin, e
+  // ficaria sem a ação se o cliente tentasse derivá-la do DTO.
+  it('a resposta de conteúdo informa o veredito de upload resolvido pelo servidor', async () => {
+    const app = createApp(ports);
+    const cookieA = await sessionCookieFor(ports, ids.userA);
+    const cookieA2 = await sessionCookieFor(ports, userA2Id);
+    const cookieAdmin = await sessionCookieFor(ports, ids.globalAdmin);
+
+    const minhaPasta = await request(app)
+      .post('/folders')
+      .set('Cookie', cookieA)
+      .send({ name: 'Pasta do Veredito' });
+    const pastaId = (minhaPasta.body as FolderBody).id;
+
+    // Raiz da unidade: não é recurso concedível, enviar é livre.
+    const raiz = await request(app).get('/folders/root/contents').set('Cookie', cookieA2);
+    expect(raiz.status).toBe(200);
+    expect(raiz.body.canUpload).toBe(true);
+
+    // Dono da pasta: pode enviar.
+    const comoDono = await request(app).get(`/folders/${pastaId}/contents`).set('Cookie', cookieA);
+    expect(comoDono.status).toBe(200);
+    expect(comoDono.body.canUpload).toBe(true);
+
+    // Outra pessoa da unidade, com `view` mas sem `upload`: enxerga a pasta e
+    // **não** pode enviar.
+    const viewGrant = await request(app)
+      .post('/grants')
+      .set('Cookie', cookieAdmin)
+      .send({
+        subjectUserIds: [userA2Id],
+        resourceType: 'folder',
+        resourceId: pastaId,
+        permissions: ['view'],
+      });
+    expect(viewGrant.status).toBe(201);
+
+    const soView = await request(app).get(`/folders/${pastaId}/contents`).set('Cookie', cookieA2);
+    expect(soView.status).toBe(200);
+    expect(soView.body.canUpload).toBe(false);
+
+    // A mesma pessoa, agora com a concessão `upload`: o veredito vira `true`
+    // sem que ela seja dona nem admin da unidade.
+    const uploadGrant = await request(app)
+      .post('/grants')
+      .set('Cookie', cookieAdmin)
+      .send({
+        subjectUserIds: [userA2Id],
+        resourceType: 'folder',
+        resourceId: pastaId,
+        permissions: ['upload'],
+      });
+    expect(uploadGrant.status).toBe(201);
+
+    const comUpload = await request(app)
+      .get(`/folders/${pastaId}/contents`)
+      .set('Cookie', cookieA2);
+    expect(comUpload.status).toBe(200);
+    expect(comUpload.body.canUpload).toBe(true);
   });
 
   it('conteúdo de outra unidade nunca aparece, mesmo por identificador direto de pasta', async () => {
@@ -205,6 +278,7 @@ describe('Navegação: pastas aninhadas, trilha e visibilidade só-por-dono', ()
         contentType: 'text/plain',
         declaredSizeBytes: 5,
         folderId: folderBId,
+        documentControl: controleDeTeste(),
       });
 
     const root = await request(app)
@@ -234,12 +308,15 @@ describe('Navegação: pastas aninhadas, trilha e visibilidade só-por-dono', ()
       contentType: 'text/plain',
       declaredSizeBytes: 5,
       folderId,
+      documentControl: controleDeTeste(),
     });
 
-    await request(app)
-      .post('/files/upload-url')
-      .set('Cookie', cookie)
-      .send({ fileName: 'na-raiz.txt', contentType: 'text/plain', declaredSizeBytes: 5 });
+    await request(app).post('/files/upload-url').set('Cookie', cookie).send({
+      fileName: 'na-raiz.txt',
+      contentType: 'text/plain',
+      declaredSizeBytes: 5,
+      documentControl: controleDeTeste(),
+    });
 
     const folderContents = await request(app)
       .get(`/folders/${folderId}/contents`)

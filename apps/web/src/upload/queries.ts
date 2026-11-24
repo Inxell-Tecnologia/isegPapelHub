@@ -3,15 +3,42 @@ import type {
   BatchUploadUrlRequest,
   BatchUploadUrlResponse,
   StorageQuotaResponse,
+  UploadUrlRequest,
+  UploadUrlResponse,
 } from '@gdoc/shared';
 import { apiClient } from '../lib/api-client';
-import { batchUploadUrlResponseSchema, storageQuotaResponseSchema } from '../lib/schemas';
+import {
+  batchUploadUrlResponseSchema,
+  storageQuotaResponseSchema,
+  uploadUrlResponseSchema,
+} from '../lib/schemas';
 import { FOLDER_CONTENTS_KEY } from '../navegacao/queries';
 
 /**
+ * `POST /files/upload-url` — publicação de **um** documento (Épico 10,
+ * US 10.5): é a rota que exige os dados de controle, e por isso a que a SPA
+ * usa quando a operação carrega exatamente um arquivo (design.md D7 de
+ * `controle-documental`).
+ *
+ * O lote continua em `useRequestUploadUrls`, abaixo, inclusive para pedir a
+ * URL de um item que falhou — repetir um item não é publicar um documento
+ * novo, e exigir os quatro campos nessa repetição quebraria o relato de falha
+ * independente do envio em lote.
+ */
+export function useRequestUploadUrl() {
+  return useMutation({
+    mutationFn: async (body: UploadUrlRequest) => {
+      const raw = await apiClient.post<UploadUrlResponse>('/files/upload-url', body);
+      return uploadUrlResponseSchema.parse(raw);
+    },
+  });
+}
+
+/**
  * `POST /files/upload-urls` — uma única chamada por lote, cota reservada
- * atomicamente no servidor (design.md D1/D3). Arquivo único também usa o
- * lote (lote de 1) — nunca o endpoint singular.
+ * atomicamente no servidor (design.md D1/D3). É a rota do **lote e da
+ * pasta**, que dispensa os dados de controle; o envio de um documento só usa
+ * `useRequestUploadUrl` (acima).
  */
 export function useRequestUploadUrls() {
   return useMutation({

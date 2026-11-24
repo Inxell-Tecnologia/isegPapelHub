@@ -70,6 +70,17 @@ resource "google_pubsub_subscription" "storage_finalize" {
   }
 
   ack_deadline_seconds = 30
+
+  # Nunca expira. Sem este bloco vale o padrão do GCP: a assinatura é APAGADA
+  # após 31 dias sem atividade. Num repositório documental, um mês sem upload
+  # (recesso, implantação recém-aberta) é plausível — e sem assinatura os
+  # eventos de finalize são descartados e os uploads ficam presos em `pending`
+  # sem erro visível (runbook, Armadilha 9; change correcoes-herdadas-do-fork).
+  # `ttl = ""` é a forma documentada de "sem expiração".
+  expiration_policy {
+    ttl = ""
+  }
+
   retry_policy {
     minimum_backoff = "5s"
     maximum_backoff = "60s"

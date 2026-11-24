@@ -10,6 +10,7 @@ import type {
   MoveItemRequest,
   RenameFileRequest,
   RenameFolderRequest,
+  UpdateDocumentControlRequest,
 } from '@gdoc/shared';
 import { apiClient } from '../lib/api-client';
 import {
@@ -85,6 +86,33 @@ export function useRenameFolder() {
     mutationFn: async ({ folderId, ...body }: RenameFolderRequest & { folderId: string }) => {
       const raw = await apiClient.patch<FolderResponse>(`/folders/${folderId}`, body);
       return folderResponseSchema.parse(raw);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * `PATCH /files/:id/document-control` (US 10.5, change `controle-documental`)
+ * — preencher ou corrigir os dados de controle de um documento existente.
+ * Nenhum byte trafega: a rota não recebe conteúdo. A listagem é invalidada
+ * porque a **situação** é reapurada pelo servidor na própria resposta, e a
+ * tela precisa refletir o veredito novo.
+ */
+export function useUpdateDocumentControl() {
+  const invalidate = useInvalidateFolderContents();
+  return useMutation({
+    mutationFn: async ({
+      fileId,
+      body,
+    }: {
+      fileId: string;
+      body: UpdateDocumentControlRequest;
+    }) => {
+      const raw = await apiClient.patch<FileSummaryResponse>(
+        `/files/${fileId}/document-control`,
+        body,
+      );
+      return fileSummaryResponseSchema.parse(raw);
     },
     onSuccess: invalidate,
   });

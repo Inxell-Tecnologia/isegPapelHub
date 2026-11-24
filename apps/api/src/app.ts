@@ -8,14 +8,19 @@ import { filesRouter } from './routes/files.js';
 import { foldersRouter } from './routes/folders.js';
 import { usersRouter } from './routes/users.js';
 import { unitsRouter } from './routes/units.js';
+import { sectorsRouter } from './routes/sectors.js';
 import { grantsRouter } from './routes/grants.js';
+import { crossUnitGrantsRouter } from './routes/cross-unit-grants.js';
 import { authRouter } from './routes/auth.js';
 import { storageEventsRouter, type StorageEventsOptions } from './routes/storage-events.js';
 import { trashRouter } from './routes/trash.js';
 import { auditRouter } from './routes/audit.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { searchRouter } from './routes/search.js';
+import { recentRouter } from './routes/recent.js';
 import { notificationsRouter } from './routes/notifications.js';
+import { favoritesRouter } from './routes/favorites.js';
+import { readingRouter } from './routes/reading.js';
 import { attachTenantContext } from './middleware/tenant-context.js';
 import { config } from './config.js';
 import { isApiPath } from './lib/api-prefixes.js';
@@ -142,30 +147,41 @@ export function createApp(ports: Ports, options: CreateAppOptions = {}): Express
   // a um destes routers — sem o path aqui, `app.use(mw, router)` aplicaria
   // `mw` a QUALQUER requisição (o Express trata o mount como '/'), inclusive
   // a caminhos sem rota nenhuma, que deveriam cair no 404 padrão (ou, com a
-  // SPA configurada, no fallback de index.html acima). `auditRouter` e
-  // `searchRouter` vivem sob `/files` (`/files/:id/audit`, `/files/search`),
-  // por isso não têm prefixo próprio na lista.
+  // SPA configurada, no fallback de index.html acima). `auditRouter`,
+  // `searchRouter` e `recentRouter` vivem sob `/files` (`/files/:id/audit`,
+  // `/files/search`, `/files/recent`), por isso não têm prefixo próprio na
+  // lista.
   const tenantScopedPrefixes = [
     '/files',
     '/folders',
     '/users',
     '/units',
+    '/sectors',
     '/grants',
     '/trash',
     '/dashboard',
     '/notifications',
+    '/favorites',
+    '/reading',
   ];
   app.use(tenantScopedPrefixes, attachTenantContext(ports));
   app.use(filesRouter(ports));
   app.use(foldersRouter(ports));
   app.use(usersRouter(ports));
   app.use(unitsRouter(ports));
+  app.use(sectorsRouter(ports));
+  // Antes de `grantsRouter`: rotas `/grants/cross-unit/*` (change
+  // `compartilhamento-entre-unidades`) sob o mesmo prefixo.
+  app.use(crossUnitGrantsRouter(ports));
   app.use(grantsRouter(ports));
   app.use(trashRouter(ports));
   app.use(auditRouter(ports));
   app.use(dashboardRouter(ports));
   app.use(searchRouter(ports));
+  app.use(recentRouter(ports));
   app.use(notificationsRouter(ports));
+  app.use(favoritesRouter(ports));
+  app.use(readingRouter(ports));
 
   const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     console.error(err);

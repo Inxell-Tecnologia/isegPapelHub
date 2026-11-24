@@ -7,8 +7,6 @@ resource "google_service_account" "api" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-api"
   display_name = "GDoc API runtime (${var.environment})"
-
-  depends_on = [google_project_service.required]
 }
 
 resource "google_project_iam_member" "api_cloudsql_client" {
@@ -51,10 +49,6 @@ resource "google_cloud_run_v2_service" "api" {
   name     = "${local.name_prefix}-api"
   location = var.region
   labels   = local.labels
-  # Serviço stateless redeployado pelo CI/CD a cada push em main (nenhum dado
-  # próprio) — diferente do Cloud SQL, que mantém `deletion_protection = true`
-  # de propósito.
-  deletion_protection = false
 
   template {
     service_account = google_service_account.api.email
@@ -163,6 +157,10 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "APP_MANUAL_URL"
         value = var.app_manual_url
       }
+      env {
+        name  = "APP_SUPPORT_CONTACT"
+        value = var.app_support_contact
+      }
       # O Cloud Run já injeta os segredos (AUTH_SESSION_SECRET, DATABASE_URL)
       # como variáveis de ambiente resolvidas a partir do Secret Manager, via
       # `value_source.secret_key_ref` abaixo (design.md: "valores sensíveis no
@@ -232,6 +230,11 @@ resource "google_cloud_run_v2_service" "api" {
     google_project_service.required,
     google_secret_manager_secret_version.database_url,
     google_secret_manager_secret_version.auth_session_secret,
+    # O Cloud Run valida o acesso da service account aos secrets na criação da
+    # revisão. Estas duas arestas fecham a mesma corrida que derruba os Jobs
+    # agendados num primeiro provisionamento (runbook, Armadilha 6; change
+    # correcoes-herdadas-do-fork): a concessão existe, mas sem dependência
+    # explícita o Terraform pode criar a revisão antes dela.
     google_secret_manager_secret_iam_member.api_database_url,
     google_secret_manager_secret_iam_member.api_auth_session_secret,
   ]

@@ -1,3 +1,5 @@
+import type { DocumentControlFields, DocumentControlInput } from './document-control.js';
+
 /** Ação de acesso a um arquivo — distingue visualizar de baixar na auditoria e no TTL. */
 export const FileAccessAction = {
   VIEW: 'view',
@@ -26,12 +28,31 @@ export type ViewUrlResponse =
   | ({ previewAvailable: true } & SignedUrlResponse)
   | { previewAvailable: false; reason: 'unsupported_format'; download: { available: boolean } };
 
+/**
+ * `POST /files/upload-url` — publicação de **um** documento. É a rota que
+ * **exige** o conjunto completo de dados de controle do tipo escolhido
+ * (`REQUIRED_CONTROL_FIELDS`, ou nenhum deles para `GENERAL_FILE`): dado
+ * ausente aqui **recusa** a requisição, nomeando o que falta.
+ *
+ * A rota do lote (`POST /files/upload-urls`) exige os mesmos dados, mas por
+ * item e com outro desfecho: ausência produz **pendência de cadastro** em vez
+ * de recusa (change `arquivo-geral-e-pendente-de-cadastro`, design.md D6). A
+ * dispensa que esta rota já teve — o lote não pedir dado algum — **não existe
+ * mais**; o que distingue as duas rotas é o desfecho do item incompleto, não a
+ * exigência.
+ *
+ * A divisão em duas rotas é o que mantém as duas regras compatíveis: o lote
+ * precisa pedir URL para **um** item ao repetir um envio que falhou, e essa
+ * repetição não é a publicação de um documento novo.
+ */
 export interface UploadUrlRequest {
   fileName: string;
   contentType: string;
   declaredSizeBytes: number;
   /** Pasta de destino (da unidade do remetente); ausente = raiz da unidade. */
   folderId?: string;
+  /** Dados de controle do documento — exigidos nesta rota (US 10.5 cenário 1). */
+  documentControl?: DocumentControlInput;
 }
 
 export interface UploadUrlResponse {
@@ -82,8 +103,20 @@ export interface GcsObjectMetadata {
   contentType?: string;
 }
 
-/** Resumo de arquivo usado na listagem de conteúdo de pasta (navegação). */
-export interface FileSummaryResponse {
+/**
+ * Resumo de arquivo usado na listagem de conteúdo de pasta (navegação).
+ *
+ * Desde o Épico 10 (change `controle-documental`) o resumo carrega também os
+ * dados de controle do documento e a **situação apurada no servidor**
+ * (`DocumentControlFields`) — ganho aditivo de campos, todos nuláveis exceto
+ * `documentStatus`, que vale `uncontrolled` para o acervo sem controle. Nenhuma
+ * tela existente precisa mudar para continuar funcionando.
+ *
+ * `status` continua descrevendo o ciclo do **upload** (`pending`/`active`/
+ * `replacing`/`over_quota`), nunca a vigência do documento: os dois conceitos
+ * não compartilham campo (design.md, Context).
+ */
+export interface FileSummaryResponse extends DocumentControlFields {
   id: string;
   ownerId: string;
   folderId: string | null;
@@ -112,6 +145,18 @@ export interface BatchUploadItemRequest {
   declaredSizeBytes: number;
   /** Subpasta relativa ao destino (ex.: "Relatorios/2024"); ausente = direto no destino. */
   relativePath?: string;
+  /**
+   * Dados de controle **deste** item (US 10.5, design.md D6 do change
+   * `arquivo-geral-e-pendente-de-cadastro`). Cada arquivo do lote tem os seus
+   * próprios dados: os de um item nunca alcançam outro.
+   *
+   * Ausente ou incompleto **não recusa** o item — ele é aceito e nasce
+   * pendente de cadastro (`documentStatus: 'awaiting_registration'`), fora de
+   * circulação até alguém completá-lo. Dado **inválido**, ao contrário, recusa
+   * o item, e só ele. Essa assimetria é o que permite exigir os dados sem
+   * quebrar a repetição de um item cuja transferência falhou.
+   */
+  documentControl?: DocumentControlInput;
 }
 
 export interface BatchUploadUrlRequest {
@@ -127,6 +172,15 @@ export interface BatchUploadItemSuccess {
   objectPath: string;
   folderId: string | null;
   expiresAt: string;
+  /**
+   * `true` quando o item nasce **pendente de cadastro** por não trazer todos
+   * os dados de controle exigidos. Existe para que quem envia um lote misto
+   * saiba quais arquivos ficaram pendentes **sem consultá-los um a um** — a
+   * resposta do lote não carrega resumo de arquivo, logo não carrega
+   * `documentStatus`, e sem este campo a informação só viria de uma segunda
+   * volta ao servidor.
+   */
+  awaitingRegistration: boolean;
 }
 
 export interface BatchUploadItemFailure {

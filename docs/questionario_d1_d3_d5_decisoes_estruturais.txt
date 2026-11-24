@@ -1,0 +1,205 @@
+PERGUNTAS SOBRE ACESSO A VARIAS UNIDADES, O PAPEL "GESTOR" E O ALCANCE DO
+RELATORIO DE LEITURA
+
+Ola! Estas sao as tres decisoes que ficaram de fora do questionario anterior,
+combinadas para tratarmos separado. Elas nao sao de tela: mexem em quem
+enxerga o que, que e o nucleo de seguranca do sistema. Por isso vem com o
+custo e o risco de cada caminho, nao so com a pergunta.
+
+Duas delas estao hoje travando trabalho: o bloco 2 impede comecar a leitura
+obrigatoria (Fase 2), e o bloco 1 impede fechar a tela Inicio.
+
+Em cada bloco explicamos primeiro como o sistema funciona hoje, para a escolha
+ser informada. Sao 8 perguntas. Fique a vontade para marcar "Outro" e escrever
+com suas palavras.
+
+
+COMO O SISTEMA FUNCIONA HOJE (vale para os tres blocos)
+
+Cada pessoa pertence a UMA unidade, e nao enxerga nada de outra unidade: nem
+por navegacao, nem por busca, nem abrindo um link direto. Esse isolamento nao
+e uma configuracao que se desliga - e a forma como o sistema foi construido,
+em duas camadas que se reforcam, e vale ate para o Administrador global, que
+hoje ve apenas CONTAGENS de outras unidades (quantos arquivos, quanto espaco),
+nunca os documentos nem quem os acessou.
+
+E o que torna seguro ter todas as unidades no mesmo sistema. Afrouxar esse
+isolamento e possivel, mas e a mudanca mais cara e mais arriscada que se pode
+pedir ao sistema hoje - e a razao de estas perguntas virem separadas das
+demais.
+
+
+BLOCO 1 - "VOCE TEM ACESSO A X UNIDADES"
+
+A secao 1.3 do material pede, na tela Inicio, o titulo "Minhas unidades" com
+uma grade das unidades liberadas ao perfil, e a frase "voce tem acesso a X
+unidades e Y documentos novos desde o ultimo acesso".
+
+Hoje a tela mostra, nesse mesmo lugar, os cartoes das PASTAS de primeiro nivel
+da unidade da pessoa - porque cada pessoa tem uma unidade so, e nao faria
+sentido listar uma grade com um item.
+
+Antes de decidir a tela, precisamos saber se a necessidade por tras dela e
+real: existe gente que precisa trabalhar em mais de uma unidade?
+
+1. Alguem precisa acessar os documentos de mais de uma unidade?
+( ) a) Nao - cada pessoa trabalha na sua unidade. O que a tela deve listar sao
+       as pastas principais da unidade dela, e o titulo muda para refletir
+       isso (ex.: "Minhas pastas" ou "Pastas da unidade")
+( ) b) Nao, mas queremos manter o titulo "Minhas unidades" mesmo listando
+       pastas
+( ) c) Sim - algumas pessoas atuam em mais de uma unidade e precisam
+       trabalhar normalmente nos documentos de todas elas
+( ) d) Sim, mas so em documentos especificos, liberados caso a caso - nao na
+       unidade inteira
+( ) e) Outro: ____________
+
+   O que cada resposta significa de trabalho e de risco:
+
+   (a) e (b) - baixo custo, entra junto com o restante da tela Inicio. A
+       diferenca em relacao ao desenho enviado precisa do seu aceite por
+       escrito, porque a tela nao vai ficar igual ao anexo.
+
+   (c) - e a mudanca mais cara do projeto ate aqui. Mexe no isolamento
+       descrito acima, exige revisar TODAS as telas que hoje filtram por
+       unidade e refazer os testes de seguranca antes do codigo. Vira um
+       trabalho proprio, com prazo proprio, e nao cabe dentro da Fase 1.
+
+   (d) - custo intermediario. Abre uma excecao controlada: a pessoa continua
+       pertencendo a uma unidade, mas pode receber liberacao para documentos
+       pontuais de outra. O isolamento deixa de ser absoluto e passa a
+       depender de quem concede a liberacao.
+
+2. Se respondeu (c) ou (d): quem sao essas pessoas, e isso e regra ou excecao?
+   (liste nome, unidade de origem e a quais unidades precisa chegar)
+   ____________________________________________
+   ____________________________________________
+
+3. Ainda na mesma frase: "Y documentos novos desde o ultimo acesso". O sistema
+   nao registra hoje quando foi o ultimo acesso de cada pessoa. O que prefere?
+( ) a) Passar a registrar o ultimo acesso e contar a partir dele, como pedido
+       (custo pequeno, mas so vale para quem entrar dali em diante)
+( ) b) Trocar por "documentos novos nos ultimos 7 dias" - sem registro novo,
+       funciona para todo mundo desde o primeiro dia
+( ) c) Tirar a contagem da frase
+( ) d) Outro: ____________
+
+4. Ainda sobre a grade: cada cartao deve abrir a pasta, ou so mostrar o nome?
+( ) a) Abrir a pasta ao clicar, como esta no material
+( ) b) So informacao, sem clique
+( ) c) Outro: ____________
+
+
+BLOCO 2 - A PALAVRA "GESTOR" ESTA SENDO USADA PARA DUAS COISAS
+
+Este bloco e o que esta travando o inicio da Fase 2.
+
+Voce ja respondeu o essencial no questionario anterior, e esta fechado:
+
+  - coordenador e gerente acompanham as pessoas do SEU SETOR;
+  - o diretor da unidade acompanha a UNIDADE INTEIRA;
+  - quem acompanha leituras NAO precisa cadastrar pessoas nem liberar
+    permissoes - sao papeis diferentes.
+
+Ficou um problema pratico de nome. "Gestor" JA E a palavra que aparece hoje na
+tela para quem administra a unidade - foi escolha de nomenclatura do proprio
+projeto. Se o acompanhamento de leituras tambem se chamar "Gestor", a mesma
+palavra passa a significar duas coisas com alcances diferentes na mesma
+interface, e a pessoa que le a tela nao tem como saber qual e qual.
+
+Os dois precisam de nomes distintos. A escolha e sua.
+
+5. Como devem se chamar os dois papeis?
+( ) a) Quem administra a unidade passa a se chamar "Administrador de unidade",
+       e "Gestor" fica para quem acompanha as leituras da equipe
+( ) b) "Gestor" continua sendo quem administra a unidade, e quem acompanha as
+       leituras recebe outro nome. Sugestoes: "Responsavel de equipe",
+       "Chefia", "Acompanhamento". Qual? ____________
+( ) c) Outro par de nomes: ____________ e ____________
+
+   Observacao: a troca vale para TODAS as telas, nao so para a Fase 2 - a
+   palavra escolhida substitui a atual em todo lugar onde aparece hoje.
+
+6. Como o sistema fica sabendo que uma pessoa acompanha leituras, e de quem?
+
+   Pergunto porque "coordenador", "gerente" e "diretor" sao hoje texto livre
+   digitado no cadastro, no campo de cargo. Texto livre nao serve para decidir
+   quem ve o que: um cargo escrito "Coordenadora" num lugar e "Coord." noutro
+   seria, para o sistema, duas coisas diferentes - e a pessoa deixaria de ver
+   a equipe dela sem ninguem perceber.
+
+( ) a) Marcacao no cadastro: ao cadastrar a pessoa, a administracao marca
+       "acompanha as leituras do setor" ou "acompanha as leituras da unidade".
+       Explicito, visivel, e nao depende de como o cargo foi digitado
+( ) b) Lista fechada de cargos: os cargos deixam de ser texto livre e passam a
+       ser escolhidos de uma lista, e o sistema deduz o alcance do cargo
+       escolhido
+( ) c) Outro: ____________
+
+   Em (a) e (b), o alcance continua o que voce ja definiu: setor para
+   coordenador e gerente, unidade inteira para diretor.
+
+
+BLOCO 3 - O QUE A GOVERNANCA DA SEDE PRECISA ENXERGAR NAS OUTRAS UNIDADES
+
+Voce escreveu no retorno anterior: "a Governanca precisa enxergar os
+documentos de todas as unidades, porque e responsavel pelo controle documental
+do Instituto." Entendido - a necessidade esta aceita, nao estamos
+questionando-a.
+
+O que precisamos e saber EXATAMENTE o que "enxergar" significa aqui, porque a
+diferenca entre as respostas abaixo e enorme em custo e em risco. Hoje,
+repetindo, ninguem alcanca conteudo de outra unidade - nem o Administrador
+global.
+
+7. O que a Governanca da Sede precisa alcancar nas OUTRAS unidades?
+( ) a) Apenas o acompanhamento da leitura obrigatoria: quem leu, quem nao leu,
+       nomes, setores, datas e percentual de adesao - SEM abrir os arquivos
+( ) b) O item (a), e tambem abrir e baixar os documentos das outras unidades
+( ) c) Os itens (a) e (b), e tambem o historico de quem visualizou e baixou
+       cada arquivo (a auditoria de acesso)
+( ) d) Nada disso - cada unidade tem a sua propria Governanca, que acompanha
+       so a propria unidade, e a Sede recebe os numeros consolidados
+( ) e) Outro: ____________
+
+   O que cada resposta significa:
+
+   (a) - excecao estreita e controlada. A Governanca passa a ver nomes e
+       situacao de leitura de outras unidades, e NADA ALEM disso: continua sem
+       abrir arquivo e sem ver quem acessou o que. E a unica opcao que
+       conseguimos entregar dentro da Fase 2 sem reabrir o isolamento.
+
+   (b) e (c) - sao o mesmo caminho do bloco 1 opcao (c): o isolamento entre
+       unidades deixa de existir para esse perfil. Vira trabalho proprio, com
+       prazo proprio, e precisa de revisao de seguranca antes do codigo.
+
+   (d) - nao mexe em nada. A Fase 2 sai mais rapido, e a Sede perde a visao
+       nominal de quem leu em cada unidade.
+
+8. Quem exerce esse papel? Nome e unidade das pessoas.
+   ____________________________________________
+
+   Pergunto porque, qualquer que seja a resposta da 7, isso nao sera um
+   "ligar para todo mundo": sera concedido pessoa a pessoa, e ficara
+   registrado quem tem esse alcance.
+
+
+O QUE DEPENDE DESTAS RESPOSTAS
+
+- Bloco 1 libera o fechamento da tela Inicio (titulo da grade, a frase da
+  saudacao) e, com ela, o tour guiado. Hoje sao as duas unicas pendencias da
+  Fase 1, junto com a logo que a Governanca ainda vai enviar.
+
+- Bloco 2 libera o INICIO da Fase 2. Enquanto a pergunta 5 nao for respondida,
+  nao conseguimos escrever a tela de leitura obrigatoria sem usar a mesma
+  palavra para duas coisas. E o bloqueio mais caro no momento: trava a Fase 2
+  inteira.
+
+- Bloco 3 define o tamanho do relatorio de acompanhamento, que e a ultima
+  entrega da Fase 2. Responder (a) ou (d) na pergunta 7 mantem o prazo;
+  responder (b) ou (c) acrescenta um trabalho de seguranca que nao cabe na
+  Fase 2 e precisaria ser planejado a parte.
+
+Assim que o bloco 2 voltar, conseguimos estimar o prazo da Fase 2, que voce
+pediu na secao 5 do material - ele depende justamente do tamanho do
+acompanhamento e do relatorio.

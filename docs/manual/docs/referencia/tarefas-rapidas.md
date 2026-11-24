@@ -3,25 +3,26 @@
 | Quero...                      | Onde          | Como                                                       |
 | ------------------------------ | -------------- | ------------------------------------------------------------ |
 | Entrar no sistema              | Tela de login | E-mail + senha fornecidos pela administração               |
-| Trocar minha senha             | Minha conta   | Menu do perfil (canto superior direito) → **Minha conta** |
-| Criar uma pasta                | Arquivos      | Botão **Nova pasta**                                       |
-| Enviar arquivos                | Arquivos      | Botão **Enviar arquivos**                                  |
-| Enviar uma pasta inteira       | Arquivos      | Botão **Enviar pasta**                                     |
-| Visualizar sem baixar          | Arquivos      | Clicar no nome ou em **Visualizar**                        |
-| Baixar um arquivo              | Arquivos      | Botão **Baixar** na linha do arquivo                       |
-| Baixar a pasta atual (ou raiz) | Arquivos      | Botão **Baixar esta pasta** (barra superior; gera um `.zip`) |
-| Baixar uma subpasta            | Arquivos      | Botão **Baixar pasta** na linha da subpasta (gera um `.zip`) |
-| Renomear um arquivo ou pasta   | Arquivos      | Botão **Renomear** na linha do item (dono ou administrador) |
-| Mover um arquivo ou pasta      | Arquivos      | Botão **Mover para...** na linha do item (dono ou administrador) |
-| Mover vários itens de uma vez  | Arquivos      | Marque as caixas de seleção da listagem → botão **Mover selecionados** |
-| Excluir um arquivo             | Arquivos      | Botão **Excluir** na linha do arquivo (vai para a Lixeira) |
-| Excluir a pasta atual          | Arquivos      | Botão **Excluir esta pasta** (barra superior)              |
-| Excluir uma subpasta           | Arquivos      | Botão **Excluir** na linha da subpasta                     |
+| Trocar minha senha             | Minha conta   | Cartão do usuário (pé do menu) → **Minha conta**          |
+| Criar uma pasta                | Documentos    | Botão **Nova pasta**                                       |
+| Enviar arquivos                | Documentos    | Botão **Enviar arquivos**                                  |
+| Enviar uma pasta inteira       | Documentos    | Botão **Enviar pasta**                                     |
+| Visualizar sem baixar          | Documentos    | Clicar no nome ou em **Visualizar**                        |
+| Baixar um arquivo              | Documentos    | Botão **Baixar** na linha do arquivo                       |
+| Baixar a pasta atual (ou raiz) | Documentos    | Botão **Baixar esta pasta** (barra superior; gera um `.zip`) |
+| Baixar uma subpasta            | Documentos    | Botão **Baixar pasta** na linha da subpasta (gera um `.zip`) |
+| Renomear um arquivo ou pasta   | Documentos    | Botão **Renomear** na linha do item (dono ou administrador) |
+| Mover um arquivo ou pasta      | Documentos    | Botão **Mover para...** na linha do item (dono ou administrador) |
+| Mover vários itens de uma vez  | Documentos    | Marque as caixas de seleção da listagem → botão **Mover selecionados** |
+| Excluir um arquivo             | Documentos    | Botão **Excluir** na linha do arquivo (vai para a Lixeira) |
+| Excluir a pasta atual          | Documentos    | Botão **Excluir esta pasta** (barra superior)              |
+| Excluir uma subpasta           | Documentos    | Botão **Excluir** na linha da subpasta                     |
 | Recuperar algo excluído        | Lixeira       | **Restaurar** (dentro do prazo de retenção)                |
-| Encontrar um arquivo           | Buscar        | Nome e/ou filtros + botão **Buscar**                       |
-| Ver quem acessou meu arquivo   | Arquivos      | Botão **Auditoria** (dono/admin)                           |
+| Ver o que mudou recentemente   | Início ou Recentes | Lista **Documentos recentes**                         |
+| Encontrar um arquivo           | Cabeçalho     | Campo **Buscar documentos** + Enter; refine na tela de resultados |
+| Ver quem acessou meu arquivo   | Documentos    | Botão **Auditoria** (dono/admin)                           |
 | Compartilhar um arquivo enviado | —            | Peça a um administrador para conceder permissão            |
-| Conceder permissão             | Arquivos      | Botão **Permissões** (admin)                               |
+| Conceder permissão             | Documentos    | Botão **Permissões** (admin)                               |
 | Cadastrar colaborador          | Colaboradores | **Novo colaborador** (admin)                               |
 | Ativar/desativar colaborador   | Colaboradores | Botão **Ativar**/**Desativar** (admin)                     |
 | Redefinir a senha de alguém    | Colaboradores | Botão **Redefinir senha** (admin)                          |

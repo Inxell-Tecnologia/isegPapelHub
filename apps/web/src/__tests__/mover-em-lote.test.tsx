@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { UserRole } from '@gdoc/shared';
 import type { FileSummaryResponse, FolderContentsResponse, FolderResponse } from '@gdoc/shared';
 import { mockFetch } from './mock-fetch';
+import { SEM_CONTROLE_DOCUMENTAL } from './document-control-fixture';
 import { renderApp } from './render-app';
 import { mockViewportWidth, NARROW_VIEWPORT } from './viewport';
 
@@ -23,6 +24,7 @@ function file(
   overrides: Partial<FileSummaryResponse> & { id: string; fileName: string },
 ): FileSummaryResponse {
   return {
+    ...SEM_CONTROLE_DOCUMENTAL,
     ownerId: 'user-1',
     folderId: null,
     contentType: 'application/pdf',
@@ -34,7 +36,10 @@ function file(
 }
 
 function contents(overrides: Partial<FolderContentsResponse> = {}): FolderContentsResponse {
-  return { folder: null, breadcrumb: [], folders: [], files: [], ...overrides };
+  // `canUpload` vem resolvido pelo servidor (design.md D10 de
+  // `identidade-visual-isetes`); o padrão aqui é a pessoa poder enviar, que é
+  // o caso do dono da pasta — os casos de recusa o sobrescrevem.
+  return { folder: null, breadcrumb: [], folders: [], files: [], canUpload: true, ...overrides };
 }
 
 async function findDialogByTitle(title: string): Promise<HTMLElement> {

@@ -18,13 +18,13 @@ export interface SelectedFile {
  * seria inventar um limite que o servidor não impõe — quem decide se ele cabe é
  * a cota.
  */
-export function fatiarEnvio(
-  selecionados: SelectedFile[],
+export function fatiarEnvio<T extends SelectedFile>(
+  selecionados: readonly T[],
   maxItems: number = UPLOAD_SLICE_MAX_ITEMS_DEFAULT,
   maxBytes: number = UPLOAD_SLICE_MAX_BYTES_DEFAULT,
-): SelectedFile[][] {
-  const fatias: SelectedFile[][] = [];
-  let atual: SelectedFile[] = [];
+): T[][] {
+  const fatias: T[][] = [];
+  let atual: T[] = [];
   let bytesDaFatia = 0;
 
   for (const selecionado of selecionados) {
@@ -45,7 +45,7 @@ export function fatiarEnvio(
 }
 
 /** Soma dos tamanhos declarados — `File.size` é metadado, não lê byte algum (design.md D3). */
-export function somarBytes(selecionados: SelectedFile[]): number {
+export function somarBytes(selecionados: readonly SelectedFile[]): number {
   return selecionados.reduce((total, item) => total + item.file.size, 0);
 }
 
@@ -61,11 +61,11 @@ export function somarBytes(selecionados: SelectedFile[]): number {
  * interface, que declara exatamente quantos arquivos e quanto volume ficaram
  * de fora. Nenhum arquivo é partido — a unidade é sempre o arquivo inteiro.
  */
-export function subconjuntoQueCabe(
-  selecionados: SelectedFile[],
+export function subconjuntoQueCabe<T extends SelectedFile>(
+  selecionados: readonly T[],
   disponivelBytes: number,
-): { cabem: SelectedFile[]; deFora: SelectedFile[] } {
-  const cabem: SelectedFile[] = [];
+): { cabem: T[]; deFora: T[] } {
+  const cabem: T[] = [];
   let acumulado = 0;
   let indice = 0;
 

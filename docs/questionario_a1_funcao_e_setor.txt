@@ -1,0 +1,125 @@
+PERGUNTAS PARA LIBERAR O AJUSTE DE "PERFIL", "SETOR" E "GESTOR"
+
+Ola! Antes de mexer na tela Inicio, precisamos fechar tres pontos do material
+enviado. Nao sao detalhes de layout: os tres mudam o cadastro das pessoas, e
+mudar o cadastro depois de pronto custa retrabalho em varias telas.
+
+Em cada bloco explicamos primeiro como o sistema funciona hoje, para a escolha
+ser informada. Sao 7 perguntas. Fique a vontade para marcar "Outro" e escrever
+com suas palavras.
+
+
+BLOCO 1 - O QUE DEVE APARECER COMO "PERFIL"
+
+Voce apontou: "para a gerente de Governanca aparece Colaborador. Verificar se o
+perfil esta sendo lido corretamente do cadastro."
+
+Verificamos. O perfil esta sendo lido corretamente - o que acontece e que o
+sistema guarda DUAS informacoes diferentes sobre cada pessoa:
+
+  1. NIVEL DE ACESSO - "Colaborador", "Gestor" ou "Administrador global".
+     E o que define o que a pessoa pode fazer no sistema (cadastrar pessoas,
+     liberar permissoes, ver a lixeira da unidade).
+
+  2. FUNCAO / CARGO - texto digitado no cadastro, por exemplo "Gerente de
+     Governanca". Hoje e apenas informacao: aparece na lista de colaboradores
+     e nao altera nenhuma permissao.
+
+A linha abaixo da saudacao mostra hoje o NIVEL DE ACESSO. A gerente de
+Governanca aparece como "Colaborador" porque esse e o nivel de acesso dela no
+cadastro. Se estivesse cadastrada no nivel Gestor, a tela ja escreveria
+"Gestor" - essa palavra ja existe na interface.
+
+Ou seja: ha duas correcoes possiveis, e provavelmente as duas sao necessarias.
+Uma e de tela, a outra e de cadastro.
+
+1. Na linha abaixo da saudacao, o que deve aparecer?
+( ) a) A funcao/cargo do cadastro (ex.: "Gerente de Governanca"); quando a
+       funcao nao estiver preenchida, mostrar o nivel de acesso
+( ) b) O nivel de acesso, como hoje ("Colaborador", "Gestor")
+( ) c) Os dois, lado a lado (ex.: "Gerente de Governanca - Gestor")
+( ) d) Outro: ____________
+
+2. Separado da tela: quais pessoas devem REALMENTE administrar a unidade -
+   cadastrar colaboradores, liberar permissoes, ver a lixeira da unidade?
+   Isso e mudanca de nivel de acesso no cadastro, nao de tela.
+( ) a) A gerente de Governanca apenas
+( ) b) A gerente de Governanca e mais estas pessoas (liste nome e unidade):
+       ____________________________________________
+( ) c) Ninguem alem de quem ja esta - a correcao e so de tela (pergunta 1)
+( ) d) Outro: ____________
+
+
+BLOCO 2 - QUEM E "GESTOR" E O QUE E "A PROPRIA EQUIPE"
+
+A secao 3.1 cria o perfil Gestor - "diretor, gerente ou coordenador da unidade
+ou setor" - que "acompanha as pendencias da propria equipe".
+
+Hoje o sistema nao sabe quem e gestor de quem: nao existe nenhum campo que
+ligue uma pessoa ao seu chefe. Sem essa informacao nao conseguimos montar a
+tela de acompanhamento nem enviar o aviso de atraso "ao gestor dele"
+(secao 3.2, etapa 4).
+
+3. O que e "a propria equipe" de um gestor?
+( ) a) Todas as pessoas da unidade dele
+( ) b) As pessoas do mesmo setor dele (depende do bloco 3 abaixo)
+( ) c) Uma lista nominal - cada pessoa tem um chefe apontado no cadastro, e o
+       gestor ve exatamente quem aponta para ele
+( ) d) Outro: ____________
+
+   Observacao sobre (c): e a opcao mais precisa, e a que da mais trabalho de
+   manter - cada admissao, saida ou troca de area exige atualizar o cadastro,
+   senao o gestor deixa de ver alguem.
+
+4. O "Gestor" da secao 3.1 e a mesma pessoa que administra a unidade no
+   sistema (pergunta 2), ou sao papeis diferentes?
+( ) a) E a mesma pessoa - quem administra a unidade tambem acompanha as
+       leituras dela
+( ) b) Sao diferentes - existe quem acompanha as leituras da equipe SEM poder
+       cadastrar pessoas nem liberar permissoes
+( ) c) Outro: ____________
+
+
+BLOCO 3 - "SETOR": INFORMACAO OU CRITERIO?
+
+O cadastro tem hoje o campo "Area de trabalho", de texto livre: cada pessoa
+digita como quiser. Serve bem para exibir na tela.
+
+Nao serve, porem, para ESCOLHER quem recebe uma leitura obrigatoria nem para
+filtrar o relatorio, porque "Governanca", "governanca" e "Gov." sao, para o
+sistema, tres setores diferentes - e quem estiver digitado de um jeito fica de
+fora do envio feito pelo outro. Para virar criterio confiavel, setor precisa
+ser uma lista fechada, cadastrada por unidade.
+
+5. O setor sera usado para escolher o publico da leitura obrigatoria e para
+   filtrar o relatorio (secoes 3.2 e 3.5)?
+( ) a) Sim - precisamos selecionar "todo o setor X" ao marcar um documento e
+       filtrar o relatorio por setor
+( ) b) Nao - setor e so informacao que aparece na tela; o publico sera definido
+       por unidade, perfil e pessoas
+( ) c) Outro: ____________
+
+6. "Setor" e "Area de trabalho" (o campo que ja existe) sao a mesma coisa?
+( ) a) Sim, e o mesmo conceito - podem usar o que ja esta cadastrado
+( ) b) Nao, sao coisas diferentes (explique): ____________
+( ) c) Outro: ____________
+
+7. Se respondeu (a) na pergunta 5: precisamos da lista dos setores de cada
+   unidade, como devem aparecer escritos na tela. Pode enviar em anexo ou
+   escrever aqui:
+   ____________________________________________
+   ____________________________________________
+
+
+O QUE DEPENDE DESTAS RESPOSTAS
+
+- Bloco 1 libera a correcao da linha abaixo da saudacao.
+- Bloco 2 libera o acompanhamento por equipe e o aviso de atraso ao gestor.
+- Bloco 3 define se o publico da leitura obrigatoria pode ser escolhido por
+  setor. Responder (b) na pergunta 5 reduz o prazo da Fase 2; responder (a)
+  acrescenta o cadastro de setores e a migracao do que ja esta digitado.
+
+Uma pergunta da secao 1.3 continua em aberto e nao esta aqui, porque e de outra
+natureza: "voce tem acesso a X unidades". Hoje cada pessoa pertence a uma
+unidade so, e esse isolamento e o nucleo de seguranca do sistema. Vamos tratar
+dela separadamente, com as alternativas e o custo de cada uma.
