@@ -81,7 +81,9 @@
       só passa a existir ali:
       (a) **antes** do merge em `main`: criar com os nomes dos três Jobs que já
       existem, separados por espaço — os valores atuais de `GCP_BOOTSTRAP_JOB`,
-      `GCP_TRASH_PURGE_JOB` e `GCP_NOTIFY_GRANTS_JOB`;
+      `GCP_TRASH_PURGE_JOB` e `GCP_NOTIFY_GRANTS_JOB`. **Feito em 2026-11-24:**
+      `gdoc-prod-bootstrap gdoc-prod-trash-purge gdoc-prod-notify-grants`
+      (conferidos com `gcloud run jobs list`);
       (b) **depois** do apply da tarefa 2.3: trocar pelo valor de
       `terraform output -raw deploy_updated_job_names` e remover as três
       variáveis antigas.
@@ -157,9 +159,11 @@
       paleta `custom` com `stylesheets/marca.css` nas cores da D5.
 - [x] 7.2 `a-tela.md` e `primeiro-acesso.md`: logo, símbolo, cores e exemplo de
       identificação do ISEG; `index.md`: o "endereço desta implantação" passa da
-      URL do Cloud Run do GDoc para a do ISEG,
-      `https://gdoc-prod-api-pbr7vkzcga-uc.a.run.app/` (`terraform output -raw
-      api_url` no Cloud Shell, 2026-11-24). Verificado:
+      URL do Cloud Run do GDoc para a do ISEG **divulgada aos usuários**,
+      `https://gdoc-prod-api-1033018645624.us-central1.run.app/` (a URL que o
+      console do Cloud Run exibe; o `terraform output -raw api_url` devolve a
+      outra forma, `gdoc-prod-api-pbr7vkzcga-uc.a.run.app`, que atende o mesmo
+      serviço). Verificado:
       `grep -rni "setes\|isetes\|hmwigy67mq" docs/manual/docs` vazio e
       `mkdocs build --strict` passa.
 

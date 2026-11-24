@@ -9,7 +9,7 @@ por dentro.
     O endereço abaixo é o desta implantação específica do PapelHub — não o endereço
     único do produto. Cada organização pode ter o seu próprio.
 
-    **https://gdoc-prod-api-pbr7vkzcga-uc.a.run.app/**
+    **https://gdoc-prod-api-1033018645624.us-central1.run.app/**
 
 Use um navegador atualizado (Chrome, Edge, Firefox ou Safari). Não é preciso instalar
 nada.
