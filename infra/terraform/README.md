@@ -104,7 +104,7 @@ outputs deste Terraform:
 
 Sem chave de service account em lugar nenhum — `cicd.tf` provisiona um
 Workload Identity Pool que só aceita tokens OIDC do repositório configurado
-em `github_repository` (`CarlosSalesNaturalTec/GDoc` por padrão).
+em `github_repository` (`Inxell-Tecnologia/isegPapelHub` por padrão).
 
 Os bindings de IAM do deployer (`cicd.tf`) são **por recurso** (privilégio
 mínimo): `roles/artifactregistry.writer` no repositório de imagens,

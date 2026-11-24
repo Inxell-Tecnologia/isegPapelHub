@@ -7,7 +7,7 @@ import { renderApp } from './render-app';
 import { mockViewportWidth, NARROW_VIEWPORT, WIDE_VIEWPORT } from './viewport';
 import { LARGURA_NAVEGACAO } from '../app/theme';
 
-const MANUAL_URL = 'https://carlossalesnaturaltec.github.io/GDoc/';
+const MANUAL_URL = 'https://inxell-tecnologia.github.io/isegPapelHub/';
 const GLOBAL_ADMIN = { id: 'admin-g', unitId: 'unit-1', role: UserRole.GLOBAL_ADMIN };
 
 function menuItemLabels(container: HTMLElement): string[] {

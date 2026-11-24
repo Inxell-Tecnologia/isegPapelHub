@@ -296,10 +296,11 @@ variable "app_client_name" {
     login e no shell (change rebranding-doc7-setes, design.md D8). Não é
     segredo — texto exibido publicamente a qualquer visitante da tela de
     login — por isso vai como env var comum do Cloud Run, não Secret Manager.
-    Vazio (padrão) = nenhuma identificação de cliente é exibida.
+    Fork por cliente: o padrão versionado é o desta implantação (change
+    sync-upstream-identidade-iseg). Vazio = nenhuma identificação exibida.
   EOT
   type        = string
-  default     = ""
+  default     = "ISEG"
 }
 
 variable "app_manual_url" {
@@ -340,5 +341,5 @@ variable "github_repository" {
     (ver cicd.tf). Só esse repositório específico pode se passar pela SA.
   EOT
   type        = string
-  default     = "CarlosSalesNaturalTec/GDoc"
+  default     = "Inxell-Tecnologia/isegPapelHub"
 }

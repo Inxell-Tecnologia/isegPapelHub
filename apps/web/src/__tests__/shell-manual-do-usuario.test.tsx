@@ -4,7 +4,7 @@ import { UserRole } from '@gdoc/shared';
 import { mockFetch, ROTAS_DA_TELA_INICIAL } from './mock-fetch';
 import { renderApp } from './render-app';
 
-const MANUAL_URL = 'https://carlossalesnaturaltec.github.io/GDoc/';
+const MANUAL_URL = 'https://inxell-tecnologia.github.io/isegPapelHub/';
 
 /**
  * Acesso ao manual na navegação (change `responsividade-mobile-tablet`,
