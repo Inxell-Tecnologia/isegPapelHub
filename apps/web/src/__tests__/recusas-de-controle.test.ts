@@ -67,6 +67,12 @@ describe('As recusas já existentes continuam distinguíveis', () => {
     expect(descreverRecusaDeControle(recusa(403, undefined))).toMatch(/Permissão insuficiente/);
   });
 
+  it('espaço do dono da pasta tem mensagem própria, sem números (posse-pelo-dono-da-pasta)', () => {
+    const mensagem = descreverRecusaDeControle(recusa(400, { error: 'owner_quota_exceeded' }));
+    expect(mensagem).toMatch(/espaço do responsável por esta pasta/);
+    expect(mensagem).not.toMatch(/\d/);
+  });
+
   it('erro desconhecido cai no genérico, e só ele', () => {
     expect(descreverRecusaDeControle(recusa(500, { error: 'outra_coisa' }))).toBe(GENERICO);
   });

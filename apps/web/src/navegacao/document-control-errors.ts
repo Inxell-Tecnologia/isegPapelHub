@@ -82,6 +82,12 @@ export function descreverRecusaDeControle(err: unknown): string {
       : 'Arquivo geral não aceita código, revisão nem data de próxima revisão.';
   }
 
+  // Espaço do dono da pasta de destino, sem valores da cota alheia (change
+  // `posse-pelo-dono-da-pasta`, spec `web-upload`).
+  if (details?.error === 'owner_quota_exceeded') {
+    return 'O espaço do responsável por esta pasta não comporta este arquivo. Procure o responsável pela pasta ou a administração.';
+  }
+
   if (err instanceof ApiError && err.status === 403) {
     return 'Permissão insuficiente para alterar os dados de controle deste documento.';
   }

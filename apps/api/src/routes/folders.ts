@@ -30,10 +30,12 @@ import {
   FolderCycleError,
   hasFolderNameConflict,
   traverseFolderSubtree,
+  validateAnchor,
   wouldCreateCycle,
   type FolderRow,
   type SubtreeManifest,
 } from '../lib/folder-tree.js';
+import { grantAuthorship, resolveNewItemOwner } from '../lib/authorship.js';
 import { canReorganize, hasAccess, isAdminOfUnit, visibleResourceClause } from '../lib/access.js';
 import {
   buildVisitBreadcrumb,
@@ -324,20 +326,32 @@ export function foldersRouter(ports: Ports): Router {
       }
 
       const outcome = await ports.database.withTenantTransaction(ctx, async (client) => {
-        if (parentId) {
-          const parent = await findFolderById(client, parentId);
-          // Pai inexistente (ou de outra unidade, escondido pela RLS) e pai
-          // de outra pessoa resolvem igual — 403, sem distinguir os casos
-          // (fail-closed, não vaza existência; mesmo tratamento do endpoint
-          // de contents e de `findAccessibleFile` em routes/files.ts).
-          if (!parent || parent.owner_id !== ctx.userId) return { status: 403 as const };
-        }
+        // Pasta-pai: dono OU admin da unidade OU grant `upload` vigente
+        // (change `posse-pelo-dono-da-pasta`, design.md D2), pela mesma
+        // `validateAnchor` do envio — criar subpasta e enviar arquivo para a
+        // pasta são a mesma autorização. Pai inexistente (ou de outra unidade,
+        // escondido pela RLS) e pai sem permissão resolvem igual — 403, sem
+        // distinguir os casos (fail-closed, não vaza existência; mesmo
+        // tratamento do endpoint de contents e de `findAccessibleFile`).
+        const anchor = await validateAnchor(client, ctx, parentId ?? null);
+        if (!anchor.ok) return { status: 403 as const };
 
+        // Dono = dono imediato da pasta-pai; na raiz, quem cria (design.md D1).
+        // Autoria registrada à parte e imutável (D3).
+        const ownerId = resolveNewItemOwner(anchor.anchor, ctx);
         const { rows } = await client.query<FolderRow>(
-          `INSERT INTO folders (unit_id, owner_id, parent_id, name) VALUES ($1, $2, $3, $4) RETURNING *`,
-          [ctx.unitId, ctx.userId, parentId ?? null, name],
+          `INSERT INTO folders (unit_id, owner_id, parent_id, name, created_by)
+           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+          [ctx.unitId, ownerId, parentId ?? null, name, ctx.userId],
         );
-        return { status: 201 as const, folder: rows[0]! };
+        const folder = rows[0]!;
+        await grantAuthorship(client, ctx, {
+          unitId: folder.unit_id,
+          ownerId,
+          resourceType: GrantResourceType.FOLDER,
+          resourceId: folder.id,
+        });
+        return { status: 201 as const, folder };
       });
 
       if (outcome.status !== 201) {
@@ -379,6 +393,8 @@ export function foldersRouter(ports: Ports): Router {
         // enviar para ela é livre a qualquer pessoa autenticada, então não há
         // `view`/`upload` a resolver aqui.
         canUpload: true,
+        // Na raiz o envio é de quem envia (posse-pelo-dono-da-pasta, D6).
+        ownedByRequester: true,
         ...favoritos,
       });
     } catch (err) {
@@ -454,6 +470,7 @@ export function foldersRouter(ports: Ports): Router {
               folders: folders.map(toFolderListItemResponse),
               files: files.map(toFileSummaryResponse),
               canUpload: false,
+              ownedByRequester: false,
               favoriteFolderIds: [],
               favoriteFileIds: [],
               readOnly: true,
@@ -476,6 +493,10 @@ export function foldersRouter(ports: Ports): Router {
         folders: outcome.folders.map(toFolderListItemResponse),
         files: outcome.files.map(toFileSummaryResponse),
         canUpload: outcome.canUpload,
+        // Envio para cá consome o espaço de quem consulta só se ele for o dono
+        // (change `posse-pelo-dono-da-pasta`, design.md D6). Não revela nada da
+        // cota do dono.
+        ownedByRequester: outcome.folder.owner_id === ctx.userId,
         ...outcome.favoritos,
       });
     } catch (err) {

@@ -47,6 +47,21 @@ individualmente, vigente ou expirada.
     intencional, para evitar liberar mais do que o pretendido. A tela exibe um
     aviso lembrando disso ao conceder sobre pasta.
 
+### Concessões automáticas (autoria)
+
+Quando um colaborador cria uma subpasta ou envia um arquivo dentro da pasta de
+**outra pessoa**, o item passa a pertencer ao **dono da pasta** (inclusive para a
+cota), e quem o criou recebe automaticamente, sobre aquele item:
+
+- **Visualizar**, **Baixar** e **Renomear**;
+- **Enviar**, quando o item é uma pasta.
+
+**Excluir** nunca é concedido automaticamente. Essas concessões são **permanentes**,
+não geram aviso ao colaborador e aparecem em **Concessões** com o rótulo
+**Automática (autoria)**. Elas funcionam como qualquer outra: você pode
+**Revogar** cada uma individualmente, e o colaborador perde o acesso correspondente
+na hora.
+
 !!! note "Colaboradores de outra unidade"
     A lista de colaboradores mostra apenas pessoas **da mesma unidade** do item. Para
     liberar um item a alguém de outra unidade, use

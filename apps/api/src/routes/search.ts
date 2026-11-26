@@ -105,8 +105,10 @@ export function searchRouter(ports: Ports): Router {
           where += ` AND ${categoryContentTypeClause(type)}`;
         }
         if (author !== undefined) {
+          // "Autor" é quem enviou (`uploaded_by`), que desde o change
+          // `posse-pelo-dono-da-pasta` (design.md D3) pode não ser o dono.
           params.push(author);
-          where += ` AND owner_id = $${params.length}`;
+          where += ` AND uploaded_by = $${params.length}`;
         }
         if (dateFrom) {
           params.push(dateFrom.toISOString());

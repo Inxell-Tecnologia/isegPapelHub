@@ -17,7 +17,7 @@ import {
 } from 'antd';
 import type { Dayjs } from 'dayjs';
 import type { GrantResponse, GrantSubjectsLimitExceededResponse } from '@gdoc/shared';
-import { GrantResourceType, Permission } from '@gdoc/shared';
+import { GrantOrigin, GrantResourceType, Permission } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
 import { RotuloDeEstado } from '../app/RotuloDeEstado';
 import { useSession } from '../auth/session-context';
@@ -283,6 +283,12 @@ export function PermissoesModal({
                     >
                       {expiryLabel(grant)}
                     </RotuloDeEstado>
+                    {/* Concessão automática a quem criou o item numa pasta de
+                        outra pessoa (change `posse-pelo-dono-da-pasta`,
+                        design.md D4). Revogável como qualquer outra. */}
+                    {grant.origin === GrantOrigin.AUTHORSHIP && (
+                      <RotuloDeEstado>Automática (autoria)</RotuloDeEstado>
+                    )}
                     <Popconfirm
                       title="Revogar permissão"
                       description={`Remover "${VERB_LABEL[grant.permission]}" deste colaborador sobre este recurso?`}

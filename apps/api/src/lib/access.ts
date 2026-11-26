@@ -88,7 +88,7 @@ export async function hasAccess(
   // `folders` quebraria a query.
   const documentColumns =
     resourceType === GrantResourceType.FILE
-      ? ', lifecycle_state, awaiting_registration, document_revision'
+      ? ', lifecycle_state, awaiting_registration, document_revision, uploaded_by'
       : '';
   const { rows } = await client.query<{
     owner_id: string;
@@ -96,6 +96,7 @@ export async function hasAccess(
     lifecycle_state?: string | null;
     awaiting_registration?: boolean | null;
     document_revision?: number | null;
+    uploaded_by?: string | null;
   }>(
     `SELECT owner_id, unit_id${documentColumns} FROM ${resourceTable(resourceType)} WHERE id = $1 ${deletedFilter}`,
     [resourceId],
@@ -120,9 +121,14 @@ export async function hasAccess(
   // o arquivo para completar os dados. A condição é avaliada **antes** dos
   // ramos de concessão, de modo que uma concessão vigente não vence a
   // pendência — subtração, nunca concessão.
+  //
+  // "Quem o enviou" é o **autor** do envio (`uploaded_by`), não o dono
+  // (change `posse-pelo-dono-da-pasta`, design.md D3): quem envia para a pasta
+  // de outra pessoa não é dono da linha, e o dono que não enviou nem
+  // administra a unidade não alcança o pendente até ele ser completado.
   if (
     resource.awaiting_registration === true &&
-    resource.owner_id !== ctx.userId &&
+    resource.uploaded_by !== ctx.userId &&
     !isAdminOfUnit(ctx, resource.unit_id)
   ) {
     return false;

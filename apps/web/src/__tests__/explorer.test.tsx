@@ -194,6 +194,67 @@ describe('Explorador de pastas/arquivos (web-navegacao)', () => {
     await waitFor(() => expect(screen.queryByText('Descartável')).not.toBeInTheDocument());
   });
 
+  it('nova pasta dentro de pasta de outra pessoa com permissão de envio é criada (change posse-pelo-dono-da-pasta)', async () => {
+    const contratos = folder({ id: 'contratos', name: 'Contratos', ownerId: 'daniel' });
+    const criada = folder({
+      id: 'prestacao',
+      name: 'PRESTAÇÃO DE CONTAS ITABUNA - TF N° 001/2025',
+      parentId: 'contratos',
+      ownerId: 'daniel',
+    });
+    const naPasta = (folders: FolderResponse[] = []) =>
+      contents({ folder: contratos, folders, canUpload: true, ownedByRequester: false });
+
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/contratos/contents': [
+        { status: 200, body: naPasta() },
+        { status: 200, body: naPasta([criada]) },
+      ],
+      'POST /folders': { status: 201, body: criada },
+    });
+
+    renderApp(['/pastas/contratos']);
+    await screen.findByRole('button', { name: /nova pasta/i });
+    await userEvent.click(screen.getByRole('button', { name: /nova pasta/i }));
+    const dialog = await findDialogByTitle('Nova pasta');
+    await userEvent.type(within(dialog).getByLabelText('Nome'), criada.name);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar' }));
+
+    await screen.findByText(criada.name);
+    expect(
+      screen.queryByText('Permissão insuficiente para executar esta ação.'),
+    ).not.toBeInTheDocument();
+    const corpo = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([input, init]) =>
+        String(input).endsWith('/folders') && (init as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(JSON.parse(String((corpo![1] as RequestInit).body))).toEqual({
+      name: criada.name,
+      parentId: 'contratos',
+    });
+  });
+
+  it('nova pasta recusada pelo servidor (403) mantém o aviso de permissão insuficiente', async () => {
+    const alheia = folder({ id: 'alheia', name: 'Alheia', ownerId: 'daniel' });
+    mockFetch({
+      'GET /auth/me': { status: 200, body: IDENTITY },
+      'GET /folders/alheia/contents': {
+        status: 200,
+        body: contents({ folder: alheia, ownedByRequester: false }),
+      },
+      'POST /folders': { status: 403, body: { error: 'forbidden' } },
+    });
+
+    renderApp(['/pastas/alheia']);
+    await userEvent.click(await screen.findByRole('button', { name: /nova pasta/i }));
+    const dialog = await findDialogByTitle('Nova pasta');
+    await userEvent.type(within(dialog).getByLabelText('Nome'), 'Qualquer');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar' }));
+
+    await screen.findByText('Permissão insuficiente para executar esta ação.');
+  });
+
   it('403 em ação de gestão exibe aviso de permissão insuficiente, sem aplicar a mudança (US 2.2 cenário 2)', async () => {
     const fileNoPerm = file({ id: 'file-np', fileName: 'protegido.pdf' });
 

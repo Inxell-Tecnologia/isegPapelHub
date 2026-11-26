@@ -205,6 +205,18 @@ export interface BatchUploadUrlResponse {
  * item** de `BatchUploadItemFailure`: esta recusa o lote inteiro, antes de
  * qualquer efeito — nenhuma linha `pending`, nenhuma pasta, nenhuma URL.
  */
+/**
+ * Recusa por falta de espaço do **dono** da pasta de destino, quando ele não é
+ * quem envia (change `posse-pelo-dono-da-pasta`, design.md D5). Distinta de
+ * `'quota exceeded'` (espaço próprio) e **sem nenhum valor** da cota alheia.
+ * Chega como corpo do 400 do envio avulso e como `error` do item no lote.
+ */
+export const OWNER_QUOTA_EXCEEDED = 'owner_quota_exceeded' as const;
+
+export interface OwnerQuotaExceededResponse {
+  error: typeof OWNER_QUOTA_EXCEEDED;
+}
+
 export interface UploadBatchLimitExceededResponse {
   error: 'upload_batch_limit_exceeded';
   found: number;

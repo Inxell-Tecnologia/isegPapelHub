@@ -59,19 +59,24 @@ Referência: PRD US 3.1 e US 10.5.
   válidos
 - **THEN** apenas aquele item é recusado, com a indicação do problema, e os demais
   recebem suas URLs normalmente
+
 ### Requirement: Reserva de cota consciente do lote
 
-Ao pré-checar a **cota efetiva** do usuário (capability `cota-individual`) para um
-lote, o sistema SHALL considerar a soma dos tamanhos declarados dos itens do próprio
-lote **e** dos envios ainda pendentes do mesmo usuário, não apenas o volume já
-finalizado (`storage_used_bytes`). Os itens que couberem dentro do limite SHALL
-receber URL; os que ultrapassarem o limite SHALL ser sinalizados com erro de cota,
-sem impedir os itens que couberem. Nenhuma linha de arquivo SHALL ser inserida para
-um item recusado por cota.
+Ao pré-checar a **cota efetiva** (capability `cota-individual`) para um lote, o
+sistema SHALL considerar, **para cada futuro dono** dos itens (capability
+`posse-e-autoria`), a soma dos tamanhos declarados dos itens do próprio lote que
+lhe pertencerão **e** dos envios ainda pendentes cujo dono é essa mesma pessoa,
+não apenas o volume já finalizado (`storage_used_bytes`). Os itens que couberem
+dentro do limite do seu futuro dono SHALL receber URL; os que ultrapassarem o
+limite SHALL ser sinalizados com erro de cota, sem impedir os itens que couberem.
+Nenhuma linha de arquivo SHALL ser inserida para um item recusado por cota.
 
-O limite aplicado SHALL ser o da pessoa que envia — sua exceção nominal quando
-houver, o padrão da plataforma quando não houver —, e NÃO SHALL ser um valor fixo
-do produto. Referência: PRD US 3.1, US 8.1.
+O limite aplicado SHALL ser o do **futuro dono** de cada item — sua exceção
+nominal quando houver, o padrão da plataforma quando não houver —, e NÃO SHALL ser
+um valor fixo do produto. Quando o futuro dono é quem envia, o comportamento é o
+mesmo de antes. Quando é outra pessoa, o erro do item SHALL ser distinguível do
+erro de cota própria e NÃO SHALL revelar valores da cota alheia. Referência: PRD
+US 3.1, US 8.1; change `posse-pelo-dono-da-pasta`.
 
 #### Scenario: Lote que excede a cota no conjunto
 - **WHEN** os arquivos do lote cabem individualmente, mas a soma deles (com os envios
@@ -88,6 +93,18 @@ do produto. Referência: PRD US 3.1, US 8.1.
 - **WHEN** um usuário com exceção nominal acima do padrão da plataforma envia um lote
   cuja soma ultrapassa o padrão, mas cabe na sua exceção
 - **THEN** todos os itens do lote recebem URL, sem recusa por cota
+
+#### Scenario: Lote para a pasta de outra pessoa usa a cota dela
+- **WHEN** um colaborador com pouco espaço próprio envia um lote para a pasta de
+  Daniel, e o lote cabe no espaço de Daniel
+- **THEN** todos os itens recebem URL, e a reserva é contabilizada em Daniel, não no
+  colaborador
+
+#### Scenario: Espaço do dono insuficiente
+- **WHEN** um colaborador envia um lote para a pasta de Daniel e o espaço de Daniel
+  não comporta parte dos itens
+- **THEN** os itens que excedem são recusados com um erro que indica falta de espaço
+  do dono da pasta, sem informar cota, consumo ou disponível de Daniel
 
 ### Requirement: Teto de itens por requisição de envio em lote
 

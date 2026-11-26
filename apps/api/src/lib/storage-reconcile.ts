@@ -71,6 +71,7 @@ export async function reconcileFinalize(
       const { rows } = await client.query<{
         id: string;
         owner_id: string;
+        uploaded_by: string;
         unit_id: string;
         status: string;
         size_bytes: string | null;
@@ -78,7 +79,7 @@ export async function reconcileFinalize(
         // Upload novo finaliza no próprio `object_path`; substituição finaliza
         // no `pending_object_path` (o `object_path` vivo só é promovido aqui —
         // ver routes/files.ts, POST /files/:id/replace-url).
-        'SELECT id, owner_id, unit_id, status, size_bytes FROM files WHERE object_path = $1 OR pending_object_path = $1',
+        'SELECT id, owner_id, uploaded_by, unit_id, status, size_bytes FROM files WHERE object_path = $1 OR pending_object_path = $1',
         [objectPath],
       );
       const file = rows[0];
@@ -136,6 +137,18 @@ export async function reconcileFinalize(
           overQuota ? 'over_quota' : 'active',
           file.id,
         ]);
+        // Envio novo concluído (change `posse-pelo-dono-da-pasta`, design.md
+        // D7): evento `upload` atribuído ao **autor** do envio, que pode não
+        // ser o dono — é o rastro de quem realmente enviou. Só na transição
+        // de `pending`: uma notificação repetida do mesmo objeto (Pub/Sub
+        // entrega pelo menos uma vez; o backfill reconcilia de novo) não
+        // duplica o evento.
+        if (file.status === 'pending') {
+          await client.query(
+            'INSERT INTO audit_events (unit_id, user_id, file_id, action) VALUES ($1, $2, $3, $4)',
+            [file.unit_id, file.uploaded_by, file.id, 'upload'],
+          );
+        }
       }
 
       return { found: true, overQuota };

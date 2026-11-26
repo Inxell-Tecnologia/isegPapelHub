@@ -990,7 +990,10 @@ export function ExplorerPage() {
       )}
       {!somenteLeitura && (
         <div ref={areaDeEnvioRef}>
-          <UploadArea destinationFolderId={currentFolderId} />
+          <UploadArea
+            destinationFolderId={currentFolderId}
+            destinationOwnedByRequester={data?.ownedByRequester ?? true}
+          />
         </div>
       )}
       {/* Barra de ação em lote (US 2.4, design.md D3/D8 do change

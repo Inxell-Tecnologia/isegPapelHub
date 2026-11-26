@@ -1,5 +1,11 @@
 import { Router } from 'express';
-import { GrantResourceType, NotificationKind, Permission, UserRole } from '@gdoc/shared';
+import {
+  GrantOrigin,
+  GrantResourceType,
+  NotificationKind,
+  Permission,
+  UserRole,
+} from '@gdoc/shared';
 import type {
   CreateGrantRequest,
   CrossUnitSubjectResponse,
@@ -33,6 +39,8 @@ interface GrantRow {
   created_at: string;
   expires_at: string | null;
   expired: boolean;
+  /** `manual` ou `autoria` (posse-pelo-dono-da-pasta, design.md D4). */
+  origin?: string;
 }
 
 function toGrantResponse(row: GrantRow): GrantResponse {
@@ -47,6 +55,7 @@ function toGrantResponse(row: GrantRow): GrantResponse {
     createdAt: new Date(row.created_at).toISOString(),
     expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
     expired: row.expired,
+    origin: (row.origin as GrantOrigin | undefined) ?? GrantOrigin.MANUAL,
   };
 }
 

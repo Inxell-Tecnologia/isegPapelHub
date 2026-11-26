@@ -13,6 +13,12 @@ export const AuditAction = {
   DELETE: 'delete',
   RESTORE: 'restore',
   MOVE: 'move',
+  /**
+   * Envio de arquivo novo concluído (change `posse-pelo-dono-da-pasta`,
+   * design.md D7), atribuído ao **autor** do envio — que pode não ser o dono.
+   * Não é exposto pela consulta de acesso do arquivo (só `view`/`download`).
+   */
+  UPLOAD: 'upload',
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
