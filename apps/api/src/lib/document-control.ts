@@ -243,10 +243,14 @@ export function nonObsoleteClause(ctx: TenantContext): string {
  * `ownerIdParam` é o placeholder que a consulta já usa para `ctx.userId`
  * (mesmo padrão de `fileSummaryColumns`). Para admin da unidade o fragmento
  * resolve para `TRUE` e nem o referencia.
+ *
+ * O remetente é comparado pela **autoria** (`uploaded_by`), não pela posse
+ * (change `posse-pelo-dono-da-pasta`, design.md D3): quem envia para a pasta
+ * de outra pessoa não é o dono do arquivo.
  */
 export function visibleRegistrationClause(ctx: TenantContext, ownerIdParam: string): string {
   if (isAdminOfUnit(ctx, ctx.unitId)) return 'TRUE';
-  return `(awaiting_registration IS NOT TRUE OR owner_id = ${ownerIdParam})`;
+  return `(awaiting_registration IS NOT TRUE OR uploaded_by = ${ownerIdParam})`;
 }
 
 /**
@@ -461,7 +465,13 @@ export async function findCodeOwner(
   client: PoolClient,
   code: string,
   options: { excludeFileId?: string } = {},
-): Promise<{ id: string; file_name: string; owner_id: string; status: string } | null> {
+): Promise<{
+  id: string;
+  file_name: string;
+  owner_id: string;
+  uploaded_by: string;
+  status: string;
+} | null> {
   const params: string[] = [code];
   let exclusion = '';
   if (options.excludeFileId) {
@@ -472,9 +482,10 @@ export async function findCodeOwner(
     id: string;
     file_name: string;
     owner_id: string;
+    uploaded_by: string;
     status: string;
   }>(
-    `SELECT id, file_name, owner_id, status FROM files
+    `SELECT id, file_name, owner_id, uploaded_by, status FROM files
      WHERE lower(document_code) = lower($1) AND deleted_at IS NULL ${exclusion}
      LIMIT 1`,
     params,

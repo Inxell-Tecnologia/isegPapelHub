@@ -78,10 +78,12 @@ cadastro** — fora de circulação, visíveis só para você e para a gestão d
 um aviso no sino, até que você complete o cadastro pela ação **Dados de controle** na
 listagem. Nenhum arquivo é descartado por estar incompleto.
 
-!!! info "Arquivo pendente ocupa o seu espaço"
+!!! info "Arquivo pendente ocupa espaço"
     Um arquivo Pendente de cadastro é um arquivo de verdade na pasta: ele **conta na
-    sua cota** como qualquer outro, mesmo sem aparecer para os leitores. Completar o
-    cadastro não muda o espaço ocupado — o que muda é a circulação.
+    cota do dono** como qualquer outro, mesmo sem aparecer para os leitores. Completar
+    o cadastro não muda o espaço ocupado — o que muda é a circulação. Se você enviou
+    para a pasta de outra pessoa, o pendente ocupa o espaço **dela**, mas só fica
+    visível para você e para a gestão da unidade até o cadastro ser completado.
 
 !!! warning "O cadastro da tabela não é rascunho"
     O que você digita na tabela existe só até você publicar. Se fechar a tela, ou
@@ -97,7 +99,8 @@ de o sistema verificar se cabe**. Ao receber sua seleção, o PapelHub:
 1. **Analisa a seleção** — conta os arquivos e soma os tamanhos. Em seleções com
    milhares de arquivos isso leva alguns segundos, e a tela mostra **Analisando
    seleção…**, com a opção de **Cancelar**. Nada é enviado nessa fase.
-2. **Consulta o seu espaço disponível** no servidor.
+2. **Consulta o seu espaço disponível** no servidor — quando a pasta de destino é sua
+   ou é a raiz (veja abaixo o envio para a pasta de outra pessoa).
 3. **Responde se cabe**, antes de transferir qualquer arquivo.
 
 **Se couber**, a tela mostra a quantidade de arquivos e o volume a enviar e aguarda a
@@ -111,6 +114,18 @@ arquivos na lixeira e em envios ainda não concluídos. Você pode então **envi
 que cabe** — o sistema abre a tabela de cadastro **apenas com o subconjunto que
 couber**, informando com clareza quantos arquivos ficaram de fora. Você não cadastra
 arquivo que não será enviado.
+
+### Enviar para a pasta de outra pessoa
+
+Quando você envia para uma pasta de **outra pessoa** (com a permissão **Enviar** sobre
+ela), o espaço usado é o do **dono da pasta**, não o seu. Por isso a tela **não
+compara** a seleção com o seu espaço: ela vai direto para a confirmação, e o servidor
+verifica o espaço do dono ao receber o envio.
+
+Se o espaço do dono não comportar algum arquivo, a tela avisa que **"o espaço do
+responsável por esta pasta não comporta estes arquivos"** e lista os que ficaram de
+fora. Os valores da cota de outra pessoa nunca são mostrados. Procure o responsável
+pela pasta ou a administração.
 
 Não existe limite de **quantidade** de arquivos por envio imposto pela tela: o envio é
 dividido internamente em partes, e a única recusa por tamanho é a que o seu espaço
@@ -130,13 +145,19 @@ cada arquivo concluir mais rápido do que se todos disputassem a conexão.
 Se algum arquivo falhar, os outros continuam. As falhas aparecem como um **contador**,
 e o botão **Ver falhas** lista quais foram, com **Repetir** em cada um.
 
-Ao enviar um arquivo, **você se torna o dono dele** e passa a poder consultar quem o
-acessou (ver [Auditoria](auditoria.md)).
+Ao enviar um arquivo para a raiz ou para uma pasta sua, **você se torna o dono dele**
+e passa a poder consultar quem o acessou (ver [Auditoria](auditoria.md)). Ao enviar
+para a pasta de **outra pessoa**, o dono do arquivo é o **dono da pasta**; você
+continua podendo ver, baixar e renomear o arquivo, e o sistema registra que foi você
+quem o enviou (ver [Criar ou enviar dentro da pasta de outra
+pessoa](navegar-e-criar.md#criar-ou-enviar-dentro-da-pasta-de-outra-pessoa)).
 
 ## Cota de armazenamento
 
 Cada colaborador tem uma cota de armazenamento (ver
-[Limites](../referencia/limites.md) para o valor vigente desta implantação). Ao
+[Limites](../referencia/limites.md) para o valor vigente desta implantação). A cota é
+de quem é **dono** dos arquivos: o que você envia para a pasta de outra pessoa conta
+na cota dela, e o que outras pessoas enviam para as suas pastas conta na sua. Ao
 atingir o limite, novos envios são recusados — com o detalhamento descrito acima.
 
 !!! warning "Excluir arquivos não libera espaço de imediato"

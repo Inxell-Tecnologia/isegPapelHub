@@ -139,6 +139,14 @@ export interface FolderContentsResponse {
    */
   canUpload: boolean;
   /**
+   * `true` quando quem consulta é o **dono** da pasta corrente (na raiz,
+   * sempre `true`). Diz à SPA se um envio para cá consome o espaço do próprio
+   * solicitante ou o do dono da pasta (change `posse-pelo-dono-da-pasta`,
+   * design.md D6) — sem revelar nada da cota do dono. Opcional no contrato:
+   * ausência é tratada como `true` (comportamento anterior).
+   */
+  ownedByRequester?: boolean;
+  /**
    * Ids das pastas e dos arquivos **desta listagem** que são favoritos de quem
    * consulta (change `favoritos`, design.md D5) — para o explorador oferecer
    * "Favoritar" ou "Remover dos favoritos" sem cruzar a página com a lista

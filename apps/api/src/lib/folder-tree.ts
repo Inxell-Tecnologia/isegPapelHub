@@ -3,6 +3,7 @@ import { GrantResourceType, Permission } from '@gdoc/shared';
 import type { TenantContext } from '../ports/database-port.js';
 import { hasAccess, isAdminOfUnit, resourceScopeClause, visibleResourceClause } from './access.js';
 import { nonObsoleteClause, visibleRegistrationClause } from './document-control.js';
+import { grantAuthorship, resolveNewItemOwner } from './authorship.js';
 
 export interface FolderRow {
   id: string;
@@ -11,6 +12,8 @@ export interface FolderRow {
   parent_id: string | null;
   name: string;
   created_at: string;
+  /** Autor (posse-pelo-dono-da-pasta, D3); imutável. */
+  created_by?: string;
 }
 
 /**
@@ -83,9 +86,16 @@ export function normalizeRelativePath(relativePath: string): string[] | null {
 async function findOrCreateChild(
   client: PoolClient,
   ctx: TenantContext,
-  parentId: string | null,
+  parent: FolderRow | null,
   name: string,
 ): Promise<FolderRow> {
+  const parentId = parent?.id ?? null;
+  // Dono do nível = dono imediato da pasta em que ele nasce; na raiz, quem
+  // envia (change `posse-pelo-dono-da-pasta`, design.md D1). Como o nível
+  // criado já carrega o dono do nível acima, a cascata sai naturalmente: a
+  // árvore enviada para a pasta de Daniel é toda de Daniel.
+  const ownerId = resolveNewItemOwner(parent, ctx);
+
   // `ON CONFLICT` casa com o índice único parcial `folders_unit_parent_name_uidx`
   // (migração 0006, restrito a `deleted_at IS NULL` pela 0008), tornando a
   // criação idempotente sob concorrência. Desde a migração `0014`
@@ -95,12 +105,26 @@ async function findOrCreateChild(
   // de uma leitura prévia como remendo só para a raiz. Não é mais necessário:
   // o `INSERT ... ON CONFLICT DO NOTHING` seguido da leitura abaixo é
   // suficiente e idêntico em qualquer nível.
-  await client.query(
-    `INSERT INTO folders (unit_id, owner_id, parent_id, name)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (unit_id, parent_id, lower(name)) WHERE deleted_at IS NULL DO NOTHING`,
-    [ctx.unitId, ctx.userId, parentId, name],
+  //
+  // `RETURNING` só devolve linha quando o nível foi **criado** agora: só aí
+  // entram autoria e concessões automáticas. Pasta reaproveitada não tem dono
+  // nem autor alterados (spec `envio-pasta`).
+  const { rows: created } = await client.query<FolderRow>(
+    `INSERT INTO folders (unit_id, owner_id, parent_id, name, created_by)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (unit_id, parent_id, lower(name)) WHERE deleted_at IS NULL DO NOTHING
+     RETURNING *`,
+    [ctx.unitId, ownerId, parentId, name, ctx.userId],
   );
+  if (created[0]) {
+    await grantAuthorship(client, ctx, {
+      unitId: created[0].unit_id,
+      ownerId,
+      resourceType: GrantResourceType.FOLDER,
+      resourceId: created[0].id,
+    });
+    return created[0];
+  }
 
   const { rows } = await client.query<FolderRow>(
     `SELECT * FROM folders
@@ -111,28 +135,29 @@ async function findOrCreateChild(
 }
 
 /**
- * Garante a existência da cadeia de pastas de `relativePath` sob `anchorId`
+ * Garante a existência da cadeia de pastas de `relativePath` sob `anchor`
  * (design.md D3), criando os níveis que faltarem e reaproveitando os
- * existentes, e devolve o `id` da pasta-folha. `relativePath` ausente
- * devolve a própria âncora, sem tocar o banco.
+ * existentes, e devolve a pasta-folha (`null` = raiz). `relativePath` ausente
+ * devolve a própria âncora, sem tocar o banco. A folha é devolvida inteira
+ * porque o **dono** dela é o dono do arquivo que vai residir ali
+ * (`posse-pelo-dono-da-pasta`, design.md D1).
  */
 export async function ensureFolderPath(
   client: PoolClient,
   ctx: TenantContext,
-  anchorId: string | null,
+  anchor: FolderRow | null,
   relativePath: string | undefined,
-): Promise<{ ok: true; folderId: string | null } | { ok: false; error: string }> {
-  if (relativePath === undefined) return { ok: true, folderId: anchorId };
+): Promise<{ ok: true; folder: FolderRow | null } | { ok: false; error: string }> {
+  if (relativePath === undefined) return { ok: true, folder: anchor };
 
   const segments = normalizeRelativePath(relativePath);
   if (!segments) return { ok: false, error: 'invalid path' };
 
-  let parentId = anchorId;
+  let parent = anchor;
   for (const name of segments) {
-    const folder = await findOrCreateChild(client, ctx, parentId, name);
-    parentId = folder.id;
+    parent = await findOrCreateChild(client, ctx, parent, name);
   }
-  return { ok: true, folderId: parentId };
+  return { ok: true, folder: parent };
 }
 
 /**

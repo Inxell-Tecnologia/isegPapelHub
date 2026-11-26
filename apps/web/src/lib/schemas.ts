@@ -215,6 +215,10 @@ export const folderContentsResponseSchema: z.ZodType<FolderContentsResponse> = z
   // API mais antiga que a SPA simplesmente não oferece a ação na orientação
   // de pasta vazia, em vez de oferecê-la sem respaldo.
   canUpload: z.boolean().catch(false),
+  // Posse da pasta corrente (change `posse-pelo-dono-da-pasta`, design.md
+  // D6). Ausente = API anterior; a SPA trata como `true` (comportamento de
+  // antes: pré-checar pelo espaço próprio).
+  ownedByRequester: z.boolean().optional().catch(undefined),
   // Favoritos entre os itens listados (change `favoritos`, design.md D5).
   // Ausentes numa API mais antiga: nada aparece como favorito, em vez de a
   // resposta inteira ser recusada.
@@ -377,6 +381,9 @@ export const grantResponseSchema: z.ZodType<GrantResponse> = z.object({
   // `expired` é resolvido pelo servidor contra o relógio do banco.
   expiresAt: z.string().nullable(),
   expired: z.boolean(),
+  // Concessão automática por autoria (posse-pelo-dono-da-pasta, D4). Ausente
+  // ou desconhecida = manual.
+  origin: z.enum(['manual', 'autoria']).optional().catch(undefined),
 });
 
 /** Espelha `GrantListResponse` (design.md D6, `web-permissoes`). */

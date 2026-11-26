@@ -395,6 +395,42 @@ describe('Gestão de permissões da SPA (web-permissoes)', () => {
     within(section).getByText(/^Expirada em/);
   });
 
+  it('concessão automática por autoria é identificada na listagem; a manual não (change posse-pelo-dono-da-pasta, D4)', async () => {
+    const fileX = file({ id: 'file-1', fileName: 'relatorio.pdf' });
+    const fulano = person({ id: 'person-1', fullName: 'Fulano' });
+    const automatica = grant({
+      id: 'grant-1',
+      subjectUserId: 'person-1',
+      permission: Permission.VIEW,
+      origin: 'autoria',
+    });
+    const manual = grant({
+      id: 'grant-2',
+      subjectUserId: 'person-1',
+      permission: Permission.DOWNLOAD,
+      origin: 'manual',
+    });
+
+    mockFetch({
+      'GET /auth/me': { status: 200, body: ADMIN },
+      'GET /folders/root/contents': { status: 200, body: contents({ files: [fileX] }) },
+      'GET /users': { status: 200, body: [fulano] },
+      'GET /grants': { status: 200, body: { grants: [automatica, manual] } },
+    });
+
+    renderApp(['/pastas']);
+    await screen.findByText('relatorio.pdf');
+    await userEvent.click(screen.getByRole('button', { name: /permissões/i }));
+
+    const dialog = await findDialogByTitle('Permissões — relatorio.pdf');
+    const section = await waitFor(() => vigentesSection(dialog));
+
+    // Um rótulo só: o da concessão automática.
+    expect(within(section).getAllByText('Automática (autoria)')).toHaveLength(1);
+    // Revogável como qualquer outra.
+    expect(within(section).getAllByRole('button', { name: /revogar/i })).toHaveLength(2);
+  });
+
   it('o aviso de não-herança está visível ao abrir o modal de uma pasta e ausente para arquivo (US 4.1 cenário 2)', async () => {
     const folderX = folder({ id: 'folder-1', name: 'Pasta A' });
     const fileX = file({ id: 'file-1', fileName: 'relatorio.pdf' });

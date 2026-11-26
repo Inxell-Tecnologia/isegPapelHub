@@ -6,6 +6,7 @@ import {
   FileAccessAction,
   GrantResourceType,
   NotificationKind,
+  OWNER_QUOTA_EXCEEDED,
   Permission,
   isPreviewable,
 } from '@gdoc/shared';
@@ -45,6 +46,7 @@ import {
   type NormalizedDocumentControl,
 } from '../lib/document-control.js';
 import { QUOTA_COLUMNS, resolveQuotaBytes, type QuotaRow } from '../lib/quota.js';
+import { grantAuthorship, resolveNewItemOwner } from '../lib/authorship.js';
 
 /**
  * Linha inteira de `files` mais as expressões derivadas do controle
@@ -381,23 +383,30 @@ export function filesRouter(ports: Ports): Router {
 
       const outcome = await ports.database
         .withTenantTransaction(ctx, async (client) => {
-          if (folderId) {
-            // RLS restringe a leitura à unidade do remetente — pasta de outra
-            // unidade não aparece aqui (navegacao spec: "a pasta de destino
-            // SHALL pertencer à mesma unidade do remetente"). Pasta própria
-            // segue livre; pasta de outra pessoa exige grant `upload`
-            // (design.md D3, Épico 4).
-            const anchor = await validateAnchor(client, ctx, folderId);
-            if (!anchor.ok) return { ok: false as const, status: anchor.status };
-          }
+          // RLS restringe a leitura à unidade do remetente — pasta de outra
+          // unidade não aparece aqui (navegacao spec: "a pasta de destino
+          // SHALL pertencer à mesma unidade do remetente"). Pasta própria
+          // segue livre; pasta de outra pessoa exige grant `upload`
+          // (design.md D3, Épico 4). Sem `folderId`, âncora = raiz.
+          const anchor = await validateAnchor(client, ctx, folderId);
+          if (!anchor.ok) return { ok: false as const, status: anchor.status };
 
+          // Dono do arquivo = dono da pasta de destino; na raiz, quem envia
+          // (change `posse-pelo-dono-da-pasta`, design.md D1). A cota decidida
+          // aqui é a **dele** — a mesma pessoa a quem a reconciliação já
+          // atribui o consumo (D5).
+          const ownerId = resolveNewItemOwner(anchor.anchor, ctx);
           const { rows } = await client.query<{ storage_used_bytes: string } & QuotaRow>(
             `SELECT ${QUOTA_COLUMNS} FROM users WHERE id = $1`,
-            [ctx.userId],
+            [ownerId],
           );
           const currentUsage = Number(rows[0]?.storage_used_bytes ?? '0');
           if (currentUsage + declaredSizeBytes! > resolveQuotaBytes(rows[0])) {
-            return { ok: false as const, status: 400 as const };
+            return {
+              ok: false as const,
+              status: 400 as const,
+              ownerQuota: ownerId !== ctx.userId,
+            };
           }
 
           // Unicidade do código na unidade (US 10.2, design.md D5). A leitura
@@ -413,9 +422,13 @@ export function filesRouter(ports: Ports): Router {
           // duplicata — a linha é reaproveitada com o objeto novo. Sem isso, um
           // envio que falhou na transferência deixaria o código travado até o
           // expurgo da lixeira, e a pessoa ficaria impedida de publicar o
-          // próprio documento de novo.
+          // próprio documento de novo. "Do próprio solicitante" é a **autoria**
+          // do envio, não a posse (posse-pelo-dono-da-pasta, design.md D3): quem
+          // enviou para a pasta de outra pessoa não é o dono da linha.
           const retomada =
-            occupant !== null && occupant.owner_id === ctx.userId && occupant.status === 'pending'
+            occupant !== null &&
+            occupant.uploaded_by === ctx.userId &&
+            occupant.status === 'pending'
               ? occupant.id
               : null;
           if (occupant && !retomada) {
@@ -432,11 +445,14 @@ export function filesRouter(ports: Ports): Router {
           ];
 
           if (retomada) {
+            // A retomada pode apontar outro destino: o dono acompanha a pasta
+            // em que o arquivo passa a residir (D1); a autoria não muda (D3).
             await client.query(
               `UPDATE files SET object_path = $1, file_name = $2, content_type = $3, size_bytes = $4,
                folder_id = $5, status = 'pending', pending_object_path = NULL,
                document_type = $6, document_code = $7, document_revision = $8,
-               responsible_sector = $9, next_review_at = $10, lifecycle_state = $11
+               responsible_sector = $9, next_review_at = $10, lifecycle_state = $11,
+               owner_id = $13
              WHERE id = $12`,
               [
                 objectPath,
@@ -446,27 +462,43 @@ export function filesRouter(ports: Ports): Router {
                 folderId ?? null,
                 ...controlValues,
                 retomada,
+                ownerId,
               ],
             );
+            await grantAuthorship(client, ctx, {
+              unitId: ctx.unitId,
+              ownerId,
+              resourceType: GrantResourceType.FILE,
+              resourceId: retomada,
+            });
             return { ok: true as const };
           }
 
           await client.query(
             `INSERT INTO files (id, unit_id, owner_id, folder_id, object_path, file_name, content_type, size_bytes, status,
-             document_type, document_code, document_revision, responsible_sector, next_review_at, lifecycle_state)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, $13, $14)`,
+             document_type, document_code, document_revision, responsible_sector, next_review_at, lifecycle_state,
+             uploaded_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, $13, $14, $15)`,
             [
               objectId,
               ctx.unitId,
-              ctx.userId,
+              ownerId,
               folderId ?? null,
               objectPath,
               fileName,
               contentType,
               declaredSizeBytes,
               ...controlValues,
+              ctx.userId,
             ],
           );
+          // Autor que não é dono continua alcançando o que enviou (D4).
+          await grantAuthorship(client, ctx, {
+            unitId: ctx.unitId,
+            ownerId,
+            resourceType: GrantResourceType.FILE,
+            resourceId: objectId,
+          });
           return { ok: true as const };
         })
         .catch((err) => {
@@ -495,7 +527,11 @@ export function filesRouter(ports: Ports): Router {
             ? 'folder not found'
             : outcome.status === 403
               ? 'forbidden'
-              : 'quota exceeded';
+              : 'ownerQuota' in outcome && outcome.ownerQuota
+                ? // Espaço do dono da pasta, sem nenhum valor da cota alheia
+                  // (spec `cota-individual`, posse-pelo-dono-da-pasta D5).
+                  OWNER_QUOTA_EXCEEDED
+                : 'quota exceeded';
         res.status(outcome.status).json({ error });
         return;
       }
@@ -567,22 +603,34 @@ export function filesRouter(ports: Ports): Router {
         const anchor = await validateAnchor(client, ctx, destinationFolderId);
         if (!anchor.ok) return { ok: false as const, status: anchor.status };
 
-        const { rows: usageRows } = await client.query<{ storage_used_bytes: string } & QuotaRow>(
-          `SELECT ${QUOTA_COLUMNS} FROM users WHERE id = $1`,
-          [ctx.userId],
-        );
-        const baseUsage = Number(usageRows[0]?.storage_used_bytes ?? '0');
-        const quotaBytes = resolveQuotaBytes(usageRows[0]);
-
-        // Reserva consciente do lote (design.md D2): soma o que já está
-        // pendente/em substituição, e cresce a cada item aceito no próprio
-        // lote — sem isso, itens do mesmo lote veem a mesma folga e furam a
-        // cota em conjunto.
-        const { rows: pendingRows } = await client.query<{ total: string | null }>(
-          `SELECT SUM(size_bytes) AS total FROM files WHERE owner_id = $1 AND status IN ('pending', 'replacing')`,
-          [ctx.userId],
-        );
-        let reserved = Number(pendingRows[0]?.total ?? '0');
+        // Reserva consciente do lote (design.md D2), **por futuro dono**
+        // (change `posse-pelo-dono-da-pasta`, design.md D5): cada item consome
+        // a cota de quem será dono dele — o dono da pasta-folha —, que é a
+        // pessoa a quem a reconciliação atribui o consumo. Soma o que já está
+        // pendente/em substituição desse dono, e cresce a cada item aceito no
+        // próprio lote — sem isso, itens do mesmo lote veem a mesma folga e
+        // furam a cota em conjunto. Carregado sob demanda: em geral o lote
+        // inteiro tem um único dono.
+        const ledgers = new Map<string, { base: number; quota: number; reserved: number }>();
+        async function ledgerOf(ownerId: string) {
+          let ledger = ledgers.get(ownerId);
+          if (!ledger) {
+            const { rows: usageRows } = await client.query<
+              { storage_used_bytes: string } & QuotaRow
+            >(`SELECT ${QUOTA_COLUMNS} FROM users WHERE id = $1`, [ownerId]);
+            const { rows: pendingRows } = await client.query<{ total: string | null }>(
+              `SELECT SUM(size_bytes) AS total FROM files WHERE owner_id = $1 AND status IN ('pending', 'replacing')`,
+              [ownerId],
+            );
+            ledger = {
+              base: Number(usageRows[0]?.storage_used_bytes ?? '0'),
+              quota: resolveQuotaBytes(usageRows[0]),
+              reserved: Number(pendingRows[0]?.total ?? '0'),
+            };
+            ledgers.set(ownerId, ledger);
+          }
+          return ledger;
+        }
 
         const prepared: PreparedItem[] = [];
         // Códigos já consumidos **por este lote** (US 10.2, design.md D6).
@@ -622,20 +670,24 @@ export function filesRouter(ports: Ports): Router {
           const control = parsedControl.value;
           const awaitingRegistration = isAwaitingRegistration(control);
 
-          const pathResult = await ensureFolderPath(
-            client,
-            ctx,
-            anchor.anchor?.id ?? null,
-            relativePath,
-          );
+          const pathResult = await ensureFolderPath(client, ctx, anchor.anchor, relativePath);
           if (!pathResult.ok) {
             prepared.push({ fileName, ok: false, error: pathResult.error });
             continue;
           }
+          const leafFolderId = pathResult.folder?.id ?? null;
+          // Dono do arquivo = dono da pasta-folha; na raiz, quem envia (D1).
+          const ownerId = resolveNewItemOwner(pathResult.folder, ctx);
+          const ledger = await ledgerOf(ownerId);
 
-          const available = quotaBytes - baseUsage - reserved;
+          const available = ledger.quota - ledger.base - ledger.reserved;
           if (declaredSizeBytes! > available) {
-            prepared.push({ fileName, ok: false, error: 'quota exceeded' });
+            // Espaço do dono da pasta, sem valor algum da cota alheia (D5).
+            prepared.push({
+              fileName,
+              ok: false,
+              error: ownerId === ctx.userId ? 'quota exceeded' : OWNER_QUOTA_EXCEEDED,
+            });
             continue;
           }
 
@@ -665,9 +717,12 @@ export function filesRouter(ports: Ports): Router {
             // concessões que apontam para o id antigo, o histórico de
             // auditoria e a identidade do evento de origem do aviso de
             // pendência — que passaria a avisar duas vezes do mesmo arquivo.
+            //
+            // "Do próprio solicitante" é a **autoria** do envio, não a posse
+            // (posse-pelo-dono-da-pasta, design.md D3).
             if (
               occupant !== null &&
-              occupant.owner_id === ctx.userId &&
+              occupant.uploaded_by === ctx.userId &&
               occupant.status === 'pending'
             ) {
               retomada = occupant.id;
@@ -701,45 +756,54 @@ export function filesRouter(ports: Ports): Router {
                  folder_id = $5, status = 'pending', pending_object_path = NULL,
                  document_type = $6, document_code = $7, document_revision = $8,
                  responsible_sector = $9, next_review_at = $10, lifecycle_state = $11,
-                 awaiting_registration = $12
+                 awaiting_registration = $12, owner_id = $14
                WHERE id = $13`,
               [
                 objectPath,
                 fileName,
                 contentType,
                 declaredSizeBytes,
-                pathResult.folderId,
+                leafFolderId,
                 ...controlValues,
                 retomada,
+                ownerId,
               ],
             );
           } else {
             await client.query(
               `INSERT INTO files (id, unit_id, owner_id, folder_id, object_path, file_name, content_type, size_bytes, status,
                  document_type, document_code, document_revision, responsible_sector, next_review_at, lifecycle_state,
-                 awaiting_registration)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, $13, $14, $15)`,
+                 awaiting_registration, uploaded_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, $13, $14, $15, $16)`,
               [
                 objectId,
                 ctx.unitId,
-                ctx.userId,
-                pathResult.folderId,
+                ownerId,
+                leafFolderId,
                 objectPath,
                 fileName,
                 contentType,
                 declaredSizeBytes,
                 ...controlValues,
+                ctx.userId,
               ],
             );
           }
-          reserved += declaredSizeBytes!;
+          // Autor que não é dono continua alcançando o que enviou (D4).
+          await grantAuthorship(client, ctx, {
+            unitId: ctx.unitId,
+            ownerId,
+            resourceType: GrantResourceType.FILE,
+            resourceId: objectId,
+          });
+          ledger.reserved += declaredSizeBytes!;
 
           prepared.push({
             fileName,
             ok: true,
             objectPath,
             contentType,
-            folderId: pathResult.folderId,
+            folderId: leafFolderId,
             awaitingRegistration,
             fileId: objectId,
           });
@@ -1137,9 +1201,13 @@ export function filesRouter(ports: Ports): Router {
       );
 
       const outcome = await ports.database.withTenantTransaction(ctx, async (client) => {
+        // Cota do **dono do arquivo**, não de quem substitui (change
+        // `posse-pelo-dono-da-pasta`, design.md D5): é a ele que a
+        // reconciliação soma o delta — antes, quem tinha `rename` sobre arquivo
+        // alheio era checado contra o próprio espaço e cobrado no do dono.
         const { rows } = await client.query<{ storage_used_bytes: string } & QuotaRow>(
           `SELECT ${QUOTA_COLUMNS} FROM users WHERE id = $1`,
-          [ctx.userId],
+          [file.owner_id],
         );
         const currentUsage = Number(rows[0]?.storage_used_bytes ?? '0');
         const oldSize = Number(file.size_bytes ?? '0');
@@ -1171,7 +1239,11 @@ export function filesRouter(ports: Ports): Router {
       });
 
       if (!outcome.ok) {
-        res.status(400).json({ error: 'quota exceeded' });
+        // Espaço do dono do arquivo quando ele não é quem substitui — sem
+        // nenhum valor da cota alheia (posse-pelo-dono-da-pasta, D5).
+        res.status(400).json({
+          error: file.owner_id === ctx.userId ? 'quota exceeded' : OWNER_QUOTA_EXCEEDED,
+        });
         return;
       }
 

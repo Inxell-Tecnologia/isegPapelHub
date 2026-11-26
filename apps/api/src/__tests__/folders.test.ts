@@ -146,7 +146,11 @@ describe('Navegação: pastas aninhadas, trilha e visibilidade só-por-dono', ()
     expect(res.status).toBe(403);
   });
 
-  it('visibilidade próprio-ou-liberado: pasta com arquivos de dois donos lista só os do solicitante', async () => {
+  // Até o change `posse-pelo-dono-da-pasta`, o arquivo depositado por A2 ficava
+  // com A2 como dono e A não o via. Agora o item nasce com o dono da pasta
+  // (design.md D1), e quem enviou continua o vendo pela concessão automática
+  // por autoria (D4) — os dois enxergam os dois arquivos.
+  it('visibilidade próprio-ou-liberado: depósito na pasta de outra pessoa é do dono e visível ao autor', async () => {
     const app = createApp(ports);
     const cookieA = await sessionCookieFor(ports, ids.userA);
     const cookieA2 = await sessionCookieFor(ports, userA2Id);
@@ -194,7 +198,13 @@ describe('Navegação: pastas aninhadas, trilha e visibilidade só-por-dono', ()
     expect(contents.status).toBe(200);
     const fileNames = contents.body.files.map((f: { fileName: string }) => f.fileName);
     expect(fileNames).toContain('meu.txt');
-    expect(fileNames).not.toContain('dele.txt');
+    expect(fileNames).toContain('dele.txt');
+
+    const contentsA2 = await request(app)
+      .get(`/folders/${sharedFolderId}/contents`)
+      .set('Cookie', cookieA2);
+    // A2 só tem `upload` sobre a pasta, não `view`: não lista a pasta.
+    expect(contentsA2.status).toBe(403);
   });
 
   // Veredito de `upload` resolvido pelo servidor (change

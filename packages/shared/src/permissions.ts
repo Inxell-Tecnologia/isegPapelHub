@@ -54,7 +54,21 @@ export interface GrantResponse {
   expiresAt: string | null;
   /** Vigente vs. expirada, resolvido pelo servidor contra `now()` do banco (design.md D2). */
   expired: boolean;
+  /**
+   * `manual` = concedida pela administração; `autoria` = concedida
+   * automaticamente a quem criou o item numa pasta de outra pessoa (change
+   * `posse-pelo-dono-da-pasta`, design.md D4). Opcional no contrato: API
+   * anterior não envia — ausência é `manual`.
+   */
+  origin?: GrantOrigin;
 }
+
+export const GrantOrigin = {
+  MANUAL: 'manual',
+  AUTHORSHIP: 'autoria',
+} as const;
+
+export type GrantOrigin = (typeof GrantOrigin)[keyof typeof GrantOrigin];
 
 export interface GrantListResponse {
   grants: GrantResponse[];

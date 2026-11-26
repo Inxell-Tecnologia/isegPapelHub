@@ -12,6 +12,7 @@ import type {
   DocumentControlInput,
   StorageQuotaResponse,
 } from '@gdoc/shared';
+import { OWNER_QUOTA_EXCEEDED } from '@gdoc/shared';
 import { ApiError } from '../lib/api-client';
 import { useNarrowMode } from '../app/responsive';
 import {
@@ -45,6 +46,14 @@ import {
 } from './slicing';
 
 const QUOTA_ERROR = 'quota exceeded';
+/**
+ * Espaço do **dono** da pasta de destino, quando ele não é quem envia (change
+ * `posse-pelo-dono-da-pasta`, design.md D5/D6): sem valores da cota alheia,
+ * e sem a pausa de D7 — consultar o próprio espaço não explicaria a recusa.
+ */
+const OWNER_QUOTA_ERROR = OWNER_QUOTA_EXCEEDED;
+const OWNER_QUOTA_MESSAGE =
+  'O espaço do responsável por esta pasta não comporta estes arquivos. Procure o responsável pela pasta ou a administração.';
 const BATCH_LIMIT_ERROR = 'upload_batch_limit_exceeded';
 /** Recusa **por item** do lote: código em conflito com o acervo ou com o próprio lote. */
 const CODE_CONFLICT_ERROR = 'document_code_conflict';
@@ -155,7 +164,12 @@ type Fase =
       tipo: 'veredito';
       cabe: boolean;
       selecao: SelectedFile[];
-      espaco: StorageQuotaResponse;
+      /**
+       * Espaço próprio consultado; `null` quando o destino é de outra pessoa —
+       * o envio consome o espaço do dono, que não é consultável (D6), e o
+       * servidor decide.
+       */
+      espaco: StorageQuotaResponse | null;
       /** Subconjunto enviável quando não cabe (D4); igual à seleção quando cabe. */
       cabem: SelectedFile[];
       deFora: SelectedFile[];
@@ -190,6 +204,11 @@ const PROGRESSO_ZERADO: Progresso = {
 interface UploadAreaProps {
   /** Pasta corrente do explorador; `null` = raiz da unidade (design.md D9). */
   destinationFolderId: string | null;
+  /**
+   * Se quem envia é o dono do destino (`ownedByRequester` da resposta de
+   * conteúdo; posse-pelo-dono-da-pasta, D6). Ausente = `true`.
+   */
+  destinationOwnedByRequester?: boolean;
 }
 
 /**
@@ -232,6 +251,7 @@ function displayName(item: Pick<FailedItem, 'fileName' | 'relativePath'>): strin
 
 function describeError(error: string | undefined): string {
   if (error === QUOTA_ERROR) return 'Cota de armazenamento atingida.';
+  if (error === OWNER_QUOTA_ERROR) return 'Sem espaço do responsável pela pasta.';
   if (error === 'invalid item') return 'Arquivo inválido.';
   // Recusa por item do lote (design.md D7): o código conflita com o acervo da
   // unidade ou com outro arquivo do mesmo envio. Repetir sem mudar o código
@@ -304,7 +324,10 @@ function estimarRestante(progresso: Progresso): string | null {
  * envio começa — fatiado (D5), com progresso macro em bytes (D6) e pausa
  * legível se o espaço acabar no meio (D7).
  */
-export function UploadArea({ destinationFolderId }: UploadAreaProps) {
+export function UploadArea({
+  destinationFolderId,
+  destinationOwnedByRequester = true,
+}: UploadAreaProps) {
   const { message, notification } = App.useApp();
   const isNarrow = useNarrowMode();
   const requestUploadUrls = useRequestUploadUrls();
@@ -509,6 +532,19 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
       return;
     }
 
+    // Destino de outra pessoa (posse-pelo-dono-da-pasta, D6): o envio consome
+    // o espaço do **dono**, que não é consultável — comparar com o espaço
+    // próprio recusaria o que cabe e aceitaria o que não cabe. Vai direto à
+    // confirmação; o servidor decide por item.
+    if (!destinationOwnedByRequester) {
+      if (!ehPublicacaoDeUmDocumento(selecao)) {
+        abrirCadastro(selecao);
+        return;
+      }
+      setFase({ tipo: 'veredito', cabe: true, selecao, espaco: null, cabem: selecao, deFora: [] });
+      return;
+    }
+
     let espaco: StorageQuotaResponse;
     try {
       espaco = await fetchStorageQuota();
@@ -578,6 +614,7 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
 
     const transfers: QueuedTransfer[] = [];
     let recusadosPorCota = 0;
+    let recusadosPorCotaDoDono = 0;
     fatia.forEach((item, index) => {
       const { file, relativePath, controle } = item;
       const fileName = item.fileName ?? file.name;
@@ -597,6 +634,7 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
       }
       const error = result?.error ?? 'invalid item';
       if (error === QUOTA_ERROR) recusadosPorCota += 1;
+      if (error === OWNER_QUOTA_ERROR) recusadosPorCotaDoDono += 1;
       registrarFalha({
         uid,
         file,
@@ -609,6 +647,10 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
         controle,
       });
     });
+
+    // Espaço do dono: aviso sem números, e os recusados ficam na lista de
+    // falhas identificando o que ficou de fora (spec `web-upload`).
+    if (recusadosPorCotaDoDono > 0) message.error(OWNER_QUOTA_MESSAGE);
 
     return { transfers, recusadosPorCota };
   }
@@ -1071,14 +1113,14 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
         />
       )}
 
-      {fase.tipo === 'veredito' && !fase.cabe && (
+      {fase.tipo === 'veredito' && !fase.cabe && fase.espaco && (
         <>
           {painelDeEspaco(
-            fase.espaco,
+            fase.espaco!,
             'A seleção não cabe no seu espaço disponível',
             `Seleção de ${fase.selecao.length} arquivo(s), ${formatarBytes(
               somarBytes(fase.selecao),
-            )} — faltam ${formatarBytes(somarBytes(fase.selecao) - fase.espaco.availableBytes)}.`,
+            )} — faltam ${formatarBytes(somarBytes(fase.selecao) - fase.espaco!.availableBytes)}.`,
           )}
           <Space style={{ marginTop: 8 }} wrap>
             {fase.cabem.length > 0 && (
@@ -1109,7 +1151,7 @@ export function UploadArea({ destinationFolderId }: UploadAreaProps) {
       {fase.tipo === 'pausado' && (
         <>
           {painelDeEspaco(
-            fase.espaco,
+            fase.espaco!,
             'Envio incompleto: o espaço acabou durante a transferência',
             `${fase.naoEnviados} arquivo(s) não foram enviados. Os que já subiram permanecem enviados.`,
           )}
